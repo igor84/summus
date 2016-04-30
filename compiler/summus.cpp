@@ -27,8 +27,9 @@ using namespace llvm;
 typedef struct {
 	char curChar;
 } TLexer;
+typedef TLexer* PLexer;
 
-void nextChar(TLexer *lexer) {
+void nextChar(PLexer lexer) {
 	lexer->curChar = getchar();
 }
 
@@ -46,7 +47,7 @@ void expected(char *expected) {
 	exit(EXIT_FAILURE);
 }
 
-void match(TLexer *lexer, char c) {
+void match(PLexer lexer, char c) {
 	if (lexer->curChar == c) nextChar(lexer);
 	else {
 		char quoted[4] = { '\'', c, '\'', 0 };
@@ -54,38 +55,50 @@ void match(TLexer *lexer, char c) {
 	}
 }
 
-bool isAlpha(TLexer *lexer) {
+bool isAlpha(PLexer lexer) {
 	char c = lexer->curChar;
 	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
 }
 
-bool isDigit(TLexer *lexer) {
+bool isDigit(PLexer lexer) {
 	char c = lexer->curChar;
 	return (c >= '0' && c <= '9');
 }
 
-char getName(TLexer *lexer) {
+char getName(PLexer lexer) {
 	if (!isAlpha(lexer)) expected("Name");
 	char c = lexer->curChar;
 	nextChar(lexer);
 	return c;
 }
 
-char getNum(TLexer *lexer) {
+char getNum(PLexer lexer) {
 	if (!isDigit(lexer)) expected("Integer");
 	char c = lexer->curChar;
 	nextChar(lexer);
 	return c;
 }
 
-Value* parseExpression(TLexer* lexer, BasicBlock* bb);
+//TODO(igors): Add getIdent function from page 19 of the tutorial that handles function calls
 
-Value* parseFactor(TLexer* lexer, BasicBlock* bb) {
+Value* parseExpression(PLexer lexer, BasicBlock* bb);
+
+Value* parseFactor(PLexer lexer, BasicBlock* bb) {
 	Value* res = NULL;
 	if (lexer->curChar == '(') {
 		nextChar(lexer);
 		res = parseExpression(lexer, bb);
 		match(lexer, ')');
+	} else if (isAlpha(lexer)) {
+		char nameArr[2] = {getName(lexer), 0};
+		char* name = &nameArr[0];
+		GlobalVariable* gvar = bb->getModule()->getGlobalVariable(name);
+		if (gvar == NULL) {
+			char errMsg[] = "Use of undefined variable 'n'";
+			errMsg[27] = nameArr[0];
+			abort(&errMsg[0]);
+		}
+		res = new LoadInst(gvar, "", bb);
 	} else {
 		char num = getNum(lexer);
 		res = ConstantInt::get(bb->getContext(), APInt(32, StringRef(&num, 1), 10));
@@ -93,7 +106,7 @@ Value* parseFactor(TLexer* lexer, BasicBlock* bb) {
 	return res;
 }
 
-Value* parseTerm(TLexer* lexer, BasicBlock* bb) {
+Value* parseTerm(PLexer lexer, BasicBlock* bb) {
 	Value* term1 = parseFactor(lexer, bb);
 	while (lexer->curChar == '*' || lexer->curChar == '/') {
 		Instruction::BinaryOps op = Instruction::Mul;
@@ -107,7 +120,7 @@ Value* parseTerm(TLexer* lexer, BasicBlock* bb) {
 	return term1;
 }
 
-Value* parseExpression(TLexer* lexer, BasicBlock* bb) {
+Value* parseExpression(PLexer lexer, BasicBlock* bb) {
 	Value* term1 = NULL;
 	if (lexer->curChar == '-') {
 		term1 = ConstantInt::get(bb->getContext(), APInt(32, 0));
@@ -128,6 +141,20 @@ Value* parseExpression(TLexer* lexer, BasicBlock* bb) {
 		term1 = BinaryOperator::Create(op, term1, term2, "", bb);
 	};
 	return term1;
+}
+
+GlobalVariable* parseAssignment(PLexer lexer, BasicBlock* bb) {
+	char namearr[2] = {getName(lexer), 0};
+	char* name = &namearr[0];
+	match(lexer, '=');
+	Value* val = parseExpression(lexer, bb);
+	GlobalVariable* gvar = bb->getModule()->getGlobalVariable(name);
+	if (gvar == NULL) {
+		gvar = new GlobalVariable(*bb->getModule(), val->getType(),
+			false, GlobalValue::ExternalLinkage, ConstantInt::get(bb->getContext(), APInt(32, 0)), name);
+	}
+	new StoreInst(val, gvar, bb);
+	return gvar;
 }
 
 Module* makeLLVMModule() {
@@ -153,7 +180,7 @@ Function* makeLLVMEntryFunc(Module *mod) {
 
 int main() {
 	TLexer lexer = {};
-	TLexer *plex = &lexer;
+	PLexer plex = &lexer;
 	nextChar(plex);
 
 	Module* mod = new Module("main.ll", getGlobalContext());
@@ -161,10 +188,10 @@ int main() {
 
 	BasicBlock* bb = BasicBlock::Create(mod->getContext(), "", func, 0);
 
-	Value* val = parseExpression(plex, bb);
+	GlobalVariable* val = parseAssignment(plex, bb);
 	if (lexer.curChar != '\n') expected("New Line");
 
-	ReturnInst::Create(bb->getContext(), val, bb);
+	ReturnInst::Create(bb->getContext(), new LoadInst(val, "", bb), bb);
 	
 	verifyModule(*mod, &errs());
 	PassManager<Module> PM;
