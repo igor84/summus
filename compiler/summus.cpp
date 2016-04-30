@@ -78,28 +78,34 @@ char getNum(TLexer *lexer) {
 	return c;
 }
 
-ConstantInt* parseTerm(TLexer* lexer, LLVMContext &llvmctx) {
+Value* parseTerm(TLexer* lexer, BasicBlock* bb) {
 	char num = getNum(lexer);
-	return ConstantInt::get(llvmctx, APInt(32, StringRef(&num, 1), 10));
+	Value* term1 = ConstantInt::get(bb->getContext(), APInt(32, StringRef(&num, 1), 10));
+	while (lexer->curChar == '*' || lexer->curChar == '/') {
+		Instruction::BinaryOps op = Instruction::Mul;
+		if (lexer->curChar == '/') {
+			op = Instruction::UDiv;
+		}
+		nextChar(lexer);
+		num = getNum(lexer);
+		Value* term2 = ConstantInt::get(bb->getContext(), APInt(32, StringRef(&num, 1), 10));
+		term1 = BinaryOperator::Create(op, term1, term2, "", bb);
+	};
+	return term1;
 }
 
 void parseExpression(TLexer* lexer, BasicBlock* bb) {
-	ConstantInt* term1 = parseTerm(lexer, bb->getContext());
-	Instruction::BinaryOps op = Instruction::Add;
-	switch (lexer->curChar)
-	{
-	case '+':;
-		break;
-	case '-':
-		op = Instruction::Sub;
-		break;
-	default:
-		expected("AddOp");
-	}
-	nextChar(lexer);
-	ConstantInt* term2 = parseTerm(lexer, bb->getContext());
-	BinaryOperator* addOp = BinaryOperator::Create(op, term1, term2, "", bb);
-	ReturnInst::Create(bb->getContext(), addOp, bb);
+	Value* term1 = parseTerm(lexer, bb);
+	while (lexer->curChar == '-' || lexer->curChar == '+') {
+		Instruction::BinaryOps op = Instruction::Add;
+		if (lexer->curChar == '-') {
+			op = Instruction::Sub;
+		}
+		nextChar(lexer);
+		Value* term2 = parseTerm(lexer, bb);
+		term1 = BinaryOperator::Create(op, term1, term2, "", bb);
+	};
+	ReturnInst::Create(bb->getContext(), term1, bb);
 }
 
 Module* makeLLVMModule() {
