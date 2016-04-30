@@ -78,24 +78,46 @@ char getNum(TLexer *lexer) {
 	return c;
 }
 
+Value* parseExpression(TLexer* lexer, BasicBlock* bb);
+
+Value* parseFactor(TLexer* lexer, BasicBlock* bb) {
+	Value* res = NULL;
+	if (lexer->curChar == '(') {
+		nextChar(lexer);
+		res = parseExpression(lexer, bb);
+		match(lexer, ')');
+	} else {
+		char num = getNum(lexer);
+		res = ConstantInt::get(bb->getContext(), APInt(32, StringRef(&num, 1), 10));
+	}
+	return res;
+}
+
 Value* parseTerm(TLexer* lexer, BasicBlock* bb) {
-	char num = getNum(lexer);
-	Value* term1 = ConstantInt::get(bb->getContext(), APInt(32, StringRef(&num, 1), 10));
+	Value* term1 = parseFactor(lexer, bb);
 	while (lexer->curChar == '*' || lexer->curChar == '/') {
 		Instruction::BinaryOps op = Instruction::Mul;
 		if (lexer->curChar == '/') {
 			op = Instruction::UDiv;
 		}
 		nextChar(lexer);
-		num = getNum(lexer);
-		Value* term2 = ConstantInt::get(bb->getContext(), APInt(32, StringRef(&num, 1), 10));
+		Value* term2 = parseFactor(lexer, bb);
 		term1 = BinaryOperator::Create(op, term1, term2, "", bb);
 	};
 	return term1;
 }
 
-void parseExpression(TLexer* lexer, BasicBlock* bb) {
-	Value* term1 = parseTerm(lexer, bb);
+Value* parseExpression(TLexer* lexer, BasicBlock* bb) {
+	Value* term1 = NULL;
+	if (lexer->curChar == '-') {
+		term1 = ConstantInt::get(bb->getContext(), APInt(32, 0));
+	}
+	else {
+		if (lexer->curChar == '+') {
+			nextChar(lexer);
+		}
+		term1 = parseTerm(lexer, bb);
+	}
 	while (lexer->curChar == '-' || lexer->curChar == '+') {
 		Instruction::BinaryOps op = Instruction::Add;
 		if (lexer->curChar == '-') {
@@ -105,7 +127,7 @@ void parseExpression(TLexer* lexer, BasicBlock* bb) {
 		Value* term2 = parseTerm(lexer, bb);
 		term1 = BinaryOperator::Create(op, term1, term2, "", bb);
 	};
-	ReturnInst::Create(bb->getContext(), term1, bb);
+	return term1;
 }
 
 Module* makeLLVMModule() {
@@ -139,7 +161,10 @@ int main() {
 
 	BasicBlock* bb = BasicBlock::Create(mod->getContext(), "", func, 0);
 
-	parseExpression(plex, bb);
+	Value* val = parseExpression(plex, bb);
+	if (lexer.curChar != '\n') expected("New Line");
+
+	ReturnInst::Create(bb->getContext(), val, bb);
 	
 	verifyModule(*mod, &errs());
 	PassManager<Module> PM;
