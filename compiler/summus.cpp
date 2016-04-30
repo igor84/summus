@@ -47,9 +47,15 @@ void expected(char *expected) {
 	exit(EXIT_FAILURE);
 }
 
+void skipWhitespace(PLexer lexer) {
+	while (lexer->curChar == ' ' || lexer->curChar == '\t') nextChar(lexer);
+}
+
 void match(PLexer lexer, char c) {
-	if (lexer->curChar == c) nextChar(lexer);
-	else {
+	if (lexer->curChar == c) {
+		nextChar(lexer);
+		skipWhitespace(lexer);
+	} else {
 		char quoted[4] = { '\'', c, '\'', 0 };
 		expected(&quoted[0]);
 	}
@@ -69,6 +75,7 @@ char getName(PLexer lexer) {
 	if (!isAlpha(lexer)) expected("Name");
 	char c = lexer->curChar;
 	nextChar(lexer);
+	skipWhitespace(lexer);
 	return c;
 }
 
@@ -76,6 +83,7 @@ char getNum(PLexer lexer) {
 	if (!isDigit(lexer)) expected("Integer");
 	char c = lexer->curChar;
 	nextChar(lexer);
+	skipWhitespace(lexer);
 	return c;
 }
 
@@ -114,6 +122,7 @@ Value* parseTerm(PLexer lexer, BasicBlock* bb) {
 			op = Instruction::UDiv;
 		}
 		nextChar(lexer);
+		skipWhitespace(lexer);
 		Value* term2 = parseFactor(lexer, bb);
 		term1 = BinaryOperator::Create(op, term1, term2, "", bb);
 	};
@@ -137,6 +146,7 @@ Value* parseExpression(PLexer lexer, BasicBlock* bb) {
 			op = Instruction::Sub;
 		}
 		nextChar(lexer);
+		skipWhitespace(lexer);
 		Value* term2 = parseTerm(lexer, bb);
 		term1 = BinaryOperator::Create(op, term1, term2, "", bb);
 	};
@@ -177,25 +187,29 @@ Function* makeLLVMEntryFunc(Module *mod) {
 }
 
 
-
+/*
+You can now get compiled executable from this compiler with command:
+compilers/x64/Debug/summus.exe | clang -x ir -o main.exe -
+*/
 int main() {
-	TLexer lexer = {};
-	PLexer plex = &lexer;
-	nextChar(plex);
+	TLexer lexerVar = {};
+	PLexer lexer = &lexerVar;
+	nextChar(lexer);
+	skipWhitespace(lexer);
 
 	Module* mod = new Module("main.ll", getGlobalContext());
 	Function* func = makeLLVMEntryFunc(mod);
 
 	BasicBlock* bb = BasicBlock::Create(mod->getContext(), "", func, 0);
 
-	GlobalVariable* val = parseAssignment(plex, bb);
-	if (lexer.curChar != '\n') expected("New Line");
+	GlobalVariable* val = parseAssignment(lexer, bb);
+	if (lexer->curChar != '\n') expected("New Line");
 
 	ReturnInst::Create(bb->getContext(), new LoadInst(val, "", bb), bb);
 	
 	verifyModule(*mod, &errs());
 	PassManager<Module> PM;
-	PrintModulePass modPass;
+	PrintModulePass modPass(outs());
 	PM.addPass(modPass);
 	PM.run(*mod);
 
