@@ -18,12 +18,12 @@
     <ClCompile Include="compiler\smmtest.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="compiler\summus.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="compiler\smmlexer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="compiler\smmparser.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

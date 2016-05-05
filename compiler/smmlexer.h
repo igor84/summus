@@ -199,7 +199,7 @@ static void smmInitSymTableWithKeywords(PSmmPrivLexer lex) {
 	}
 }
 
-static PSmmSymbol smmParseIdent(PSmmPrivLexer privLex) {
+static bool smmParseIdent(PSmmPrivLexer privLex, PSmmToken token) {
 	char tmpString[1024];
 	uint32_t hash = 0;
 	char* cc = privLex->lex.curChar;
@@ -216,7 +216,14 @@ static PSmmSymbol smmParseIdent(PSmmPrivLexer privLex) {
 	privLex->lex.filePos.lineOffset += i;
 	privLex->lex.scanCount += i;
 
-	return smmGetSymbol(privLex, tmpString, hash);
+	PSmmSymbol symbol = smmGetSymbol(privLex, tmpString, hash);
+
+	token->tokenType = symbol->symbolType;
+	token->repr = symbol->name;
+	if (symbol->symbolType == smmIdent) {
+		token->intVal = hash;
+	}
+	return true;
 }
 
 static bool smmParseHexNumber(PSmmLexer lex, PSmmToken token) {
@@ -320,7 +327,7 @@ PSmmToken smmGetNextToken(PSmmLexer lex) {
 	case 0:
 		token->tokenType = smmEof;
 		return token;
-	case '+': case '-': case '*': case '/': case '=': case ';':
+	case '+': case '-': case '*': case '/': case '=': case ';': case '(': case ')':
 		token->tokenType = (SmmTokenType)*cc;
 		smmNextChar(lex);
 		break;
@@ -339,9 +346,7 @@ PSmmToken smmGetNextToken(PSmmLexer lex) {
 		break;
 	default:
 		if (isalpha(*cc)) {
-			PSmmSymbol symbol = smmParseIdent(privLex);
-			token->tokenType = symbol->symbolType;
-			token->repr = symbol->name;
+			smmParseIdent(privLex, token);
 		} else {
 			smmReportError(lex, "Invalid character");
 			smmSkipStatement(lex);
