@@ -91,6 +91,7 @@
       <BufferSecurityCheck>true</BufferSecurityCheck>
       <MinimalRebuild>false</MinimalRebuild>
       <CallingConvention>FastCall</CallingConvention>
+      <CompileAs>CompileAsC</CompileAs>
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>C:\Program Files\LLVM\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
@@ -124,11 +125,16 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="compiler\smmtest.cpp" />
+    <ClCompile Include="compiler\smmlexer.c" />
+    <ClCompile Include="compiler\smmmsgs.c" />
+    <ClCompile Include="compiler\smmtest.c" />
+    <ClCompile Include="compiler\smmutil.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="compiler\smmlexer.h" />
+    <ClInclude Include="compiler\smmmsgs.h" />
     <ClInclude Include="compiler\smmparser.h" />
+    <ClInclude Include="compiler\smmutil.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

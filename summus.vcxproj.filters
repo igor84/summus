@@ -15,7 +15,16 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="compiler\smmtest.cpp">
+    <ClCompile Include="compiler\smmlexer.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="compiler\smmtest.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="compiler\smmutil.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="compiler\smmmsgs.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -24,6 +33,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="compiler\smmparser.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="compiler\smmutil.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="compiler\smmmsgs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
