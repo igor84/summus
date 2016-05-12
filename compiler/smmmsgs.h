@@ -7,7 +7,7 @@
 #include <stdint.h>
 
 typedef enum {
-	errSmmUnknown,
+	errSmmUnknown, errSmmMemoryAllocationFailed,
 	errSmmInvalidHexDigit, errSmmIntTooBig, errSmmInvalidFloatExponent, errSmmInvalidNumber,
 	errSmmInvalidCharacter
 } SmmMsgType;
@@ -19,6 +19,7 @@ struct SmmFilePos {
 typedef struct SmmFilePos* PSmmFilePos;
 
 void smmPostMessage(SmmMsgType msg, const char* fileName, const struct SmmFilePos filePos);
+void smmAbortWithMessage(SmmMsgType msg, const char* additionalInfo, const char* fileName, const int line);
 
 bool smmHadErrors();
 

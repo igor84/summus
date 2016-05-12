@@ -6,7 +6,7 @@
 int main(void) {
 	//TODO literal types
 	//char buf[] = "1231231239999999999999999999999999.456456e10";
-	PSmmAllocator allocator = smmGetGlobalAllocator("test.smm", 64 * 1024 * 1024);
+	PSmmAllocator allocator = smmCreatePermanentAllocator("test.smm", 64 * 1024 * 1024);
 	PSmmLexer lex = smmInitLexer(NULL, "test.smm", allocator);
 	PSmmToken t = smmGetNextToken(lex);
 	while (t->type != smmEof) {

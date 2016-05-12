@@ -12,6 +12,7 @@
 
 typedef struct SmmAllocator* PSmmAllocator;
 struct SmmAllocator {
+	char* name;
 	void* (*alloc)(PSmmAllocator allocator, size_t size); // Get zeroed memory if available
 	void* (*malloc)(PSmmAllocator allocator, size_t size); // Just get the memory
 	void* (*calloc)(PSmmAllocator allocator, size_t count, size_t size); // Get and zero memory
@@ -21,7 +22,7 @@ struct SmmAllocator {
 void* smmStdLibAlloc(PSmmAllocator allocator, size_t size);
 void* smmStdLibCAlloc(PSmmAllocator allocator, size_t count, size_t size);
 void smmStdLibFree(PSmmAllocator allocator, void* ptr);
-struct SmmAllocator SMM_DEFAULT_ALLOCATOR;
+struct SmmAllocator SMM_STDLIB_ALLOCATOR;
 
 #define SMM_DICTINARY_ARRAY_SIZE 8192
 
@@ -49,8 +50,8 @@ PSmmDictEntry smmGetDictEntry(PSmmDict dict, char* key, uint32_t hash, bool crea
 void* smmGetDictValue(PSmmDict dict, char* key, uint32_t hash, bool createIfMissing);
 void smmAddDictValue(PSmmDict dict, char* key, uint32_t hash, void* value);
 void smmFreeDictValue(PSmmDict dict, char* key, uint32_t hash);
-PSmmAllocator smmGetGlobalAllocator(char* name, size_t size);
-void smmFreeGlobalAllocator(PSmmAllocator a);
+PSmmAllocator smmCreatePermanentAllocator(char* name, size_t size);
+void smmFreePermanentAllocator(PSmmAllocator a);
 void smmPrintAllocatorInfo(const PSmmAllocator allocator);
 
 #endif

@@ -6,6 +6,7 @@
 #include <stdio.h>
 
 #include "smmutil.h"
+#include "smmmsgs.h"
 
 // Disable warning that we are using variable length arrays in structs
 #pragma warning(disable : 4200)
@@ -15,7 +16,6 @@ struct SmmPrivAllocator {
 	size_t used;
 	size_t size;
 	size_t free;
-	char* name;
 	unsigned char memory[0];
 };
 typedef struct SmmPrivAllocator* PSmmPrivAllocator;
@@ -24,35 +24,34 @@ struct SmmPrivDict {
 	struct SmmDict dict;
 	PSmmAllocator allocator;
 	size_t size;
-	PSmmDictEntry entries[];
+	PSmmDictEntry entries[0];
 };
 typedef struct SmmPrivDict* PSmmPrivDict;
 
-void* smmCreateAllocator(char* key, PSmmAllocator a, void* context);
-
-#define SMM_ALLOCATOR_DICT_SIZE 8 * 1024
-
-static struct {
-	struct SmmDict dict;
-	PSmmAllocator allocator;
-	size_t size;
-	PSmmDictEntry entries[SMM_ALLOCATOR_DICT_SIZE];
-} SmmAllocatorDict = { { NULL, smmCreateAllocator }, &SMM_DEFAULT_ALLOCATOR, SMM_ALLOCATOR_DICT_SIZE };
-
-struct SmmAllocator SMM_DEFAULT_ALLOCATOR = { smmStdLibAlloc, smmStdLibAlloc, smmStdLibCAlloc, smmStdLibFree };
+struct SmmAllocator SMM_STDLIB_ALLOCATOR = { "STDLIB", smmStdLibAlloc, smmStdLibAlloc, smmStdLibCAlloc, smmStdLibFree };
 
 /********************************************************
 Private Functions
 *********************************************************/
 
+void smmAbortWithAllocError(PSmmAllocator allocator, size_t size, int line) {
+	char ainfo[64] = {0};
+	sprintf(ainfo, "; Allocator: %s, Requested size: %lld", allocator->name, size);
+	smmAbortWithMessage(errSmmMemoryAllocationFailed, ainfo, __FILE__, line);
+}
+
 void* smmStdLibAlloc(PSmmAllocator allocator, size_t size) {
 	void* result = malloc(size);
-	assert(result != NULL);
+	if (result == NULL) {
+		smmAbortWithAllocError(allocator, size, __LINE__ - 2);
+	}
 	return result;
 }
 void* smmStdLibCAlloc(PSmmAllocator allocator, size_t count, size_t size) {
 	void* result = calloc(count, size);
-	assert(result != NULL);
+	if (result == NULL) {
+		smmAbortWithAllocError(allocator, size, __LINE__ - 2);
+	}
 	return result;
 }
 
@@ -62,11 +61,13 @@ void smmStdLibFree(PSmmAllocator allocator, void* ptr) {
 
 void* smmGlobalAlloc(PSmmAllocator allocator, size_t size) {
 	PSmmPrivAllocator privAllocator = (PSmmPrivAllocator) allocator;
-	assert(size < privAllocator->free);
+	if (size > privAllocator->free) {
+		smmAbortWithAllocError(allocator, size, __LINE__ - 2);
+	}
 	size_t pos = privAllocator->size - privAllocator->free;
 	void* location = &privAllocator->memory[pos];
 	privAllocator->used += size;
-	size = (size + 15) & (~0xf); //We align memory on 16 bytes
+	size = (size + 0xf) & (~0xf); //We align memory on 16 bytes
 	privAllocator->free -= size;
 	return location;
 }
@@ -77,20 +78,6 @@ void* smmGlobalCAlloc(PSmmAllocator allocator, size_t count, size_t size) {
 
 void smmGlobalFree(PSmmAllocator allocator, void* ptr) {
 	// Does nothing
-}
-
-void* smmCreateAllocator(char* key, PSmmAllocator a, void* context) {
-	size_t* size = (size_t *)context;
-	PSmmPrivAllocator smmAllocator = (PSmmPrivAllocator)calloc(1, *size);
-	assert(sizeof(struct SmmPrivAllocator) & 0xf == 0); // So we maintain 16 byte alignment
-	smmAllocator->allocator.alloc = smmGlobalAlloc;
-	smmAllocator->allocator.malloc = smmGlobalAlloc;
-	smmAllocator->allocator.calloc = smmGlobalCAlloc;
-	smmAllocator->allocator.free = smmGlobalFree;
-	smmAllocator->name = key;
-	smmAllocator->size = *size - sizeof(struct SmmPrivAllocator);
-	smmAllocator->free = smmAllocator->size;
-	return smmAllocator;
 }
 
 /********************************************************
@@ -180,6 +167,7 @@ void smmAddDictValue(PSmmDict dict, char* key, uint32_t hash, void* value) {
 
 void smmFreeDictValue(PSmmDict dict, char* key, uint32_t hash) {
 	PSmmDictEntry entry = smmGetDictEntry(dict, key, hash, false);
+	if (entry == NULL) return;
 	PSmmPrivDict privDict = (PSmmPrivDict)dict;
 	hash = hash & (privDict->size - 1);
 	privDict->entries[hash] = entry->next;
@@ -189,19 +177,37 @@ void smmFreeDictValue(PSmmDict dict, char* key, uint32_t hash) {
 	a->free(a, entry);
 }
 
-PSmmAllocator smmGetGlobalAllocator(char* name, size_t size) {
+PSmmAllocator smmCreatePermanentAllocator(char* name, size_t size) {
+	assert(sizeof(struct SmmPrivAllocator) & 0xf == 0); // So we maintain 16 byte alignment
 	size = (size + 0xfff) & (~0xfff); // We take memory in chunks of 4KB
-	SmmAllocatorDict.dict.elemCreateFuncContext = &size;
-	return (PSmmAllocator)smmGetDictValue(&SmmAllocatorDict.dict, name, smmHashString(name), true);
+	PSmmPrivAllocator smmAllocator = (PSmmPrivAllocator)calloc(1, size);
+	if (smmAllocator == NULL) {
+		char ainfo[100] = { 0 };
+		sprintf(ainfo, "; Creating allocator %s with size %lld", name, size);
+		smmAbortWithMessage(errSmmMemoryAllocationFailed, ainfo, __FILE__, __LINE__ - 4);
+	}
+	size_t skipBytes = sizeof(struct SmmPrivAllocator);
+	skipBytes = ((skipBytes + 0xf) & (~0xf)) - skipBytes;
+	smmAllocator->allocator.name = (char*)&smmAllocator->memory[skipBytes];
+	strcpy(smmAllocator->allocator.name, name);
+	smmAllocator->allocator.alloc = smmGlobalAlloc;
+	smmAllocator->allocator.malloc = smmGlobalAlloc;
+	smmAllocator->allocator.calloc = smmGlobalCAlloc;
+	smmAllocator->allocator.free = smmGlobalFree;
+	smmAllocator->size = size;
+	skipBytes += (strlen(name) + 1 + 0xf) & (~0xf);
+	smmAllocator->free = smmAllocator->size - skipBytes;
+	//We make sure we did setup everything so next mem alloc starts from 16 bytes aligned address
+	assert(((int)&smmAllocator->memory[smmAllocator->size - smmAllocator->free] & 0xf) == 0);
+	return &smmAllocator->allocator;
 }
 
-void smmFreeGlobalAllocator(PSmmAllocator allocator) {
-	PSmmPrivAllocator a = (PSmmPrivAllocator)allocator;
-	smmFreeDictValue(&SmmAllocatorDict.dict, a->name, smmHashString(a->name));
+void smmFreePermanentAllocator(PSmmAllocator allocator) {
+	free(allocator);
 }
 
 void smmPrintAllocatorInfo(const PSmmAllocator allocator) {
 	PSmmPrivAllocator a = (PSmmPrivAllocator)allocator;
 	printf("Allocator %s Size=%lldMB Used=%lldKB Allocated=%lldKB Free=%lldKB\n",
-		a->name, a->size >> 20, a->used >> 10, (a->size - a->free) >> 10, a->free >> 10);
+		allocator->name, a->size >> 20, a->used >> 10, (a->size - a->free) >> 10, a->free >> 10);
 }
