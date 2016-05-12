@@ -19,11 +19,6 @@ struct SmmAllocator {
 	void  (*free)(PSmmAllocator allocator, void* ptr);
 };
 
-void* smmStdLibAlloc(PSmmAllocator allocator, size_t size);
-void* smmStdLibCAlloc(PSmmAllocator allocator, size_t count, size_t size);
-void smmStdLibFree(PSmmAllocator allocator, void* ptr);
-struct SmmAllocator SMM_STDLIB_ALLOCATOR;
-
 #define SMM_DICTINARY_ARRAY_SIZE 8192
 
 typedef struct SmmDictEntry* PSmmDictEntry;

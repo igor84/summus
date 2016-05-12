@@ -28,8 +28,6 @@ struct SmmPrivDict {
 };
 typedef struct SmmPrivDict* PSmmPrivDict;
 
-struct SmmAllocator SMM_STDLIB_ALLOCATOR = { "STDLIB", smmStdLibAlloc, smmStdLibAlloc, smmStdLibCAlloc, smmStdLibFree };
-
 /********************************************************
 Private Functions
 *********************************************************/
@@ -38,25 +36,6 @@ void smmAbortWithAllocError(PSmmAllocator allocator, size_t size, int line) {
 	char ainfo[64] = {0};
 	sprintf(ainfo, "; Allocator: %s, Requested size: %lld", allocator->name, size);
 	smmAbortWithMessage(errSmmMemoryAllocationFailed, ainfo, __FILE__, line);
-}
-
-void* smmStdLibAlloc(PSmmAllocator allocator, size_t size) {
-	void* result = malloc(size);
-	if (result == NULL) {
-		smmAbortWithAllocError(allocator, size, __LINE__ - 2);
-	}
-	return result;
-}
-void* smmStdLibCAlloc(PSmmAllocator allocator, size_t count, size_t size) {
-	void* result = calloc(count, size);
-	if (result == NULL) {
-		smmAbortWithAllocError(allocator, size, __LINE__ - 2);
-	}
-	return result;
-}
-
-void smmStdLibFree(PSmmAllocator allocator, void* ptr) {
-	free(ptr);
 }
 
 void* smmGlobalAlloc(PSmmAllocator allocator, size_t size) {
