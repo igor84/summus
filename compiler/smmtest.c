@@ -2,20 +2,28 @@
 
 #include "smmutil.h"
 #include "smmlexer.h"
+#include "smmparser.h"
 
 int main(void) {
 	//TODO literal types
+	/*
+	
+	TODO:
+		GlobalSettings
+		Should I report "probably missing operator" instead of expected ';' if it is in the same line and continue to parse expression
+	
+	*/
 	//char buf[] = "1231231239999999999999999999999999.456456e10";
+	char buf[64 * 1024] = { 0 };
+	FILE* f = fopen("expressions.smm", "rb");
+	fread(buf, 1, 64 * 1024, f);
+	fclose(f);
 	PSmmAllocator allocator = smmCreatePermanentAllocator("test.smm", 64 * 1024 * 1024);
-	PSmmLexer lex = smmInitLexer(NULL, "test.smm", allocator);
-	PSmmToken t = smmGetNextToken(lex);
-	while (t->type != smmEof) {
-		printf("Got token %d with value %.20e  single: %.20e\n", t->type, t->floatVal, (float)t->floatVal);
-		t = smmGetNextToken(lex);
-	}
+	PSmmLexer lex = smmCreateLexer(buf, "test.smm", allocator);
+	
+	PSmmParser parser = smmCreateParser(lex, allocator);
 
-	printf("0.1 double=%.20e single=%.20e\n", 0.1l, 0.1f);
-	printf("4.2 double=%.20e single=%.20e\n", 4.2l, 4.2f);
+	smmParse(parser);
 	
 	smmPrintAllocatorInfo(allocator);
 

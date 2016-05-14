@@ -8,8 +8,10 @@
 
 typedef enum {
 	errSmmUnknown, errSmmMemoryAllocationFailed,
-	errSmmInvalidHexDigit, errSmmIntTooBig, errSmmInvalidFloatExponent, errSmmInvalidNumber,
-	errSmmInvalidCharacter
+	errSmmInvalidHexDigit, errSmmIntTooBig, errSmmInvalidFloatExponent, errSmmInvalid0Number,
+	errSmmInvalidNumber, errSmmInvalidCharacter,
+
+	errSmmGotUnexpectedToken
 } SmmMsgType;
 
 struct SmmFilePos {
@@ -18,8 +20,8 @@ struct SmmFilePos {
 };
 typedef struct SmmFilePos* PSmmFilePos;
 
-void smmPostMessage(SmmMsgType msg, const char* fileName, const struct SmmFilePos filePos);
-void smmAbortWithMessage(SmmMsgType msg, const char* additionalInfo, const char* fileName, const int line);
+void smmPostMessage(SmmMsgType msgType, const char* fileName, const struct SmmFilePos filePos, ...);
+void smmAbortWithMessage(SmmMsgType msgType, const char* additionalInfo, const char* fileName, const int line);
 
 bool smmHadErrors();
 

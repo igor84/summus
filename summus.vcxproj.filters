@@ -27,6 +27,9 @@
     <ClCompile Include="compiler\smmmsgs.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="compiler\smmparser.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="compiler\smmlexer.h">
@@ -41,5 +44,10 @@
     <ClInclude Include="compiler\smmmsgs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="tests\expressions.smm">
+      <Filter>Resource Files</Filter>
+    </None>
   </ItemGroup>
 </Project>

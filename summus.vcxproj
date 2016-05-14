@@ -127,6 +127,7 @@
   <ItemGroup>
     <ClCompile Include="compiler\smmlexer.c" />
     <ClCompile Include="compiler\smmmsgs.c" />
+    <ClCompile Include="compiler\smmparser.c" />
     <ClCompile Include="compiler\smmtest.c" />
     <ClCompile Include="compiler\smmutil.c" />
   </ItemGroup>
@@ -135,6 +136,9 @@
     <ClInclude Include="compiler\smmmsgs.h" />
     <ClInclude Include="compiler\smmparser.h" />
     <ClInclude Include="compiler\smmutil.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="tests\expressions.smm" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

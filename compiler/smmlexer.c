@@ -15,39 +15,39 @@
 Type Definitions
 *********************************************************/
 
-struct SmmPrivLexer {
+struct PrivLexer {
 	struct SmmLexer lex;
 	SmmLexTypeEnum lexType;
 	PSmmAllocator allocator;
 	void(*skipWhitespace)(const PSmmLexer);
 	PSmmDict symTable;
 };
-typedef struct SmmPrivLexer* PSmmPrivLexer;
+typedef struct PrivLexer* PPrivLexer;
 
 /********************************************************
 Private Functions
 *********************************************************/
 
-static char smmNextChar(const PSmmLexer lex) {
+static char nextChar(const PSmmLexer lex) {
 	lex->filePos.lineOffset++;
 	lex->curChar++;
 	lex->scanCount++;
 	return *lex->curChar;
 }
 
-static void smmSkipWhitespaceFromBuffer(const PSmmLexer lex) {
+static void skipWhitespaceFromBuffer(const PSmmLexer lex) {
 	char cc = *lex->curChar;
 	bool thereMayBeMoreWhites;
 	do {
 		thereMayBeMoreWhites = false;
 		while (cc == '\t' || cc == ' ' || cc == '\v' || cc == '\f') {
-			cc = smmNextChar(lex);
+			cc = nextChar(lex);
 			thereMayBeMoreWhites = true;
 		}
 		if (cc == 0) return;
 		if (cc == '\r' || cc == '\n') {
-			if (cc + lex->curChar[1] == '\r' + '\n') smmNextChar(lex);
-			cc = smmNextChar(lex);
+			if (cc + lex->curChar[1] == '\r' + '\n') nextChar(lex);
+			cc = nextChar(lex);
 			lex->filePos.lineNumber++;
 			lex->filePos.lineOffset = 1;
 			thereMayBeMoreWhites = true;
@@ -55,13 +55,13 @@ static void smmSkipWhitespaceFromBuffer(const PSmmLexer lex) {
 	} while (thereMayBeMoreWhites);
 }
 
-static void smmSkipWhitespaceFromStdIn(const PSmmLexer lex) {
+static void skipWhitespaceFromStdIn(const PSmmLexer lex) {
 	char cc = *lex->curChar;
 	bool thereMayBeMoreWhites;
 	do {
 		thereMayBeMoreWhites = false;
 		while (isspace(cc)) {
-			cc = smmNextChar(lex);
+			cc = nextChar(lex);
 			thereMayBeMoreWhites = true;
 		}
 		if (cc == 0) {
@@ -77,23 +77,23 @@ static void smmSkipWhitespaceFromStdIn(const PSmmLexer lex) {
 	} while (thereMayBeMoreWhites);
 }
 
-static void smmSkipAlNum(PSmmLexer lex) {
+static void skipAlNum(PSmmLexer lex) {
 	char cc;
 	do {
-		cc = smmNextChar(lex);
+		cc = nextChar(lex);
 	} while (isalnum(cc));
 }
 
-static void* smmCreateSymbolElem(char* key, PSmmAllocator a, void* context) {
+static void* createSymbolElem(char* key, PSmmAllocator a, void* context) {
 	PSmmSymbol res = (PSmmSymbol)a->alloc(a, sizeof(struct SmmSymbol));
 	res->name = key;
-	res->type = smmIdent;
+	res->type = ttSmmIdent;
 	return res;
 }
 
-static void smmInitSymTableWithKeywords(PSmmPrivLexer lex) {
+static void initSymTableWithKeywords(PPrivLexer lex) {
 	static char* keywords[] = { "div", "and", "or", "xor" };
-	static SmmTokenType keyTypes[] = { smmIntDiv, smmAndOp, smmOrOp, smmXorOp };
+	static SmmTokenType keyTypes[] = { ttSmmIntDiv, ttSmmAndOp, ttSmmOrOp, ttSmmXorOp };
 	int size = sizeof(keywords) / sizeof(char*);
 	for (int i = 0; i < size; i++) {
 		PSmmSymbol symbol = (PSmmSymbol)smmGetDictValue(lex->symTable, keywords[i], smmHashString(keywords[i]), true);
@@ -101,7 +101,7 @@ static void smmInitSymTableWithKeywords(PSmmPrivLexer lex) {
 	}
 }
 
-static bool smmParseIdent(PSmmPrivLexer privLex, PSmmToken token) {
+static bool parseIdent(PPrivLexer privLex, PSmmToken token) {
 	uint32_t hash = 0;
 	char* cc = privLex->lex.curChar;
 	char* ident = cc;
@@ -123,13 +123,13 @@ static bool smmParseIdent(PSmmPrivLexer privLex, PSmmToken token) {
 
 	token->type = symbol->type;
 	token->repr = symbol->name;
-	if (symbol->type == smmIdent) {
+	if (symbol->type == ttSmmIdent) {
 		token->hash = hash;
 	}
 	return true;
 }
 
-static void smmParseHexNumber(PSmmLexer lex, PSmmToken token) {
+static void parseHexNumber(PSmmLexer lex, PSmmToken token) {
 	int64_t res = 0;
 	int digitsLeft = 64 / 4;
 	char cc = *lex->curChar;
@@ -142,26 +142,26 @@ static void smmParseHexNumber(PSmmLexer lex, PSmmToken token) {
 				res = (res << 4) + cc - 'a' + 10;
 			} else if (cc > 'f' && cc < 'z') {
 				smmPostMessage(errSmmInvalidHexDigit, lex->fileName, lex->filePos);
-				smmSkipAlNum(lex);
+				skipAlNum(lex);
 				break;
 			} else {
 				break;
 			}
 		}
-		cc = smmNextChar(lex);
+		cc = nextChar(lex);
 		digitsLeft--;
 	} while (digitsLeft > 0);
 
 	if (digitsLeft == 0 && isalnum(*lex->curChar)) {
 		smmPostMessage(errSmmIntTooBig, lex->fileName, lex->filePos);
-		smmSkipAlNum(lex);
+		skipAlNum(lex);
 	} else {
-		token->type = smmInteger;
+		token->type = ttSmmInteger;
 		token->intVal = res;
 	}
 }
 
-static void smmParseNumber(PSmmLexer lex, PSmmToken token) {
+static void parseNumber(PSmmLexer lex, PSmmToken token) {
 	uint64_t res = 0;
 	bool parseAsInt = true;
 	enum {smmMainInt, smmFraction, smmExponent} part = smmMainInt;
@@ -180,7 +180,7 @@ static void smmParseNumber(PSmmLexer lex, PSmmToken token) {
 					} else {
 						dres = INFINITY;
 						do {
-							cc = smmNextChar(lex);
+							cc = nextChar(lex);
 						} while (isdigit(cc));
 						break;
 					}
@@ -194,6 +194,12 @@ static void smmParseNumber(PSmmLexer lex, PSmmToken token) {
 				dres = dres * 10 + d;
 			}
 		} else if (cc == '.' && part == smmMainInt) {
+			if (!isdigit(lex->curChar[1])) {
+				smmPostMessage(errSmmInvalidNumber, lex->fileName, lex->filePos);
+				nextChar(lex);
+				skipAlNum(lex);
+				break;
+			}
 			if (parseAsInt) dres = res;
 			res = 0;
 			parseAsInt = false;
@@ -207,18 +213,18 @@ static void smmParseNumber(PSmmLexer lex, PSmmToken token) {
 			res = 0;
 			if (lex->curChar[1] == '-' || lex->curChar[1] == '+') {
 				expSign = '+' - lex->curChar[1] + 1; // 1 or -1
-				smmNextChar(lex);
+				nextChar(lex);
 			}
 			if (!isdigit(lex->curChar[1])) {
 				smmPostMessage(errSmmInvalidFloatExponent, lex->fileName, lex->filePos);
-				smmNextChar(lex);
-				smmSkipAlNum(lex);
+				nextChar(lex);
+				skipAlNum(lex);
 				break;
 			}
 		} else {
 			break;
 		}
-		cc = smmNextChar(lex);
+		cc = nextChar(lex);
 	} while (true);
 
 	if (part != smmMainInt) {
@@ -226,13 +232,13 @@ static void smmParseNumber(PSmmLexer lex, PSmmToken token) {
 		dres *= pow(10, e);
 	}
 	if (parseAsInt) {
-		token->type = smmInteger;
+		token->type = ttSmmInteger;
 		token->intVal = res;
 	} else if (part != smmMainInt) {
-		token->type = smmFloat;
+		token->type = ttSmmFloat;
 		token->floatVal = dres;
 	} else {
-		token->type = smmErr;
+		token->type = ttSmmErr;
 		smmPostMessage(errSmmIntTooBig, lex->fileName, lex->filePos);
 	}
 }
@@ -246,16 +252,16 @@ Returns a new instance of SmmLexer that will scan the given buffer or stdin
 if given buffer is null. When scanning stdin end of file is signaled using
 "Enter - CTRL+Z - Enter" on Windows and CTRL+D on *nix systems
 */
-PSmmLexer smmInitLexer(char* buffer, char* fileName, PSmmAllocator allocator) {
-	PSmmPrivLexer privLex = (PSmmPrivLexer)allocator->alloc(allocator, sizeof(struct SmmPrivLexer));
+PSmmLexer smmCreateLexer(char* buffer, char* fileName, PSmmAllocator allocator) {
+	PPrivLexer privLex = (PPrivLexer)allocator->alloc(allocator, sizeof(struct PrivLexer));
 
 	if (!buffer) {
 		buffer = (char *)allocator->alloc(allocator, SMM_STDIN_BUFFER_LENGTH);
 		fgets(buffer, SMM_STDIN_BUFFER_LENGTH, stdin);
-		privLex->skipWhitespace = smmSkipWhitespaceFromStdIn;
+		privLex->skipWhitespace = skipWhitespaceFromStdIn;
 		privLex->lexType = smmLexTypeStdIn;
 	} else {
-		privLex->skipWhitespace = smmSkipWhitespaceFromBuffer;
+		privLex->skipWhitespace = skipWhitespaceFromBuffer;
 		privLex->lex.fileName = fileName;
 	}
 	privLex->allocator = allocator;
@@ -263,13 +269,13 @@ PSmmLexer smmInitLexer(char* buffer, char* fileName, PSmmAllocator allocator) {
 	privLex->lex.curChar = buffer;
 	privLex->lex.filePos.lineNumber = 1;
 	privLex->lex.filePos.lineOffset = 1;
-	privLex->symTable = smmCreateDict(allocator, SMM_LEXER_DICT_SIZE, privLex, smmCreateSymbolElem);
-	smmInitSymTableWithKeywords(privLex);
+	privLex->symTable = smmCreateDict(allocator, SMM_LEXER_DICT_SIZE, privLex, createSymbolElem);
+	initSymTableWithKeywords(privLex);
 	return &privLex->lex;
 }
 
 PSmmToken smmGetNextToken(PSmmLexer lex) {
-	PSmmPrivLexer privLex = (PSmmPrivLexer)lex;
+	PPrivLexer privLex = (PPrivLexer)lex;
 	privLex->skipWhitespace(lex);
 
 	PSmmToken token = (PSmmToken)calloc(1, sizeof(struct SmmToken));
@@ -280,33 +286,33 @@ PSmmToken smmGetNextToken(PSmmLexer lex) {
 	switch (*cc)
 	{
 	case 0:
-		token->type = smmEof;
+		token->type = ttSmmEof;
 		return token;
 	case '+': case '-': case '*': case '/': case '=': case ';': case '(': case ')':
 		token->type = *cc;
-		smmNextChar(lex);
+		nextChar(lex);
 		break;
 	case '0':
 		if (lex->curChar[1] == 'x') {
-			smmNextChar(lex);
-			smmNextChar(lex);
-			smmParseHexNumber(lex, token);
+			nextChar(lex);
+			nextChar(lex);
+			parseHexNumber(lex, token);
 		} else if (lex->curChar[1] == '.') {
-			smmParseNumber(lex, token);
+			parseNumber(lex, token);
 		} else {
-			smmPostMessage(errSmmInvalidNumber, lex->fileName, lex->filePos);
-			smmSkipAlNum(lex);
+			smmPostMessage(errSmmInvalid0Number, lex->fileName, lex->filePos);
+			skipAlNum(lex);
 		}
 		break;
 	case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9':
-		smmParseNumber(lex, token);
+		parseNumber(lex, token);
 		break;
 	default:
 		if (isalpha(*cc)) {
-			smmParseIdent(privLex, token);
+			parseIdent(privLex, token);
 		} else {
 			smmPostMessage(errSmmInvalidCharacter, lex->fileName, lex->filePos);
-			smmNextChar(lex);
+			nextChar(lex);
 		}
 		break;
 	}

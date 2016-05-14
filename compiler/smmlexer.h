@@ -19,13 +19,24 @@ Type Definitions
 typedef enum { smmLexTypeFile, smmLexTypeStdIn } SmmLexTypeEnum;
 
 typedef enum {
-	smmErr,
-	smmIdent = 256, // Because first 255 values are reserved for existing chars
-	smmInteger,
-	smmFloat,
-	smmIntDiv, smmAndOp, smmOrOp, smmXorOp,
-	smmEof
+	ttSmmErr,
+	ttSmmIdent = 256, // Because first 255 values are reserved for existing chars
+	ttSmmInteger,
+	ttSmmFloat,
+	ttSmmIntDiv, ttSmmAndOp, ttSmmOrOp, ttSmmXorOp,
+	ttSmmEof
 } SmmTokenType;
+
+static char* smmTokenTypeToString[] = {
+	"identifier",
+	"integer",
+	"float",
+	"integer division",
+	"and",
+	"or",
+	"xor",
+	"eof"
+};
 
 struct SmmLexer {
 	char* fileName; // Used only for error messages
@@ -62,7 +73,7 @@ Returns a new instance of SmmLexer that will scan the given buffer or stdin
 if given buffer is null. When scanning stdin end of file is signaled using
 "Enter, CTRL+Z, Enter" on Windows and CTRL+D on *nix systems
 */
-PSmmLexer smmInitLexer(char* buffer, char* filename, PSmmAllocator allocator);
+PSmmLexer smmCreateLexer(char* buffer, char* filename, PSmmAllocator allocator);
 
 PSmmToken smmGetNextToken(PSmmLexer lex);
 

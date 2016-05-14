@@ -1,3 +1,4 @@
+#include  <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -5,31 +6,40 @@
 #include "smmmsgs.h"
 #include "smmutil.h"
 
-static const char* smmMsgTypeToString[] = {
+static const char* msgTypeToString[] = {
 	"unknown error", "failed allocating memory",
 	"invalid hex digit",
 	"integer literal too big",
 	"invalid exponent in float literal",
 	"only binary, hex and float literals can start with 0",
-	"invalid character"
+	"invalid number literal",
+	"invalid character",
+	"expected %s but got %s"
 };
 
-static int smmErrorCounter;
+static int errorCounter;
 
-void smmPostMessage(SmmMsgType msg, const char* fileName, const struct SmmFilePos filePos) {
-	smmErrorCounter++;
+void smmPostMessage(SmmMsgType msgType, const char* fileName, const struct SmmFilePos filePos, ...) {
+	errorCounter++;
+	char msg[2000] = { 0 };
+	
+	va_list argList;
+	va_start(argList, filePos);
+	vsprintf(msg, msgTypeToString[msgType], argList);
+	va_end(argList);
+
 	if (fileName) {
-		printf("Error: %s (at %s:%d:%d)\n", smmMsgTypeToString[msg], fileName, filePos.lineNumber, filePos.lineOffset);
+		printf("Error: %s (at %s:%d:%d)\n", msg, fileName, filePos.lineNumber, filePos.lineOffset);
 	} else {
-		printf("Error: %s (at %d:%d)\n", smmMsgTypeToString[msg], filePos.lineNumber, filePos.lineOffset);
+		printf("Error: %s (at %d:%d)\n", msg, filePos.lineNumber, filePos.lineOffset);
 	}
 }
 
-void smmAbortWithMessage(SmmMsgType msg, const char* additionalInfo, const char* fileName, const int line) {
-	printf("Compiler Error: %s %s (at %s:%d)\n", smmMsgTypeToString[msg], additionalInfo, fileName, line);
+void smmAbortWithMessage(SmmMsgType msgType, const char* additionalInfo, const char* fileName, const int line) {
+	printf("Compiler Error: %s %s (at %s:%d)\n", msgTypeToString[msgType], additionalInfo, fileName, line);
 	exit(1);
 }
 
 bool smmHadErrors() {
-	return smmErrorCounter > 0;
+	return errorCounter > 0;
 }
