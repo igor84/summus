@@ -34,7 +34,7 @@ Private Functions
 
 void abortWithAllocError(PSmmAllocator allocator, size_t size, int line) {
 	char ainfo[64] = {0};
-	sprintf(ainfo, "; Allocator: %s, Requested size: %lld", allocator->name, size);
+	sprintf(ainfo, "; Allocator: %s, Requested size: %zu", allocator->name, size);
 	smmAbortWithMessage(errSmmMemoryAllocationFailed, ainfo, __FILE__, line);
 }
 
@@ -86,7 +86,7 @@ uint32_t smmHashString(char* value) {
 }
 
 PSmmDict smmCreateDict(PSmmAllocator allocator, size_t size, void* elemCreateFuncContext, SmmElementCreateFunc createFunc) {
-	assert((size && !(size & (size - 1))) == 0); // Size has only one bit set
+	assert((size & ~(size & (size - 1))) == size); // Size has only one bit set
 	PPrivDict privDict = allocator->alloc(allocator, sizeof(PPrivDict) + size * sizeof(PSmmDictEntry));
 	privDict->allocator = allocator;
 	privDict->size = size;
@@ -157,12 +157,11 @@ void smmFreeDictValue(PSmmDict dict, char* key, uint32_t hash) {
 }
 
 PSmmAllocator smmCreatePermanentAllocator(char* name, size_t size) {
-	assert(sizeof(struct PrivAllocator) & 0xf == 0); // So we maintain 16 byte alignment
 	size = (size + 0xfff) & (~0xfff); // We take memory in chunks of 4KB
 	PPrivAllocator smmAllocator = (PPrivAllocator)calloc(1, size);
 	if (smmAllocator == NULL) {
 		char ainfo[100] = { 0 };
-		sprintf(ainfo, "; Creating allocator %s with size %lld", name, size);
+		sprintf(ainfo, "; Creating allocator %s with size %zu", name, size);
 		smmAbortWithMessage(errSmmMemoryAllocationFailed, ainfo, __FILE__, __LINE__ - 4);
 	}
 	size_t skipBytes = sizeof(struct PrivAllocator);
@@ -177,7 +176,7 @@ PSmmAllocator smmCreatePermanentAllocator(char* name, size_t size) {
 	skipBytes += (strlen(name) + 1 + 0xf) & (~0xf);
 	smmAllocator->free = smmAllocator->size - skipBytes;
 	//We make sure we did setup everything so next mem alloc starts from 16 bytes aligned address
-	assert(((int)&smmAllocator->memory[smmAllocator->size - smmAllocator->free] & 0xf) == 0);
+	assert(((uintptr_t)&smmAllocator->memory[smmAllocator->size - smmAllocator->free] & 0xf) == 0);
 	return &smmAllocator->allocator;
 }
 
@@ -187,6 +186,6 @@ void smmFreePermanentAllocator(PSmmAllocator allocator) {
 
 void smmPrintAllocatorInfo(const PSmmAllocator allocator) {
 	PPrivAllocator a = (PPrivAllocator)allocator;
-	printf("\nAllocator %s Size=%lldMB Used=%lldKB Allocated=%lldKB Free=%lldKB\n",
+	printf("\nAllocator %s Size=%zuMB Used=%zuKB Allocated=%zuKB Free=%zuKB\n",
 		allocator->name, a->size >> 20, a->used >> 10, (a->size - a->free) >> 10, a->free >> 10);
 }
