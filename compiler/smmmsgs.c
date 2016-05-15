@@ -14,7 +14,9 @@ static const char* msgTypeToString[] = {
 	"only binary, hex and float literals can start with 0",
 	"invalid number literal",
 	"invalid character",
-	"expected %s but got %s"
+	"missing expected %s",
+	"expected %s but got %s",
+	"operand must be l-value"
 };
 
 static int errorCounter;

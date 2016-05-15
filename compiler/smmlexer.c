@@ -11,6 +11,17 @@
 #define SMM_STDIN_BUFFER_LENGTH 64 * 1024
 #define SMM_LEXER_DICT_SIZE 8 * 1024
 
+static char* tokenTypeToString[] = {
+	"identifier",
+	"integer",
+	"float",
+	"integer division",
+	"and",
+	"or",
+	"xor",
+	"eof"
+};
+
 /********************************************************
 Type Definitions
 *********************************************************/
@@ -276,11 +287,13 @@ PSmmLexer smmCreateLexer(char* buffer, char* fileName, PSmmAllocator allocator) 
 
 PSmmToken smmGetNextToken(PSmmLexer lex) {
 	PPrivLexer privLex = (PPrivLexer)lex;
+	int lastLine = lex->filePos.lineNumber;
 	privLex->skipWhitespace(lex);
 
 	PSmmToken token = (PSmmToken)calloc(1, sizeof(struct SmmToken));
 	token->filePos = lex->filePos;
 	token->pos = lex->scanCount;
+	token->isFirstOnLine = lastLine != lex->filePos.lineNumber;
 	char* cc = lex->curChar;
 
 	switch (*cc)
@@ -324,4 +337,13 @@ PSmmToken smmGetNextToken(PSmmLexer lex) {
 		token->repr[cnt - 1] = 0;
 	}
 	return token;
+}
+
+char* smmTokenTypeToString(SmmTokenType type, char* buf) {
+	if (type > 255) return tokenTypeToString[type - 256];
+
+	buf[2] = buf[0] = '\'';
+	buf[1] = (char)type;
+	buf[3] = 0;
+	return buf;
 }

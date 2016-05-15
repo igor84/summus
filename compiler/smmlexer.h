@@ -27,17 +27,6 @@ typedef enum {
 	ttSmmEof
 } SmmTokenType;
 
-static char* smmTokenTypeToString[] = {
-	"identifier",
-	"integer",
-	"float",
-	"integer division",
-	"and",
-	"or",
-	"xor",
-	"eof"
-};
-
 struct SmmLexer {
 	char* fileName; // Used only for error messages
 	char* buffer;
@@ -58,6 +47,7 @@ struct SmmToken {
 	int type;
 	char* repr;
 	int pos;
+	bool isFirstOnLine;
 	struct SmmFilePos filePos;
 	union {
 		uint64_t intVal;
@@ -76,5 +66,7 @@ if given buffer is null. When scanning stdin end of file is signaled using
 PSmmLexer smmCreateLexer(char* buffer, char* filename, PSmmAllocator allocator);
 
 PSmmToken smmGetNextToken(PSmmLexer lex);
+
+char* smmTokenTypeToString(SmmTokenType type, char* buf);
 
 #endif

@@ -46,7 +46,7 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="tests\expressions.smm">
+    <None Include="tests\test.smm">
       <Filter>Resource Files</Filter>
     </None>
   </ItemGroup>

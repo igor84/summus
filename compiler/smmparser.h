@@ -7,8 +7,10 @@
 
 struct SmmParser {
 	PSmmLexer lex;
+	PSmmToken lastToken;
 	PSmmToken curToken;
 	PSmmDict idents;
+	int lastErrorLine;
 	PSmmAllocator allocator;
 };
 typedef struct SmmParser* PSmmParser;

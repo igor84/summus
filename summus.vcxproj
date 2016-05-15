@@ -138,7 +138,7 @@
     <ClInclude Include="compiler\smmutil.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="tests\expressions.smm" />
+    <None Include="tests\test.smm" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

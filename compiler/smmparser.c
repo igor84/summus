@@ -35,14 +35,20 @@ Private Functions
 
 PSmmAstNode parseExpression(PSmmParser parser);
 
+void getNextToken(PSmmParser parser) {
+	parser->lastToken = parser->curToken;
+	parser->curToken = smmGetNextToken(parser->lex);
+}
+
 bool findToken(PSmmParser parser, SmmTokenType tokenType) {
 	PSmmToken curToken = parser->curToken;
 	while (curToken->type != tokenType && curToken->type != ';' && curToken->type != ttSmmEof) {
+		parser->lastToken = curToken;
 		curToken = smmGetNextToken(parser->lex);
 	}
 	bool found = curToken->type == tokenType;
-	if (found) parser->curToken = smmGetNextToken(parser->lex);
-	else parser->curToken = curToken;
+	parser->curToken = curToken;
+	if (found) getNextToken(parser);
 	return found;
 }
 
@@ -51,28 +57,31 @@ PSmmToken expect(PSmmParser parser, SmmTokenType type) {
 	if (token->type != type) {
 		if (token->type != ttSmmErr) {
 			// If it is smmErr lexer already reported the error
-			char* expected = &(char)type;
-			if (type > 255) expected = smmTokenTypeToString[type];
-			char* got = token->repr;
-			if (token->type > 255) {
-				got = smmTokenTypeToString[token->type - 256];
+			char expBuf[4], gotBuf[4];
+			char* expected = smmTokenTypeToString(type, expBuf);
+			char* got = smmTokenTypeToString(token->type, gotBuf);
+			if (token->isFirstOnLine && parser->lastToken) {
+				smmPostMessage(errSmmNoExpectedToken, parser->lex->fileName, parser->lastToken->filePos, expected);
+				parser->lastErrorLine = parser->lastToken->filePos.lineNumber;
+			} else {
+				smmPostMessage(errSmmGotUnexpectedToken, parser->lex->fileName, token->filePos, expected, got);
+				parser->lastErrorLine = token->filePos.lineNumber;
 			}
-			smmPostMessage(errSmmGotUnexpectedToken, parser->lex->fileName, token->filePos, got, expected);
 		}
 		return NULL;
 	}
-	parser->curToken = smmGetNextToken(parser->lex);
+	getNextToken(parser);
 	return token;
 }
 
 PSmmAstNode parseFactor(PSmmParser parser) {
 	PSmmAstNode res = &errorNode;
 	if (parser->curToken->type == '(') {
-		parser->curToken = smmGetNextToken(parser->lex);
+		getNextToken(parser);
 		res = parseExpression(parser);
 		expect(parser, ')');
 	} else {
-		bool reportedError = false;
+		bool reportedError = parser->lastErrorLine == parser->curToken->filePos.lineNumber;
 		SmmAstNodeKind kind;
 		do {
 			kind = nkSmmError;
@@ -87,13 +96,11 @@ PSmmAstNode parseFactor(PSmmParser parser) {
 				res->kind = kind;
 				res->token = parser->curToken;
 			} else if (!reportedError) {
-				char* got = parser->curToken->repr;
-				if (parser->curToken->type > 255) {
-					got = smmTokenTypeToString[parser->curToken->type - 256];
-				}
-				smmPostMessage(errSmmGotUnexpectedToken, parser->lex->fileName, parser->curToken->filePos, "factor", got);
+				char gotBuf[4];
+				char* got = smmTokenTypeToString(parser->curToken->type, gotBuf);
+				smmPostMessage(errSmmGotUnexpectedToken, parser->lex->fileName, parser->curToken->filePos, "symbol or literal", got);
 			}
-			parser->curToken = smmGetNextToken(parser->lex);
+			getNextToken(parser);
 		} while (kind == nkSmmError && parser->curToken->type != ';' && parser->curToken->type != ttSmmEof);
 	}
 	return res;
@@ -108,7 +115,7 @@ PSmmAstNode parseTerm(PSmmParser parser) {
 		} else if (parser->curToken->type == ttSmmIntDiv) {
 			kind = nkSmmSDiv;
 		}
-		parser->curToken = smmGetNextToken(parser->lex);
+		getNextToken(parser);
 		PSmmAstNode term2 = parseFactor(parser);
 		PSmmAstNode res = newSmmAstNode();
 		res->kind = kind;
@@ -123,9 +130,9 @@ PSmmAstNode parseExpression(PSmmParser parser) {
 	bool doNeg = false;
 	if (parser->curToken->type == '-') {
 		doNeg = true;
-		parser->curToken = smmGetNextToken(parser->lex);
+		getNextToken(parser);
 	} else if (parser->curToken->type == '+') {
-		parser->curToken = smmGetNextToken(parser->lex);
+		getNextToken(parser);
 	}
 	PSmmAstNode term1 = parseTerm(parser);
 	if (doNeg) {
@@ -139,7 +146,7 @@ PSmmAstNode parseExpression(PSmmParser parser) {
 		if (parser->curToken->type == '-') {
 			kind = nkSmmSub;
 		}
-		parser->curToken = smmGetNextToken(parser->lex);
+		getNextToken(parser);
 		PSmmAstNode term2 = parseTerm(parser);
 		PSmmAstNode res = newSmmAstNode();
 		res->kind = kind;
@@ -151,19 +158,25 @@ PSmmAstNode parseExpression(PSmmParser parser) {
 }
 
 PSmmAstNode parseStatement(PSmmParser parser) {
-	PSmmToken token = expect(parser, ttSmmIdent);
-	if (!expect(parser, (SmmTokenType)'=') && !findToken(parser, '=')) {
-		return &errorNode;
+	PSmmAstNode lval = parseExpression(parser);
+	if (parser->curToken->type == '=') {
+		if (lval->kind != nkSmmSymbol) {
+			lval = &errorNode;
+			if (parser->lastErrorLine != parser->curToken->filePos.lineNumber) {
+				smmPostMessage(errSmmOperandMustBeLVal, parser->lex->fileName, parser->curToken->filePos);
+			}
+		}
+		getNextToken(parser);
+		PSmmAstNode val = parseExpression(parser);
+		if (lval == &errorNode || val == &errorNode) return &errorNode;
+		PSmmAstNode assignment = newSmmAstNode();
+		assignment->kind = nkSmmDeclAssignment;
+		assignment->left = lval;
+		assignment->right = val;
+		return assignment;
 	}
-	PSmmAstNode val = parseExpression(parser);
-	PSmmAstNode sym = newSmmAstNode();
-	sym->kind = (token != NULL) ? nkSmmSymbol : nkSmmError;
-	sym->token = token;
-	PSmmAstNode assignment = newSmmAstNode();
-	assignment->kind = nkSmmDeclAssignment;
-	assignment->left = sym;
-	assignment->right = val;
-	return assignment;
+	
+	return lval;
 }
 
 void printNode(PSmmAstNode node) {

@@ -11,7 +11,7 @@ typedef enum {
 	errSmmInvalidHexDigit, errSmmIntTooBig, errSmmInvalidFloatExponent, errSmmInvalid0Number,
 	errSmmInvalidNumber, errSmmInvalidCharacter,
 
-	errSmmGotUnexpectedToken
+	errSmmNoExpectedToken, errSmmGotUnexpectedToken, errSmmOperandMustBeLVal
 } SmmMsgType;
 
 struct SmmFilePos {
