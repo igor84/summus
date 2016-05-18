@@ -16,6 +16,7 @@ static char* tokenTypeToString[] = {
 	"integer",
 	"float",
 	"integer division",
+	"integer modulo",
 	"and",
 	"or",
 	"xor",
@@ -103,8 +104,8 @@ static void* createSymbolElem(char* key, PSmmAllocator a, void* context) {
 }
 
 static void initSymTableWithKeywords(PPrivLexer lex) {
-	static char* keywords[] = { "div", "and", "or", "xor" };
-	static SmmTokenType keyTypes[] = { ttSmmIntDiv, ttSmmAndOp, ttSmmOrOp, ttSmmXorOp };
+	static char* keywords[] = { "div", "mod", "and", "or", "xor" };
+	static SmmTokenType keyTypes[] = { ttSmmIntDiv, ttSmmIntMod, ttSmmAndOp, ttSmmOrOp, ttSmmXorOp };
 	int size = sizeof(keywords) / sizeof(char*);
 	for (int i = 0; i < size; i++) {
 		PSmmSymbol symbol = (PSmmSymbol)smmGetDictValue(lex->symTable, keywords[i], smmHashString(keywords[i]), true);
@@ -296,12 +297,12 @@ PSmmToken smmGetNextToken(PSmmLexer lex) {
 	token->isFirstOnLine = lastLine != lex->filePos.lineNumber;
 	char* cc = lex->curChar;
 
-	switch (*cc)
-	{
+	switch (*cc) {
 	case 0:
 		token->type = ttSmmEof;
 		return token;
-	case '+': case '-': case '*': case '/': case '=': case ';': case '(': case ')':
+	case '+': case '-': case '*': case '/': case '%': case '=':
+	case ';': case '(': case ')':
 		token->type = *cc;
 		nextChar(lex);
 		break;
@@ -339,11 +340,12 @@ PSmmToken smmGetNextToken(PSmmLexer lex) {
 	return token;
 }
 
-char* smmTokenTypeToString(SmmTokenType type, char* buf) {
-	if (type > 255) return tokenTypeToString[type - 256];
+char* smmTokenToString(PSmmToken token, char* buf) {
+	if (token->type > 255) return tokenTypeToString[token->type - 256];
+	if (token->type == ttSmmErr) return token->repr;
 
 	buf[2] = buf[0] = '\'';
-	buf[1] = (char)type;
+	buf[1] = (char)token->type;
 	buf[3] = 0;
 	return buf;
 }

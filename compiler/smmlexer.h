@@ -23,7 +23,7 @@ typedef enum {
 	ttSmmIdent = 256, // Because first 255 values are reserved for existing chars
 	ttSmmInteger,
 	ttSmmFloat,
-	ttSmmIntDiv, ttSmmAndOp, ttSmmOrOp, ttSmmXorOp,
+	ttSmmIntDiv, ttSmmIntMod, ttSmmAndOp, ttSmmOrOp, ttSmmXorOp,
 	ttSmmEof
 } SmmTokenType;
 
@@ -67,6 +67,6 @@ PSmmLexer smmCreateLexer(char* buffer, char* filename, PSmmAllocator allocator);
 
 PSmmToken smmGetNextToken(PSmmLexer lex);
 
-char* smmTokenTypeToString(SmmTokenType type, char* buf);
+char* smmTokenToString(PSmmToken token, char* buf);
 
 #endif

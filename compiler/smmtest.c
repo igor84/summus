@@ -7,11 +7,17 @@
 int main(void) {
 	/*
 	TODO:
+		Add typing to parser and lexer
+		Add logical operators
+		Add bitwise operators
 		GlobalSettings
-		literal types
 	*/
 	char buf[64 * 1024] = { 0 };
 	FILE* f = fopen("test.smm", "rb");
+	if (!f) {
+		printf("Can't find test.smm in the current folder!\n");
+		return EXIT_FAILURE;
+	}
 	fread(buf, 1, 64 * 1024, f);
 	fclose(f);
 	PSmmAllocator allocator = smmCreatePermanentAllocator("test.smm", 64 * 1024 * 1024);

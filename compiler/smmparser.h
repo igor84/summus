@@ -15,6 +15,7 @@ struct SmmParser {
 };
 typedef struct SmmParser* PSmmParser;
 
+// Each enum value should have coresponding string in smmparser.c
 typedef enum {
 	nkSmmError, nkSmmProgram, nkSmmDeclAssignment, nkSmmSymbol,
 	nkSmmAdd = 8, nkSmmFAdd,
