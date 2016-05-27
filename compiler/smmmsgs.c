@@ -1,4 +1,5 @@
-#include  <stdarg.h>
+#define _CRT_SECURE_NO_WARNINGS
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -15,8 +16,13 @@ static const char* msgTypeToString[] = {
 	"invalid number literal",
 	"invalid character",
 	"missing expected %s",
-	"expected %s but got %s",
-	"operand must be l-value"
+	"expected %s but got '%s'",
+	"identifier '%s' is undefined",
+	"identifier '%s' is already defined",
+	"operand must be l-value",
+	"undefined type '%s'",
+	"identifier '%s' is already taken as %s",
+	"operator %s not defined for operands of type %s"
 };
 
 static int errorCounter;

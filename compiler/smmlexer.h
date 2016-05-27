@@ -19,13 +19,12 @@ Type Definitions
 typedef enum { smmLexTypeFile, smmLexTypeStdIn } SmmLexTypeEnum;
 
 typedef enum {
-	ttSmmErr,
-	ttSmmIdent = 256, // Because first 255 values are reserved for existing chars
-	ttSmmInteger,
-	ttSmmFloat,
-	ttSmmIntDiv, ttSmmIntMod, ttSmmAndOp, ttSmmOrOp, ttSmmXorOp,
-	ttSmmEof
-} SmmTokenType;
+	tkSmmErr,
+	tkSmmIdent = 256, // Because first 255 values are reserved for existing chars
+	tkSmmIntDiv, tkSmmIntMod, tkSmmAndOp, tkSmmOrOp, tkSmmXorOp,
+	tkSmmUInt32, tkSmmUInt64, tkSmmFloat64, tkSmmBool,
+	tkSmmEof
+} SmmTokenKind;
 
 struct SmmLexer {
 	char* fileName; // Used only for error messages
@@ -39,24 +38,24 @@ typedef struct SmmLexer* PSmmLexer;
 
 struct SmmSymbol {
 	char* name;
-	int type;
+	int kind;
 };
 typedef struct SmmSymbol* PSmmSymbol;
 
 struct SmmToken {
-	int type;
+	int kind;
 	char* repr;
-	int pos;
+	uint64_t pos;
 	bool isFirstOnLine;
 	struct SmmFilePos filePos;
 	union {
 		uint64_t intVal;
 		double floatVal;
 		bool boolVal;
-		uint64_t hash;
+		uint32_t hash;
 	};
 };
-typedef struct SmmToken* PSmmToken;;
+typedef struct SmmToken* PSmmToken;
 
 /**
 Returns a new instance of SmmLexer that will scan the given buffer or stdin

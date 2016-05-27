@@ -1,3 +1,5 @@
+#define _CRT_SECURE_NO_WARNINGS
+
 #include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -129,7 +131,8 @@ PSmmDictEntry smmGetDictEntry(PSmmDict dict, char* key, uint32_t hash, bool crea
 
 void* smmGetDictValue(PSmmDict dict, char* key, uint32_t hash, bool createIfMissing) {
 	PSmmDictEntry entry = smmGetDictEntry(dict, key, hash, createIfMissing);
-	assert(entry != NULL);
+	assert(!createIfMissing || (entry != NULL));
+	if (entry == NULL) return NULL;
 	return entry->value;
 }
 
@@ -145,9 +148,10 @@ void smmAddDictValue(PSmmDict dict, char* key, uint32_t hash, void* value) {
 }
 
 void smmFreeDictValue(PSmmDict dict, char* key, uint32_t hash) {
+	PPrivDict privDict;
 	PSmmDictEntry entry = smmGetDictEntry(dict, key, hash, false);
 	if (entry == NULL) return;
-	PPrivDict privDict = (PPrivDict)dict;
+	privDict = (PPrivDict)dict;
 	hash = hash & (privDict->size - 1);
 	privDict->entries[hash] = entry->next;
 	PSmmAllocator a = ((PPrivDict)dict)->allocator;

@@ -1,3 +1,4 @@
+#define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
 
 #include "smmutil.h"
@@ -7,7 +8,9 @@
 int main(void) {
 	/*
 	TODO:
-		Add typing to parser and lexer
+		Think about supporting literals of all primitive types using suffixes and such
+		(when doing int / int how to specify if you want float32 or float64 result or how to smartly determine that)
+		Do complete code review and add all the comments
 		Add logical operators
 		Add bitwise operators
 		GlobalSettings

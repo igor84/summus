@@ -1,3 +1,4 @@
+#define _CRT_SECURE_NO_WARNINGS
 #include <string.h>
 #include <ctype.h>
 #include <stdint.h>
@@ -10,16 +11,12 @@
 
 #define SMM_STDIN_BUFFER_LENGTH 64 * 1024
 #define SMM_LEXER_DICT_SIZE 8 * 1024
+#define SMM_MAX_HEX_DIGITS 16
 
 static char* tokenTypeToString[] = {
 	"identifier",
-	"integer",
-	"float",
-	"integer division",
-	"integer modulo",
-	"and",
-	"or",
-	"xor",
+	"div", "mod", "and", "or", "xor",
+	"uint32", "uint64", "float64", "bool",
 	"eof"
 };
 
@@ -99,17 +96,23 @@ static void skipAlNum(PSmmLexer lex) {
 static void* createSymbolElem(char* key, PSmmAllocator a, void* context) {
 	PSmmSymbol res = (PSmmSymbol)a->alloc(a, sizeof(struct SmmSymbol));
 	res->name = key;
-	res->type = ttSmmIdent;
+	res->kind = tkSmmIdent;
 	return res;
 }
 
 static void initSymTableWithKeywords(PPrivLexer lex) {
-	static char* keywords[] = { "div", "mod", "and", "or", "xor" };
-	static SmmTokenType keyTypes[] = { ttSmmIntDiv, ttSmmIntMod, ttSmmAndOp, ttSmmOrOp, ttSmmXorOp };
-	int size = sizeof(keywords) / sizeof(char*);
-	for (int i = 0; i < size; i++) {
+	static char* keywords[] = {
+		"div", "mod", "and", "or", "xor"
+	};
+	static SmmTokenKind keyKinds[] = {
+		tkSmmIntDiv, tkSmmIntMod, tkSmmAndOp, tkSmmOrOp, tkSmmXorOp
+	};
+	int count = sizeof(keywords) / sizeof(char*);
+	// Assert that both arrays have the same size
+	assert((sizeof(keyKinds) / sizeof(keyKinds[0])) == count);
+	for (int i = 0; i < count; i++) {
 		PSmmSymbol symbol = (PSmmSymbol)smmGetDictValue(lex->symTable, keywords[i], smmHashString(keywords[i]), true);
-		symbol->type = keyTypes[i];
+		symbol->kind = keyKinds[i];
 	}
 }
 
@@ -133,9 +136,9 @@ static bool parseIdent(PPrivLexer privLex, PSmmToken token) {
 	PSmmSymbol symbol = smmGetDictValue(privLex->symTable, ident, hash, true);
 	*cc = old;
 
-	token->type = symbol->type;
+	token->kind = symbol->kind;
 	token->repr = symbol->name;
-	if (symbol->type == ttSmmIdent) {
+	if (symbol->kind == tkSmmIdent) {
 		token->hash = hash;
 	}
 	return true;
@@ -143,7 +146,7 @@ static bool parseIdent(PPrivLexer privLex, PSmmToken token) {
 
 static void parseHexNumber(PSmmLexer lex, PSmmToken token) {
 	int64_t res = 0;
-	int digitsLeft = 64 / 4;
+	int digitsLeft = SMM_MAX_HEX_DIGITS;
 	char cc = *lex->curChar;
 	do {
 		if (cc >= '0' && cc <= '9') {
@@ -155,7 +158,7 @@ static void parseHexNumber(PSmmLexer lex, PSmmToken token) {
 			} else if (cc > 'f' && cc < 'z') {
 				smmPostMessage(errSmmInvalidHexDigit, lex->fileName, lex->filePos);
 				skipAlNum(lex);
-				break;
+				return;
 			} else {
 				break;
 			}
@@ -168,7 +171,8 @@ static void parseHexNumber(PSmmLexer lex, PSmmToken token) {
 		smmPostMessage(errSmmIntTooBig, lex->fileName, lex->filePos);
 		skipAlNum(lex);
 	} else {
-		token->type = ttSmmInteger;
+		if (digitsLeft < 8) token->kind = tkSmmUInt64;
+		else token->kind = tkSmmUInt32;
 		token->intVal = res;
 	}
 }
@@ -181,6 +185,7 @@ static void parseNumber(PSmmLexer lex, PSmmToken token) {
 	int exp = 0;
 	int expSign = 1;
 	char cc = *lex->curChar;
+	token->kind = tkSmmUInt32;
 	do {
 		if (cc >= '0' && cc <= '9') {
 			int d = cc - '0';
@@ -190,7 +195,6 @@ static void parseNumber(PSmmLexer lex, PSmmToken token) {
 						parseAsInt = false;
 						dres = res * 10.0 + d;
 					} else {
-						dres = INFINITY;
 						do {
 							cc = nextChar(lex);
 						} while (isdigit(cc));
@@ -198,6 +202,9 @@ static void parseNumber(PSmmLexer lex, PSmmToken token) {
 					}
 				} else {
 					res = res * 10 + d;
+					if (res > UINT32_MAX) {
+						token->kind = tkSmmUInt64;
+					}
 				}
 			} else if (part == smmMainInt) {
 				dres = dres * 10 + d;
@@ -212,14 +219,14 @@ static void parseNumber(PSmmLexer lex, PSmmToken token) {
 				skipAlNum(lex);
 				break;
 			}
-			if (parseAsInt) dres = res;
+			if (parseAsInt) dres = (double)res;
 			res = 0;
 			parseAsInt = false;
 			part = smmFraction;
 		} else if ((cc == 'e' || cc == 'E') && part != smmExponent) {
 			part = smmExponent;
 			if (parseAsInt) {
-				dres = res;
+				dres = (double)res;
 				parseAsInt = false;
 			}
 			res = 0;
@@ -240,17 +247,16 @@ static void parseNumber(PSmmLexer lex, PSmmToken token) {
 	} while (true);
 
 	if (part != smmMainInt) {
-		int e = expSign * res - exp;
+		double e = expSign * (double)res - exp;
 		dres *= pow(10, e);
 	}
 	if (parseAsInt) {
-		token->type = ttSmmInteger;
 		token->intVal = res;
 	} else if (part != smmMainInt) {
-		token->type = ttSmmFloat;
+		token->kind = tkSmmFloat64;
 		token->floatVal = dres;
 	} else {
-		token->type = ttSmmErr;
+		token->kind = tkSmmErr;
 		smmPostMessage(errSmmIntTooBig, lex->fileName, lex->filePos);
 	}
 }
@@ -295,15 +301,15 @@ PSmmToken smmGetNextToken(PSmmLexer lex) {
 	token->filePos = lex->filePos;
 	token->pos = lex->scanCount;
 	token->isFirstOnLine = lastLine != lex->filePos.lineNumber;
-	char* cc = lex->curChar;
+	char* firstChar = lex->curChar;
 
-	switch (*cc) {
+	switch (*firstChar) {
 	case 0:
-		token->type = ttSmmEof;
+		token->kind = tkSmmEof;
 		return token;
 	case '+': case '-': case '*': case '/': case '%': case '=':
-	case ';': case '(': case ')':
-		token->type = *cc;
+	case ':': case ';': case '(': case ')':
+		token->kind = *firstChar;
 		nextChar(lex);
 		break;
 	case '0':
@@ -322,7 +328,7 @@ PSmmToken smmGetNextToken(PSmmLexer lex) {
 		parseNumber(lex, token);
 		break;
 	default:
-		if (isalpha(*cc)) {
+		if (isalpha(*firstChar)) {
 			parseIdent(privLex, token);
 		} else {
 			smmPostMessage(errSmmInvalidCharacter, lex->fileName, lex->filePos);
@@ -332,20 +338,19 @@ PSmmToken smmGetNextToken(PSmmLexer lex) {
 	}
 
 	if (!token->repr) {
-		int cnt = lex->scanCount - token->pos + 1;
-		token->repr = (char*)malloc(cnt);
-		strncpy(token->repr, cc, cnt - 1);
-		token->repr[cnt - 1] = 0;
+		int cnt = (int)(lex->scanCount - token->pos);
+		token->repr = (char*)privLex->allocator->alloc(privLex->allocator, cnt + 1);
+		strncpy(token->repr, firstChar, cnt);
 	}
 	return token;
 }
 
 char* smmTokenToString(PSmmToken token, char* buf) {
-	if (token->type > 255) return tokenTypeToString[token->type - 256];
-	if (token->type == ttSmmErr) return token->repr;
+	if (token->kind > 255) return tokenTypeToString[token->kind - 256];
+	if (token->kind == tkSmmErr) return token->repr;
 
 	buf[2] = buf[0] = '\'';
-	buf[1] = (char)token->type;
+	buf[1] = (char)token->kind;
 	buf[3] = 0;
 	return buf;
 }
