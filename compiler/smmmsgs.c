@@ -1,8 +1,8 @@
-#define _CRT_SECURE_NO_WARNINGS
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "smmmsgs.h"
 #include "smmutil.h"
@@ -15,6 +15,7 @@ static const char* msgTypeToString[] = {
 	"only binary, hex and float literals can start with 0",
 	"invalid number literal",
 	"invalid character",
+
 	"missing expected %s",
 	"expected %s but got '%s'",
 	"identifier '%s' is undefined",
@@ -45,7 +46,7 @@ void smmPostMessage(SmmMsgType msgType, const char* fileName, const struct SmmFi
 
 void smmAbortWithMessage(SmmMsgType msgType, const char* additionalInfo, const char* fileName, const int line) {
 	printf("Compiler Error: %s %s (at %s:%d)\n", msgTypeToString[msgType], additionalInfo, fileName, line);
-	exit(1);
+	exit(EXIT_FAILURE);
 }
 
 bool smmHadErrors() {

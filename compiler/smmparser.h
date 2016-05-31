@@ -1,5 +1,3 @@
-#pragma once
-
 #ifndef SMM_PARSER_H
 #define SMM_PARSER_H
 

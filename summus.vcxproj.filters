@@ -13,6 +13,9 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Tests">
+      <UniqueIdentifier>{3731b16b-ecca-42a4-be53-a9d275773514}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="compiler\smmlexer.c">
@@ -30,6 +33,21 @@
     <ClCompile Include="compiler\smmparser.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="tests\smmlexertests.c">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="tests\CuTest.c">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="tests\AllTests.c">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="tests\smmmsgsMockup.c">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="tests\smmparsertests.c">
+      <Filter>Tests</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="compiler\smmlexer.h">
@@ -43,6 +61,9 @@
     </ClInclude>
     <ClInclude Include="compiler\smmmsgs.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="tests\CuTest.h">
+      <Filter>Tests</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

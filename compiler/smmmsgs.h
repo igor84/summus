@@ -1,7 +1,13 @@
-#pragma once
-
 #ifndef SMM_MSGS_H
 #define SMM_MSGS_H
+
+/**
+ * Functions for reporting compiler errors.
+ *
+ * We use enum of possible error messages so we can later easily define that
+ * some range of enums are warnings or hints and provide the option to disable
+ * some of them.
+ */
 
 #include <stdbool.h>
 #include <stdint.h>

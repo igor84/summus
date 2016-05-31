@@ -1,5 +1,3 @@
-#define _CRT_SECURE_NO_WARNINGS
-
 #include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -13,6 +11,12 @@
 // Disable warning that we are using variable length arrays in structs
 #pragma warning(disable : 4200)
 
+/**
+ * We create a private Allocator struct with additional data that has public struct
+ * as the first member so &PrivAllocatorVar == &PrivAllocatorVar.allocator which
+ * allows us to cast between PSmmAllocator and PPrivAllocator. We use this technique
+ * for Dictinary as well.
+ */
 struct PrivAllocator {
 	struct SmmAllocator allocator;
 	size_t used;
@@ -88,7 +92,7 @@ uint32_t smmHashString(char* value) {
 }
 
 PSmmDict smmCreateDict(PSmmAllocator allocator, size_t size, void* elemCreateFuncContext, SmmElementCreateFunc createFunc) {
-	assert((size & ~(size & (size - 1))) == size); // Size has only one bit set
+	assert(size && !(size & (size - 1))); // Size must have only one bit set
 	PPrivDict privDict = allocator->alloc(allocator, sizeof(PPrivDict) + size * sizeof(PSmmDictEntry));
 	privDict->allocator = allocator;
 	privDict->size = size;
@@ -100,12 +104,12 @@ PSmmDict smmCreateDict(PSmmAllocator allocator, size_t size, void* elemCreateFun
 PSmmDictEntry smmGetDictEntry(PSmmDict dict, char* key, uint32_t hash, bool createIfMissing) {
 	PPrivDict privDict = (PPrivDict)dict;
 	hash = hash & (privDict->size - 1);
-	PSmmDictEntry* entries = ((PPrivDict)dict)->entries;
+	PSmmDictEntry* entries = privDict->entries;
 	PSmmDictEntry result = entries[hash];
 	PSmmDictEntry last = NULL;
 
 	while (result) {
-		if (strcmp(key, result->key) == 0) {
+		if (key == result->key || strcmp(key, result->key) == 0) {
 			// Put the found element on start of the list so next search is faster
 			if (last) {
 				last->next = result->next;
@@ -147,7 +151,7 @@ void smmAddDictValue(PSmmDict dict, char* key, uint32_t hash, void* value) {
 	privDict->entries[hash] = result;
 }
 
-void smmFreeDictValue(PSmmDict dict, char* key, uint32_t hash) {
+void smmFreeDictEntry(PSmmDict dict, char* key, uint32_t hash) {
 	PPrivDict privDict;
 	PSmmDictEntry entry = smmGetDictEntry(dict, key, hash, false);
 	if (entry == NULL) return;
@@ -155,7 +159,8 @@ void smmFreeDictValue(PSmmDict dict, char* key, uint32_t hash) {
 	hash = hash & (privDict->size - 1);
 	privDict->entries[hash] = entry->next;
 	PSmmAllocator a = ((PPrivDict)dict)->allocator;
-	a->free(a, entry->key);
+	// Even though new key is created for new entry it is not freed here because
+	// it is usually later used in different places
 	a->free(a, entry->value);
 	a->free(a, entry);
 }

@@ -1,4 +1,4 @@
-#define _CRT_SECURE_NO_WARNINGS
+#include <assert.h>
 #include <string.h>
 #include <ctype.h>
 #include <stdint.h>
@@ -75,7 +75,7 @@ static void skipWhitespaceFromStdIn(const PSmmLexer lex) {
 		}
 		if (cc == 0) {
 			if (feof(stdin)) return;
-			lex->buffer[0] = 0;
+			lex->buffer[0] = 0; // We set first character to null in case fgets just reads eof
 			fgets(lex->buffer, SMM_STDIN_BUFFER_LENGTH, stdin);
 			lex->curChar = lex->buffer;
 			cc = *lex->curChar;
@@ -96,23 +96,25 @@ static void skipAlNum(PSmmLexer lex) {
 static void* createSymbolElem(char* key, PSmmAllocator a, void* context) {
 	PSmmSymbol res = (PSmmSymbol)a->alloc(a, sizeof(struct SmmSymbol));
 	res->name = key;
-	res->kind = tkSmmIdent;
+	res->kind = tkSmmIdent; // By default it is ident but it can be changed later
 	return res;
 }
 
 static void initSymTableWithKeywords(PPrivLexer lex) {
-	static char* keywords[] = {
-		"div", "mod", "and", "or", "xor"
+	struct Keywords {
+		char* name;
+		int kind;
 	};
-	static SmmTokenKind keyKinds[] = {
-		tkSmmIntDiv, tkSmmIntMod, tkSmmAndOp, tkSmmOrOp, tkSmmXorOp
+	static struct Keywords keywords[] = {
+		{"div", tkSmmIntDiv}, { "mod", tkSmmIntMod },
+		{ "and", tkSmmAndOp }, { "or", tkSmmOrOp }, { "xor", tkSmmXorOp }
 	};
-	int count = sizeof(keywords) / sizeof(char*);
-	// Assert that both arrays have the same size
-	assert((sizeof(keyKinds) / sizeof(keyKinds[0])) == count);
+	
+	int count = sizeof(keywords) / sizeof(struct Keywords);
 	for (int i = 0; i < count; i++) {
-		PSmmSymbol symbol = (PSmmSymbol)smmGetDictValue(lex->symTable, keywords[i], smmHashString(keywords[i]), true);
-		symbol->kind = keyKinds[i];
+		struct Keywords k = keywords[i];
+		PSmmSymbol symbol = (PSmmSymbol)smmGetDictValue(lex->symTable, k.name, smmHashString(k.name), true);
+		symbol->kind = k.kind;
 	}
 }
 
@@ -132,7 +134,7 @@ static bool parseIdent(PPrivLexer privLex, PSmmToken token) {
 	privLex->lex.scanCount += i;
 
 	char old = *cc;
-	*cc = 0;
+	*cc = 0; // Temporarily set the end of string here so we can just use ident pointer bellow
 	PSmmSymbol symbol = smmGetDictValue(privLex->symTable, ident, hash, true);
 	*cc = old;
 
@@ -182,7 +184,7 @@ static void parseNumber(PSmmLexer lex, PSmmToken token) {
 	bool parseAsInt = true;
 	enum {smmMainInt, smmFraction, smmExponent} part = smmMainInt;
 	double dres = 0;
-	int exp = 0;
+	int exp = 0; // Exponent for decimals, not the ones after E in 12.43E+12
 	int expSign = 1;
 	char cc = *lex->curChar;
 	token->kind = tkSmmUInt32;
@@ -190,20 +192,24 @@ static void parseNumber(PSmmLexer lex, PSmmToken token) {
 		if (cc >= '0' && cc <= '9') {
 			int d = cc - '0';
 			if (parseAsInt || part == smmExponent) {
-				if (res > ((UINT64_MAX - d) / 10)) {
+				// If we are parsing int or exponent first check if we are about to overflow
+				if (res <= ((UINT64_MAX - d) / 10)) {
+					res = res * 10 + d;
+					if (res > UINT32_MAX) {
+						token->kind = tkSmmUInt64;
+					}
+				} else {
 					if (parseAsInt) {
+						// Since the number can't fit in the largest int we assume it is double
 						parseAsInt = false;
 						dres = res * 10.0 + d;
 					} else {
+						// If we get here we are parsing exponent after E and it is too big
+						// so we just skip remaining digits and later return error
 						do {
 							cc = nextChar(lex);
 						} while (isdigit(cc));
 						break;
-					}
-				} else {
-					res = res * 10 + d;
-					if (res > UINT32_MAX) {
-						token->kind = tkSmmUInt64;
 					}
 				}
 			} else if (part == smmMainInt) {
@@ -219,6 +225,7 @@ static void parseNumber(PSmmLexer lex, PSmmToken token) {
 				skipAlNum(lex);
 				break;
 			}
+			// If int part was too big for int then we already switched to using dres
 			if (parseAsInt) dres = (double)res;
 			res = 0;
 			parseAsInt = false;
@@ -247,8 +254,9 @@ static void parseNumber(PSmmLexer lex, PSmmToken token) {
 	} while (true);
 
 	if (part != smmMainInt) {
-		double e = expSign * (double)res - exp;
-		dres *= pow(10, e);
+		// This combination of operations is the only one that passes all the tests
+		dres *= pow(10, -exp);
+		dres /= pow(10, -expSign * (double)res);
 	}
 	if (parseAsInt) {
 		token->intVal = res;
@@ -266,10 +274,10 @@ API Functions
 *********************************************************/
 
 /**
-Returns a new instance of SmmLexer that will scan the given buffer or stdin
-if given buffer is null. When scanning stdin end of file is signaled using
-"Enter - CTRL+Z - Enter" on Windows and CTRL+D on *nix systems
-*/
+ * Returns a new instance of SmmLexer that will scan the given buffer or stdin
+ * if given buffer is null. When scanning stdin end of file is signaled using
+ * "Enter - CTRL+Z - Enter" on Windows and CTRL+D on *nix systems
+ */
 PSmmLexer smmCreateLexer(char* buffer, char* fileName, PSmmAllocator allocator) {
 	PPrivLexer privLex = (PPrivLexer)allocator->alloc(allocator, sizeof(struct PrivLexer));
 
@@ -296,10 +304,11 @@ PSmmToken smmGetNextToken(PSmmLexer lex) {
 	PPrivLexer privLex = (PPrivLexer)lex;
 	int lastLine = lex->filePos.lineNumber;
 	privLex->skipWhitespace(lex);
+	PSmmAllocator a = privLex->allocator;
 
-	PSmmToken token = (PSmmToken)calloc(1, sizeof(struct SmmToken));
+	uint64_t pos = lex->scanCount;
+	PSmmToken token = (PSmmToken)a->alloc(a, sizeof(struct SmmToken));
 	token->filePos = lex->filePos;
-	token->pos = lex->scanCount;
 	token->isFirstOnLine = lastLine != lex->filePos.lineNumber;
 	char* firstChar = lex->curChar;
 
@@ -317,7 +326,7 @@ PSmmToken smmGetNextToken(PSmmLexer lex) {
 			nextChar(lex);
 			nextChar(lex);
 			parseHexNumber(lex, token);
-		} else if (lex->curChar[1] == '.') {
+		} else if (!isalnum(lex->curChar[1])) {
 			parseNumber(lex, token);
 		} else {
 			smmPostMessage(errSmmInvalid0Number, lex->fileName, lex->filePos);
@@ -338,13 +347,18 @@ PSmmToken smmGetNextToken(PSmmLexer lex) {
 	}
 
 	if (!token->repr) {
-		int cnt = (int)(lex->scanCount - token->pos);
+		int cnt = (int)(lex->scanCount - pos);
 		token->repr = (char*)privLex->allocator->alloc(privLex->allocator, cnt + 1);
 		strncpy(token->repr, firstChar, cnt);
 	}
 	return token;
 }
 
+/**
+ * Given the token and 4 element buffer returns token's string representation.
+ * The buffer is needed in case token is a single character token so we can just
+ * put "<quote>char<quote><null>" into the buffer and return it.
+ */
 char* smmTokenToString(PSmmToken token, char* buf) {
 	if (token->kind > 255) return tokenTypeToString[token->kind - 256];
 	if (token->kind == tkSmmErr) return token->repr;

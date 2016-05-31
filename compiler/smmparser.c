@@ -73,12 +73,11 @@ PSmmToken expect(PSmmParser parser, int type) {
 	if (token->kind != type) {
 		if (token->kind != tkSmmErr) {
 			// If it is smmErr, lexer already reported the error
-			char expBuf[4], gotBuf[4];
+			char expBuf[4];
 			char tmpRepr[2] = { (char)type, 0 };
 			struct SmmToken tmpToken = {type};
 			tmpToken.repr = tmpRepr;
 			char* expected = smmTokenToString(&tmpToken, expBuf);
-			char* got = smmTokenToString(token, gotBuf);
 			struct SmmFilePos filePos;
 			if (token->isFirstOnLine && parser->prevToken) {
 				filePos = parser->prevToken->filePos;
@@ -283,12 +282,12 @@ PSmmAstNode parseDeclaration(PSmmParser parser, PSmmAstNode lval) {
 	if (parser->curToken->kind == '=') {
 		return parseAssignment(parser, lval);
 	}
-	// Otherwise it should just be declaration so next is expected ';'
+	// Otherwise it should just be declaration so ';' is expected next
 	return NULL;
 }
 
 PSmmAstNode parseStatement(PSmmParser parser) {
-	PSmmAstNode lval, ident = NULL;
+	PSmmAstNode lval;
 
 	struct SmmFilePos fpos = parser->curToken->filePos;
 	lval = parseExpression(parser);
