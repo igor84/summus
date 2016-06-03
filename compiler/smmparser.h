@@ -1,6 +1,7 @@
 #ifndef SMM_PARSER_H
 #define SMM_PARSER_H
 
+#include "smmcommon.h"
 #include "smmlexer.h"
 
 struct SmmParser {

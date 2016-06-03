@@ -1,3 +1,6 @@
+#include "smmutil.h"
+#include "smmmsgs.h"
+
 #include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -5,11 +8,7 @@
 #include <string.h>
 #include <stdio.h>
 
-#include "smmutil.h"
-#include "smmmsgs.h"
-
-// Disable warning that we are using variable length arrays in structs
-#pragma warning(disable : 4200)
+#define MSG_BUFFER_LENGTH 100
 
 /**
  * We create a private Allocator struct with additional data that has public struct
@@ -39,8 +38,8 @@ Private Functions
 *********************************************************/
 
 void abortWithAllocError(PSmmAllocator allocator, size_t size, int line) {
-	char ainfo[64] = {0};
-	sprintf(ainfo, "; Allocator: %s, Requested size: %zu", allocator->name, size);
+	char ainfo[MSG_BUFFER_LENGTH] = {0};
+	snprintf(ainfo, MSG_BUFFER_LENGTH, "; Allocator: %s, Requested size: %zu", allocator->name, size);
 	smmAbortWithMessage(errSmmMemoryAllocationFailed, ainfo, __FILE__, line);
 }
 
@@ -123,7 +122,7 @@ PSmmDictEntry smmGetDictEntry(PSmmDict dict, char* key, uint32_t hash, bool crea
 	}
 
 	if (createIfMissing && dict->elemCreateFunc) {
-		int keyLength = strlen(key) + 1;
+		size_t keyLength = strlen(key) + 1;
 		char* keyVal = (char*)privDict->allocator->alloc(privDict->allocator, keyLength);
 		strcpy(keyVal, key);
 		smmAddDictValue(dict, keyVal , hash, dict->elemCreateFunc(keyVal, privDict->allocator, dict->elemCreateFuncContext));
@@ -169,8 +168,8 @@ PSmmAllocator smmCreatePermanentAllocator(char* name, size_t size) {
 	size = (size + 0xfff) & (~0xfff); // We take memory in chunks of 4KB
 	PPrivAllocator smmAllocator = (PPrivAllocator)calloc(1, size);
 	if (smmAllocator == NULL) {
-		char ainfo[100] = { 0 };
-		sprintf(ainfo, "; Creating allocator %s with size %zu", name, size);
+		char ainfo[MSG_BUFFER_LENGTH] = { 0 };
+		snprintf(ainfo, MSG_BUFFER_LENGTH, "; Creating allocator %s with size %zu", name, size);
 		smmAbortWithMessage(errSmmMemoryAllocationFailed, ainfo, __FILE__, __LINE__ - 4);
 	}
 	size_t skipBytes = sizeof(struct PrivAllocator);

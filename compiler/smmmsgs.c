@@ -7,6 +7,8 @@
 #include "smmmsgs.h"
 #include "smmutil.h"
 
+#define MSG_BUFFER_LENGTH 2000
+
 static const char* msgTypeToString[] = {
 	"unknown error", "failed allocating memory",
 	"invalid hex digit",
@@ -30,11 +32,11 @@ static int errorCounter;
 
 void smmPostMessage(SmmMsgType msgType, const char* fileName, const struct SmmFilePos filePos, ...) {
 	errorCounter++;
-	char msg[2000] = { 0 };
+	char msg[MSG_BUFFER_LENGTH] = { 0 };
 	
 	va_list argList;
 	va_start(argList, filePos);
-	vsprintf(msg, msgTypeToString[msgType], argList);
+	vsnprintf(msg, MSG_BUFFER_LENGTH, msgTypeToString[msgType], argList);
 	va_end(argList);
 
 	if (fileName) {

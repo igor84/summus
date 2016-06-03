@@ -10,14 +10,12 @@
  * standard input which allows implementation of language console later on.
  */
 
+#include "smmcommon.h"
 #include <stdint.h>
 #include <stdbool.h>
 
 #include "smmmsgs.h"
 #include "smmutil.h"
-
-// Disable warning that we are using anonimous unions in structs
-#pragma warning(disable : 4201)
 
 /********************************************************
 Type Definitions

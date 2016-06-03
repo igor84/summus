@@ -65,6 +65,9 @@
     <ClInclude Include="tests\CuTest.h">
       <Filter>Tests</Filter>
     </ClInclude>
+    <ClInclude Include="compiler\smmcommon.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="tests\test.smm">

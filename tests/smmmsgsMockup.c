@@ -1,3 +1,4 @@
+#include "../compiler/smmcommon.h"
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>

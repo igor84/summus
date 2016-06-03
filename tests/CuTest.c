@@ -1,3 +1,4 @@
+#include "../compiler/smmcommon.h"
 #include <assert.h>
 #include <setjmp.h>
 #include <stdlib.h>
@@ -11,7 +12,7 @@
  * CuStr
  *-------------------------------------------------------------------------*/
 
-char* CuStrAlloc(int size)
+char* CuStrAlloc(size_t size)
 {
 	char* newStr = (char*) malloc( sizeof(char) * (size) );
 	return newStr;
@@ -19,7 +20,7 @@ char* CuStrAlloc(int size)
 
 char* CuStrCopy(const char* old)
 {
-	int len = strlen(old);
+	size_t len = strlen(old);
 	char* newStr = CuStrAlloc(len + 1);
 	strcpy(newStr, old);
 	return newStr;
@@ -68,7 +69,7 @@ void CuStringAppend(CuString* str, const char* text)
 		text = "NULL";
 	}
 
-	length = strlen(text);
+	length = (int)strlen(text);
 	if (str->length + length + 1 >= str->size)
 		CuStringResize(str, str->length + length + 1 + STRING_INC);
 	str->length += length;
@@ -95,7 +96,7 @@ void CuStringAppendFormat(CuString* str, const char* format, ...)
 
 void CuStringInsert(CuString* str, const char* text, int pos)
 {
-	int length = strlen(text);
+	int length = (int)strlen(text);
 	if (pos > str->length)
 		pos = str->length;
 	if (str->length + length + 1 >= str->size)
@@ -208,6 +209,15 @@ void CuAssertIntEquals_LineMsg(CuTest* tc, const char* file, int line, const cha
 	char buf[STRING_MAX];
 	if (expected == actual) return;
 	sprintf(buf, "expected <%d> but was <%d>", expected, actual);
+	CuFail_Line(tc, file, line, message, buf);
+}
+
+void CuAssertUIntEquals_LineMsg(CuTest* tc, const char* file, int line, const char* message,
+	uint64_t expected, uint64_t actual)
+{
+	char buf[STRING_MAX];
+	if (expected == actual) return;
+	sprintf(buf, "expected <%llu> but was <%llu>", (long long)expected, (long long)actual);
 	CuFail_Line(tc, file, line, message, buf);
 }
 

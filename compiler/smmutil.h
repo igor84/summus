@@ -35,8 +35,10 @@
  * Function smmFreeDictEntry frees from the memory both the entry and its value.
  */
 
+#include "smmcommon.h"
 #include <stdbool.h>
 #include <stdint.h>
+#include <stddef.h>
 
 #define SMM_DEFAULT_GLOBAL_MEMORY_SIZE 64 * 1024 * 1024
 

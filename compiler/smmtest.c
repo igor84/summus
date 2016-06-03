@@ -1,9 +1,9 @@
-#include <stdio.h>
-#include <stdlib.h>
-
 #include "smmutil.h"
 #include "smmlexer.h"
 #include "smmparser.h"
+
+#include <stdio.h>
+#include <stdlib.h>
 
 int main(void) {
 	/*

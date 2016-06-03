@@ -1,13 +1,13 @@
+#include "smmlexer.h"
+#include "smmutil.h"
+#include "smmmsgs.h"
+
 #include <assert.h>
 #include <string.h>
 #include <ctype.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <math.h>
-
-#include "smmutil.h"
-#include "smmmsgs.h"
-#include "smmlexer.h"
 
 #define SMM_STDIN_BUFFER_LENGTH 64 * 1024
 #define SMM_LEXER_DICT_SIZE 8 * 1024

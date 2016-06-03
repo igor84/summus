@@ -6,9 +6,6 @@
 #include "smmlexer.h"
 #include "smmparser.h"
 
-// Disable warning that we are using anonimous unions in structs
-#pragma warning(disable : 4201)
-
 #define SMM_PARSER_IDENTS_DICT_SIZE 8 * 1024
 
 /********************************************************
