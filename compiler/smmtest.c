@@ -1,9 +1,27 @@
 #include "smmutil.h"
 #include "smmlexer.h"
 #include "smmparser.h"
+#include "smmsemtypes.h"
 
 #include <stdio.h>
 #include <stdlib.h>
+
+void printNode(PSmmAstNode node) {
+	fputs(nodeKindToString[node->kind], stdout);
+	if (node->type && node->type->kind != 0) {
+		fputs(":", stdout);
+		fputs(node->type->name, stdout);
+	}
+	if (node->kind != nkSmmNeg) {
+		fputs(" ", stdout);
+	}
+	if (node->left) printNode(node->left);
+	if (node->right) printNode(node->right);
+	if (node->next) {
+		puts("");
+		printNode(node->next);
+	}
+}
 
 int main(void) {
 	/*
@@ -16,19 +34,31 @@ int main(void) {
 		GlobalSettings
 	*/
 	char buf[64 * 1024] = { 0 };
-	FILE* f = fopen("test.smm", "rb");
+	char* filename = "test.smm";
+	FILE* f = fopen(filename, "rb");
 	if (!f) {
 		printf("Can't find test.smm in the current folder!\n");
 		return EXIT_FAILURE;
 	}
 	fread(buf, 1, 64 * 1024, f);
 	fclose(f);
-	PSmmAllocator allocator = smmCreatePermanentAllocator("test.smm", 64 * 1024 * 1024);
-	PSmmLexer lex = smmCreateLexer(buf, "test.smm", allocator);
+	PSmmAllocator allocator = smmCreatePermanentAllocator(filename, 64 * 1024 * 1024);
+	PSmmLexer lex = smmCreateLexer(buf, filename, allocator);
 	
 	PSmmParser parser = smmCreateParser(lex, allocator);
 
-	smmParse(parser);
+	PSmmAstNode program = smmParse(parser);
+
+	puts("\n");
+	printNode(program);
+	puts("\n");
+
+	struct SmmModuleData data = {program, filename, allocator};
+	smmAnalyzeTypes(&data);
+
+	puts("\n");
+	printNode(program);
+	puts("\n");
 	
 	smmPrintAllocatorInfo(allocator);
 

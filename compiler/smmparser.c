@@ -1,10 +1,11 @@
-#include <stdint.h>
-#include <stdio.h>
-
 #include "smmutil.h"
 #include "smmmsgs.h"
 #include "smmlexer.h"
 #include "smmparser.h"
+
+#include <stdint.h>
+#include <stdio.h>
+#include <assert.h>
 
 #define SMM_PARSER_IDENTS_DICT_SIZE 8 * 1024
 
@@ -12,33 +13,26 @@
 Type Definitions
 *********************************************************/
 
-// There should be one string corresponding to each value of
-// SmmAstNodeKind enum from smmparser.h
-static char* nodeKindToString[] = {
+// There should be one string corresponding to each value of SmmAstNodeKind enum
+char* nodeKindToString[] = {
 	"error", "Program", "=", "Ident", "", "", "", "",
 	"+", "+.",
 	"-", "-.",
 	"*", "*.",
 	"udiv", "sdiv", "/",
 	"umod", "smod", "%",
-	"-", "type", "uint", "float"
+	"-", "type", "int", "float",
+	"cast"
 };
 
 static struct SmmTypeInfo builtInTypes[] = {
 	{ tiSmmUnknown, "/unknown/", 0},
-	{ tiSmmInt8, "int8", 1, tifSmmInt }, { tiSmmInt16, "int16", 2, tifSmmInt },
-	{ tiSmmInt32, "int32", 4, tifSmmInt }, { tiSmmInt64, "int64", 8, tifSmmInt },
 	{ tiSmmUInt8, "uint8", tifSmmUnsignedInt }, { tiSmmUInt16, "uint16", 2, tifSmmUnsignedInt },
 	{ tiSmmUInt32, "uint32", 4, tifSmmUnsignedInt }, { tiSmmUInt64, "uint64", 8, tifSmmUnsignedInt },
+	{ tiSmmInt8, "int8", 1, tifSmmInt },{ tiSmmInt16, "int16", 2, tifSmmInt },
+	{ tiSmmInt32, "int32", 4, tifSmmInt },{ tiSmmInt64, "int64", 8, tifSmmInt },
 	{ tiSmmFloat32, "float32", 4, tifSmmFloat }, { tiSmmFloat64, "float64", 8, tifSmmFloat },
-	{ tiSmmBool, "bool", 1 }
-};
-
-static PSmmTypeInfo tokenTypeToTypeInfo[] = {
-	&builtInTypes[tiSmmUInt32],
-	&builtInTypes[tiSmmUInt64],
-	&builtInTypes[tiSmmFloat64],
-	&builtInTypes[tiSmmBool]
+	{ tiSmmSoftFloat64, "/sfloat64/", 8, tifSmmFloat }, { tiSmmBool, "bool", 1 }
 };
 
 static struct SmmAstNode errorNode = { nkSmmError, &builtInTypes[0] };
@@ -90,6 +84,23 @@ PSmmToken expect(PSmmParser parser, int type) {
 	return token;
 }
 
+PSmmTypeInfo getLiteralTokenType(PSmmToken token) {
+	switch (token->kind) {
+	case tkSmmBool: return &builtInTypes[tiSmmBool];
+	case tkSmmFloat: return &builtInTypes[tiSmmSoftFloat64];
+	case tkSmmUInt:
+		if (token->uintVal <= INT8_MAX) return &builtInTypes[tiSmmInt8];
+		if (token->uintVal <= INT16_MAX) return &builtInTypes[tiSmmInt16];
+		if (token->uintVal <= INT32_MAX) return &builtInTypes[tiSmmInt32];
+		if (token->uintVal <= INT64_MAX) return &builtInTypes[tiSmmInt64];
+		return &builtInTypes[tiSmmUInt64];
+	default:
+		// Should never happen
+		assert(false && "Got literal of unknown kind!");
+		return &builtInTypes[tiSmmUnknown];
+	}
+}
+
 bool isNegFactor(PSmmParser parser) {
 	bool doNeg = false;
 	if (parser->curToken->kind == '-') {
@@ -118,15 +129,15 @@ PSmmAstNode parseFactor(PSmmParser parser) {
 			kind = nkSmmError;
 			switch (parser->curToken->kind) {
 			case tkSmmIdent: kind = nkSmmIdent; break;
-			case tkSmmUInt32: case tkSmmUInt64: kind = nkSmmUInt; break;
-			case tkSmmFloat64: kind = nkSmmFloat; break;
+			case tkSmmUInt: kind = nkSmmInt; break;
+			case tkSmmFloat: kind = nkSmmFloat; break;
 			default: break;
 			}
 			if (kind != nkSmmError) {
 				if (kind != nkSmmIdent) {
 					res = newSmmAstNode();
 					res->kind = kind;
-					res->type = tokenTypeToTypeInfo[parser->curToken->kind - tkSmmUInt32];
+					res->type = getLiteralTokenType(parser->curToken);
 					res->token = parser->curToken;
 				} else {
 					PSmmAstNode var = (PSmmAstNode)smmGetDictValue(parser->idents, parser->curToken->repr, parser->curToken->hash, false);
@@ -164,16 +175,34 @@ PSmmAstNode parseFactor(PSmmParser parser) {
 	}
 
 	if (doNeg) {
-		PSmmAstNode neg = newSmmAstNode();
-		neg->kind = nkSmmNeg;
-		neg->left = res;
-		neg->type = res->type;
-		if ((neg->type->kind >= tiSmmUInt8) && (neg->type->kind < tiSmmUInt64)) {
-			neg->type = &builtInTypes[neg->type->kind - tiSmmUInt8 + tiSmmInt16];
-		} else if (neg->type->kind == tiSmmUInt64) {
-			neg->type = &builtInTypes[tiSmmInt64];
+		if (res->kind == nkSmmInt) {
+			res->token->kind = tkSmmInt;
+			res->token->sintVal = -(int64_t)res->token->uintVal;
+			switch (res->type->kind) {
+			case tiSmmInt16: if (res->token->sintVal == INT8_MIN) res->type = &builtInTypes[tiSmmInt8]; break;
+			case tiSmmInt32: if (res->token->sintVal == INT16_MIN) res->type = &builtInTypes[tiSmmInt16]; break;
+			case tiSmmInt64: if (res->token->sintVal == INT32_MIN) res->type = &builtInTypes[tiSmmInt32]; break;
+			case tiSmmUInt64:
+				res->type = &builtInTypes[tiSmmInt64];
+				if (res->token->sintVal != INT64_MIN) {
+					smmPostMessage(wrnSmmConversionDataLoss,
+						parser->lex->fileName,
+						res->token->filePos,
+						res->type->name,
+						builtInTypes[tiSmmInt64].name);
+				}
+				break;
+			}
+		} else {
+			PSmmAstNode neg = newSmmAstNode();
+			neg->kind = nkSmmNeg;
+			neg->left = res;
+			neg->type = res->type;
+			if (neg->type->flags & tifSmmUnsigned) {
+				neg->type = &builtInTypes[neg->type->kind - tiSmmUInt8 + tiSmmInt8];
+			}
+			res = neg;
 		}
-		res = neg;
 	}
 	return res;
 }
@@ -190,7 +219,7 @@ PSmmAstNode parseTerm(PSmmParser parser) {
 		res->right = term2;
 
 		PSmmTypeInfo type = (term1->type->kind > term2->type->kind) ? term1->type : term2->type;
-		PSmmTypeInfo ftype = type->kind < tiSmmFloat32 ? &builtInTypes[tiSmmFloat64] : type;
+		PSmmTypeInfo ftype = type->kind < tiSmmFloat32 ? &builtInTypes[tiSmmSoftFloat64] : type;
 		switch (opToken->kind) {
 		case '/':
 			res->kind = nkSmmFDiv;
@@ -231,7 +260,7 @@ PSmmAstNode parseExpression(PSmmParser parser) {
 		getNextToken(parser);
 		PSmmAstNode term2 = parseTerm(parser);
 		PSmmAstNode res = newSmmAstNode();
-		if (((term1->type->flags | term2->type->flags) & tifSmmFloat) != 0) {
+		if ((term1->type->flags | term2->type->flags) & tifSmmFloat) {
 			res->kind = kind + 1;
 		} else {
 			res->kind = kind;
@@ -249,10 +278,14 @@ PSmmAstNode parseExpression(PSmmParser parser) {
 }
 
 PSmmAstNode parseAssignment(PSmmParser parser, PSmmAstNode lval) {
+	PSmmToken eqToken = parser->curToken;
 	expect(parser, '=');
 	PSmmAstNode val = parseExpression(parser);
 	if (lval == &errorNode || val == &errorNode) return &errorNode;
 	if (!lval->type) {
+		if (val->type->kind == tiSmmSoftFloat64) {
+			val->type = &builtInTypes[tiSmmFloat64];
+		}
 		lval->type = val->type;
 	}
 	PSmmAstNode assignment = newSmmAstNode();
@@ -260,6 +293,7 @@ PSmmAstNode parseAssignment(PSmmParser parser, PSmmAstNode lval) {
 	assignment->left = lval;
 	assignment->right = val;
 	assignment->type = lval->type;
+	assignment->token = eqToken;
 	return assignment;
 }
 
@@ -316,23 +350,6 @@ PSmmAstNode parseStatement(PSmmParser parser) {
 	return lval;
 }
 
-void printNode(PSmmAstNode node) {
-	fputs(nodeKindToString[node->kind], stdout);
-	if (node->kind == nkSmmIdent) {
-		fputs(":", stdout);
-		fputs(node->type->name, stdout);
-	}
-	if (node->kind != nkSmmNeg) {
-		fputs(" ", stdout);
-	}
-	if (node->left) printNode(node->left);
-	if (node->right) printNode(node->right);
-	if (node->next) {
-		puts("");
-		printNode(node->next);
-	}
-}
-
 void initIdentsDict(PSmmParser parser) {
 	parser->idents = smmCreateDict(parser->allocator, SMM_PARSER_IDENTS_DICT_SIZE, NULL, NULL);
 	int cnt = sizeof(builtInTypes) / sizeof(struct SmmTypeInfo);
@@ -358,7 +375,7 @@ PSmmParser smmCreateParser(PSmmLexer lex, PSmmAllocator allocator) {
 }
 
 
-void smmParse(PSmmParser parser) {
+PSmmAstNode smmParse(PSmmParser parser) {
 	PSmmAstNode program = newSmmAstNode();
 	program->kind = nkSmmProgram;
 	PSmmAstNode lastStmt = program;
@@ -374,7 +391,5 @@ void smmParse(PSmmParser parser) {
 		lastStmt->next = curStmt;
 		lastStmt = curStmt;
 	}
-
-	printNode(program);
-	puts("");
+	return program;
 }

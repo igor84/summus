@@ -50,28 +50,28 @@ void TestParseHexNumber(CuTest *tc) {
 		"0x10000000000000000 0xxrg 0x123asd 0x123.324 ";
 	PSmmLexer lex = smmCreateLexer(buf, "TestParseHexNumber", allocator);
 	PSmmToken token = smmGetNextToken(lex);
-	CuAssertIntEquals(tc, tkSmmUInt32, token->kind);
-	CuAssertUIntEquals(tc, 0, token->intVal);
+	CuAssertIntEquals(tc, tkSmmUInt, token->kind);
+	CuAssertUIntEquals(tc, 0, token->uintVal);
 
 	token = smmGetNextToken(lex);
-	CuAssertIntEquals(tc, tkSmmUInt32, token->kind);
-	CuAssertUIntEquals(tc, 0x1234abcd, token->intVal);
+	CuAssertIntEquals(tc, tkSmmUInt, token->kind);
+	CuAssertUIntEquals(tc, 0x1234abcd, token->uintVal);
 
 	token = smmGetNextToken(lex);
-	CuAssertIntEquals(tc, tkSmmUInt32, token->kind);
-	CuAssertUIntEquals(tc, 0x567890ef, token->intVal);
+	CuAssertIntEquals(tc, tkSmmUInt, token->kind);
+	CuAssertUIntEquals(tc, 0x567890ef, token->uintVal);
 
 	token = smmGetNextToken(lex);
-	CuAssertIntEquals(tc, tkSmmUInt32, token->kind);
-	CuAssertUIntEquals(tc, 0xffffffff, token->intVal);
+	CuAssertIntEquals(tc, tkSmmUInt, token->kind);
+	CuAssertUIntEquals(tc, 0xffffffff, token->uintVal);
 
 	token = smmGetNextToken(lex);
-	CuAssertIntEquals(tc, tkSmmUInt64, token->kind);
-	CuAssertTrue(tc, 0x100000000 == token->intVal);
+	CuAssertIntEquals(tc, tkSmmUInt, token->kind);
+	CuAssertTrue(tc, 0x100000000 == token->uintVal);
 
 	token = smmGetNextToken(lex);
-	CuAssertIntEquals(tc, tkSmmUInt64, token->kind);
-	CuAssertTrue(tc, 0xFFFFFFFFFFFFFFFF == token->intVal);
+	CuAssertIntEquals(tc, tkSmmUInt, token->kind);
+	CuAssertTrue(tc, 0xFFFFFFFFFFFFFFFF == token->uintVal);
 
 	// 0x10000000000000000
 	struct SmmFilePos filepos = { 0 };
@@ -91,8 +91,8 @@ void TestParseHexNumber(CuTest *tc) {
 
 	// 0x123.324
 	token = smmGetNextToken(lex);
-	CuAssertIntEquals(tc, tkSmmUInt32, token->kind);
-	CuAssertUIntEquals(tc, 0x123, token->intVal);
+	CuAssertIntEquals(tc, tkSmmUInt, token->kind);
+	CuAssertUIntEquals(tc, 0x123, token->uintVal);
 	smmPostMessage(errSmmInvalidCharacter, (char*)tc, filepos);
 	token = smmGetNextToken(lex);
 	CuAssertIntEquals(tc, tkSmmErr, token->kind);
@@ -105,28 +105,28 @@ void TestParseNumber(CuTest *tc) {
 		"1111111111111111111111111111111.456 1.12345678901234567890";
 	PSmmLexer lex = smmCreateLexer(buf, "TestParseNumber", allocator);
 	PSmmToken token = smmGetNextToken(lex);
-	CuAssertIntEquals(tc, tkSmmUInt32, token->kind);
-	CuAssertUIntEquals(tc, 0, token->intVal);
+	CuAssertIntEquals(tc, tkSmmUInt, token->kind);
+	CuAssertUIntEquals(tc, 0, token->uintVal);
 
 	token = smmGetNextToken(lex);
-	CuAssertIntEquals(tc, tkSmmUInt32, token->kind);
-	CuAssertUIntEquals(tc, 1, token->intVal);
+	CuAssertIntEquals(tc, tkSmmUInt, token->kind);
+	CuAssertUIntEquals(tc, 1, token->uintVal);
 
 	token = smmGetNextToken(lex);
-	CuAssertIntEquals(tc, tkSmmUInt32, token->kind);
-	CuAssertUIntEquals(tc, 1234567890, token->intVal);
+	CuAssertIntEquals(tc, tkSmmUInt, token->kind);
+	CuAssertUIntEquals(tc, 1234567890, token->uintVal);
 
 	token = smmGetNextToken(lex);
-	CuAssertIntEquals(tc, tkSmmUInt32, token->kind);
-	CuAssertUIntEquals(tc, 4294967295, token->intVal);
+	CuAssertIntEquals(tc, tkSmmUInt, token->kind);
+	CuAssertUIntEquals(tc, 4294967295, token->uintVal);
 
 	token = smmGetNextToken(lex);
-	CuAssertIntEquals(tc, tkSmmUInt64, token->kind);
-	CuAssertTrue(tc, 4294967296 == token->intVal);
+	CuAssertIntEquals(tc, tkSmmUInt, token->kind);
+	CuAssertTrue(tc, 4294967296 == token->uintVal);
 
 	token = smmGetNextToken(lex);
-	CuAssertIntEquals(tc, tkSmmUInt64, token->kind);
-	CuAssertTrue(tc, 18446744073709551615U == token->intVal);
+	CuAssertIntEquals(tc, tkSmmUInt, token->kind);
+	CuAssertTrue(tc, 18446744073709551615U == token->uintVal);
 
 	// 18446744073709551616 MAX_UINT64 + 1
 	struct SmmFilePos filepos = { 0 };
@@ -141,33 +141,33 @@ void TestParseNumber(CuTest *tc) {
 
 	// 43abc
 	token = smmGetNextToken(lex);
-	CuAssertIntEquals(tc, tkSmmUInt32, token->kind);
-	CuAssertUIntEquals(tc, 43, token->intVal);
+	CuAssertIntEquals(tc, tkSmmUInt, token->kind);
+	CuAssertUIntEquals(tc, 43, token->uintVal);
 	token = smmGetNextToken(lex);
 	CuAssertIntEquals(tc, tkSmmIdent, token->kind);
 
 	token = smmGetNextToken(lex);
-	CuAssertIntEquals(tc, tkSmmFloat64, token->kind);
+	CuAssertIntEquals(tc, tkSmmFloat, token->kind);
 	CuAssertDblEquals(tc, 123.321, token->floatVal, 0);
 
 	token = smmGetNextToken(lex);
-	CuAssertIntEquals(tc, tkSmmFloat64, token->kind);
+	CuAssertIntEquals(tc, tkSmmFloat, token->kind);
 	CuAssertDblEquals(tc, 4.2, token->floatVal, 0);
 
 	token = smmGetNextToken(lex);
-	CuAssertIntEquals(tc, tkSmmFloat64, token->kind);
+	CuAssertIntEquals(tc, tkSmmFloat, token->kind);
 	CuAssertDblEquals(tc, 456E2, token->floatVal, 0);
 
 	token = smmGetNextToken(lex);
-	CuAssertIntEquals(tc, tkSmmFloat64, token->kind);
+	CuAssertIntEquals(tc, tkSmmFloat, token->kind);
 	CuAssertDblEquals(tc, 789E-2, token->floatVal, 0);
 
 	token = smmGetNextToken(lex);
-	CuAssertIntEquals(tc, tkSmmFloat64, token->kind);
+	CuAssertIntEquals(tc, tkSmmFloat, token->kind);
 	CuAssertDblEquals(tc, 901.234E+123, token->floatVal, 0);
 
 	token = smmGetNextToken(lex);
-	CuAssertIntEquals(tc, tkSmmFloat64, token->kind);
+	CuAssertIntEquals(tc, tkSmmFloat, token->kind);
 #pragma GCC diagnostic push // Clang understands both GCC and clang pragmas
 #pragma GCC diagnostic ignored "-Woverflow"
 #pragma clang diagnostic ignored "-Wliteral-range"
@@ -175,7 +175,7 @@ void TestParseNumber(CuTest *tc) {
 #pragma GCC diagnostic pop
 
 	token = smmGetNextToken(lex);
-	CuAssertIntEquals(tc, tkSmmFloat64, token->kind);
+	CuAssertIntEquals(tc, tkSmmFloat, token->kind);
 	CuAssertDblEquals(tc, 234.3434E-234, token->floatVal, 0);
 
 	// . (dot)
@@ -185,19 +185,19 @@ void TestParseNumber(CuTest *tc) {
 
 	// 34
 	token = smmGetNextToken(lex);
-	CuAssertIntEquals(tc, tkSmmUInt32, token->kind);
+	CuAssertIntEquals(tc, tkSmmUInt, token->kind);
 
 	// 37.b
 	smmPostMessage(errSmmInvalidNumber, (char*)tc, filepos);
 	token = smmGetNextToken(lex);
-	CuAssertIntEquals(tc, tkSmmUInt32, token->kind);
+	CuAssertIntEquals(tc, tkSmmUInt, token->kind);
 
 	token = smmGetNextToken(lex);
-	CuAssertIntEquals(tc, tkSmmFloat64, token->kind);
+	CuAssertIntEquals(tc, tkSmmFloat, token->kind);
 	CuAssertDblEquals(tc, 1111111111111111111111111111111.456, token->floatVal, 0);
 
 	token = smmGetNextToken(lex);
-	CuAssertIntEquals(tc, tkSmmFloat64, token->kind);
+	CuAssertIntEquals(tc, tkSmmFloat, token->kind);
 	CuAssertDblEquals(tc, 1.12345678901234567890, token->floatVal, 0);
 }
 

@@ -27,7 +27,7 @@ typedef enum {
 	tkSmmErr,
 	tkSmmIdent = 256, // Because first 255 values are reserved for existing chars
 	tkSmmIntDiv, tkSmmIntMod, tkSmmAndOp, tkSmmOrOp, tkSmmXorOp,
-	tkSmmUInt32, tkSmmUInt64, tkSmmFloat64, tkSmmBool,
+	tkSmmInt, tkSmmUInt, tkSmmFloat, tkSmmBool,
 	tkSmmEof
 } SmmTokenKind;
 
@@ -53,7 +53,8 @@ struct SmmToken {
 	bool isFirstOnLine;
 	struct SmmFilePos filePos;
 	union {
-		uint64_t intVal;
+		uint64_t uintVal;
+		int64_t sintVal;
 		double floatVal;
 		bool boolVal;
 		uint32_t hash;

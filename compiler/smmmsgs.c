@@ -8,6 +8,7 @@
 #include "smmutil.h"
 
 #define MSG_BUFFER_LENGTH 2000
+#define WARNING_START wrnSmmConversionDataLoss
 
 static const char* msgTypeToString[] = {
 	"unknown error", "failed allocating memory",
@@ -25,13 +26,21 @@ static const char* msgTypeToString[] = {
 	"operand must be l-value",
 	"undefined type '%s'",
 	"identifier '%s' is already taken as %s",
-	"operator %s not defined for operands of type %s"
+	"operator %s not defined for operands of type %s",
+
+	"possible loss of data in conversion from %s to %s"
 };
 
 static int errorCounter;
 
 void smmPostMessage(SmmMsgType msgType, const char* fileName, const struct SmmFilePos filePos, ...) {
-	errorCounter++;
+	char* lvl;
+	if (msgType < WARNING_START) {
+		errorCounter++;
+		lvl = "ERROR";
+	} else {
+		lvl = "WARNING";
+	}
 	char msg[MSG_BUFFER_LENGTH] = { 0 };
 	
 	va_list argList;
@@ -40,9 +49,9 @@ void smmPostMessage(SmmMsgType msgType, const char* fileName, const struct SmmFi
 	va_end(argList);
 
 	if (fileName) {
-		printf("Error: %s (at %s:%d:%d)\n", msg, fileName, filePos.lineNumber, filePos.lineOffset);
+		printf("%s: %s (at %s:%d:%d)\n", lvl, msg, fileName, filePos.lineNumber, filePos.lineOffset);
 	} else {
-		printf("Error: %s (at %d:%d)\n", msg, filePos.lineNumber, filePos.lineOffset);
+		printf("%s: %s (at %d:%d)\n", lvl, msg, filePos.lineNumber, filePos.lineOffset);
 	}
 }
 

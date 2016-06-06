@@ -173,9 +173,8 @@ static void parseHexNumber(PSmmLexer lex, PSmmToken token) {
 		smmPostMessage(errSmmIntTooBig, lex->fileName, lex->filePos);
 		skipAlNum(lex);
 	} else {
-		if (digitsLeft < 8) token->kind = tkSmmUInt64;
-		else token->kind = tkSmmUInt32;
-		token->intVal = res;
+		token->kind = tkSmmUInt;
+		token->uintVal = res;
 	}
 }
 
@@ -187,7 +186,7 @@ static void parseNumber(PSmmLexer lex, PSmmToken token) {
 	int exp = 0; // Exponent for decimals, not the ones after E in 12.43E+12
 	int expSign = 1;
 	char cc = *lex->curChar;
-	token->kind = tkSmmUInt32;
+	token->kind = tkSmmUInt;
 	do {
 		if (cc >= '0' && cc <= '9') {
 			int d = cc - '0';
@@ -195,9 +194,6 @@ static void parseNumber(PSmmLexer lex, PSmmToken token) {
 				// If we are parsing int or exponent first check if we are about to overflow
 				if (res <= ((UINT64_MAX - d) / 10)) {
 					res = res * 10 + d;
-					if (res > UINT32_MAX) {
-						token->kind = tkSmmUInt64;
-					}
 				} else {
 					if (parseAsInt) {
 						// Since the number can't fit in the largest int we assume it is double
@@ -259,9 +255,9 @@ static void parseNumber(PSmmLexer lex, PSmmToken token) {
 		dres /= pow(10, -expSign * (double)res);
 	}
 	if (parseAsInt) {
-		token->intVal = res;
+		token->uintVal = res;
 	} else if (part != smmMainInt) {
-		token->kind = tkSmmFloat64;
+		token->kind = tkSmmFloat;
 		token->floatVal = dres;
 	} else {
 		token->kind = tkSmmErr;
@@ -309,6 +305,7 @@ PSmmToken smmGetNextToken(PSmmLexer lex) {
 	uint64_t pos = lex->scanCount;
 	PSmmToken token = (PSmmToken)a->alloc(a, sizeof(struct SmmToken));
 	token->filePos = lex->filePos;
+	// It should be false for first token on first line, but true for first token on following lines
 	token->isFirstOnLine = lastLine != lex->filePos.lineNumber;
 	char* firstChar = lex->curChar;
 
