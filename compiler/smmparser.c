@@ -15,7 +15,7 @@ Type Definitions
 
 // There should be one string corresponding to each value of SmmAstNodeKind enum
 char* nodeKindToString[] = {
-	"error", "Program", "=", "Ident", "", "", "", "",
+	"error", "Program", ":", "=", "Ident",
 	"+", "+.",
 	"-", "-.",
 	"*", "*.",
@@ -239,7 +239,11 @@ PSmmAstNode parseTerm(PSmmParser parser) {
 			if (opToken->kind == tkSmmIntMod) res->kind += nkSmmSRem - nkSmmSDiv;
 			break;
 		default:
-			res->kind = nkSmmMul;
+			if (type->flags & tifSmmFloat) {
+				res->kind = nkSmmFMul;
+			} else {
+				res->kind = nkSmmMul;
+			}
 			res->type = type;
 			break;
 		}
@@ -298,6 +302,7 @@ PSmmAstNode parseAssignment(PSmmParser parser, PSmmAstNode lval) {
 }
 
 PSmmAstNode parseDeclaration(PSmmParser parser, PSmmAstNode lval) {
+	PSmmToken declToken = parser->curToken;
 	expect(parser, ':');
 	if (parser->curToken->kind == tkSmmIdent) {
 		//Type is given in declaration so use it
@@ -310,11 +315,15 @@ PSmmAstNode parseDeclaration(PSmmParser parser, PSmmAstNode lval) {
 		}
 		getNextToken(parser);
 	}
+	PSmmAstNode decl = newSmmAstNode();
+	decl->kind = nkSmmDecl;
+	decl->token = declToken;
+	decl->left = lval;
 	if (parser->curToken->kind == '=') {
-		return parseAssignment(parser, lval);
+		decl->right = parseAssignment(parser, lval);
 	}
 	// Otherwise it should just be declaration so ';' is expected next
-	return NULL;
+	return decl;
 }
 
 PSmmAstNode parseStatement(PSmmParser parser) {
@@ -379,11 +388,18 @@ PSmmAstNode smmParse(PSmmParser parser) {
 	PSmmAstNode program = newSmmAstNode();
 	program->kind = nkSmmProgram;
 	PSmmAstNode lastStmt = program;
+	PSmmAstNode lastDecl = program;
 	
 	while (parser->curToken->kind != tkSmmEof) {
 		PSmmAstNode curStmt = parseStatement(parser);
+		if (curStmt->kind == nkSmmDecl) {
+			curStmt->next = lastDecl->next;
+			lastDecl->next = curStmt;
+			if (lastDecl == lastStmt) lastStmt = curStmt;
+			lastDecl = curStmt;
+			curStmt = curStmt->right;
+		}
 		if (!expect(parser, ';')) curStmt = &errorNode;
-		if (curStmt == NULL) continue;
 		if (curStmt == &errorNode) {
 			curStmt = newSmmAstNode();
 			*curStmt = errorNode;

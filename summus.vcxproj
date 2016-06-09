@@ -182,6 +182,7 @@
     <ClCompile Include="compiler\smmlexer.c">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Test|x64'">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="compiler\smmlllvmmodulegen.c" />
     <ClCompile Include="compiler\smmmsgs.c">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Test|x64'">true</ExcludedFromBuild>
     </ClCompile>
@@ -214,8 +215,10 @@
   <ItemGroup>
     <ClInclude Include="compiler\smmcommon.h" />
     <ClInclude Include="compiler\smmlexer.h" />
+    <ClInclude Include="compiler\smmlllvmmodulegen.h" />
     <ClInclude Include="compiler\smmmsgs.h" />
     <ClInclude Include="compiler\smmparser.h" />
+    <ClInclude Include="compiler\smmpasses.h" />
     <ClInclude Include="compiler\smmsemtypes.h" />
     <ClInclude Include="compiler\smmutil.h" />
     <ClInclude Include="tests\CuTest.h">

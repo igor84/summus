@@ -51,6 +51,9 @@
     <ClCompile Include="compiler\smmsemtypes.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="compiler\smmlllvmmodulegen.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="compiler\smmlexer.h">
@@ -72,6 +75,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="compiler\smmsemtypes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="compiler\smmpasses.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="compiler\smmlllvmmodulegen.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

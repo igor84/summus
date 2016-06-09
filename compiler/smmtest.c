@@ -2,6 +2,7 @@
 #include "smmlexer.h"
 #include "smmparser.h"
 #include "smmsemtypes.h"
+#include "smmlllvmmodulegen.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -26,6 +27,7 @@ void printNode(PSmmAstNode node) {
 int main(void) {
 	/*
 	TODO:
+		How to force double calc and cast at the end in a:float32 = b *12.5/2.3; where b:float64. (Check if it works)
 		Think about supporting literals of all primitive types using suffixes and such
 		(when doing int / int how to specify if you want float32 or float64 result or how to smartly determine that)
 		Do complete code review and add all the comments
@@ -59,6 +61,8 @@ int main(void) {
 	puts("\n");
 	printNode(program);
 	puts("\n");
+
+	smmGenLLVMModule(&data, allocator);
 	
 	smmPrintAllocatorInfo(allocator);
 

@@ -116,7 +116,7 @@ void smmAnalyzeTypes(PSmmModuleData data) {
 		if (parent->kind == nkSmmAssignment) {
 			assert(parent->type == parent->left->type);
 			fixExpressionTypes(data, parent->right, parent);
-		} else {
+		} else if (parent->kind != nkSmmDecl) {
 			fixExpressionTypes(data, parent, parent);
 		}
 		parent = parent->next;

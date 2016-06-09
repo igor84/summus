@@ -2,14 +2,7 @@
 #define SMM_TYPE_FIXER_H
 
 #include "smmcommon.h"
-#include "smmparser.h"
-
-struct SmmModuleData {
-	PSmmAstNode module;
-	char* filename;
-	PSmmAllocator allocator;
-};
-typedef struct SmmModuleData* PSmmModuleData;
+#include "smmpasses.h"
 
 void smmAnalyzeTypes(PSmmModuleData data);
 
