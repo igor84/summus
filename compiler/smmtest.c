@@ -24,7 +24,7 @@ void printNode(PSmmAstNode node) {
 	}
 }
 
-int main(void) {
+int main(int argc, char **argv) {
 	/*
 	TODO:
 		Add casts and handle cast nodes in semtypes
@@ -33,15 +33,20 @@ int main(void) {
 		Add bitwise operators
 		GlobalSettings
 	*/
-	char buf[64 * 1024] = { 0 };
-	const char* filename = "test.smm";
-	FILE* f = fopen(filename, "rb");
-	if (!f) {
-		printf("Can't find test.smm in the current folder!\n");
-		return EXIT_FAILURE;
+	const char* filename = "console";
+	char* buf = NULL;
+	char filebuf[64 * 1024] = { 0 };
+	if (argc > 1) {
+		const char* filename = argv[1];
+		FILE* f = fopen(filename, "rb");
+		if (!f) {
+			printf("Can't find %s in the current folder!\n", filename);
+			return EXIT_FAILURE;
+		}
+		fread(filebuf, 1, 64 * 1024, f);
+		fclose(f);
+		buf = filebuf;
 	}
-	fread(buf, 1, 64 * 1024, f);
-	fclose(f);
 	PSmmAllocator allocator = smmCreatePermanentAllocator(filename, 64 * 1024 * 1024);
 	PSmmLexer lex = smmCreateLexer(buf, filename, allocator);
 	

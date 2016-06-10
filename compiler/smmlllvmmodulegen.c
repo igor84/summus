@@ -176,9 +176,9 @@ void smmGenLLVMModule(PSmmModuleData mdata, PSmmAllocator a) {
 	LLVMSetTarget(mod, LLVMGetDefaultTargetTriple());
 	
 	LLVMTypeRef funcType = LLVMFunctionType(LLVMInt32Type(), NULL, 0, 0);
-	LLVMValueRef main = LLVMAddFunction(mod, "main", funcType);
+	LLVMValueRef mainfunc = LLVMAddFunction(mod, "main", funcType);
 
-	LLVMBasicBlockRef entry = LLVMAppendBasicBlock(main, "entry");
+	LLVMBasicBlockRef entry = LLVMAppendBasicBlock(mainfunc, "entry");
 
 	data->builder = LLVMCreateBuilder();
 	LLVMPositionBuilderAtEnd(data->builder, entry);
