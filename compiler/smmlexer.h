@@ -32,7 +32,7 @@ typedef enum {
 } SmmTokenKind;
 
 struct SmmLexer {
-	char* fileName; // Used only for error messages
+	const char* fileName; // Used only for error messages
 	char* buffer;
 	char* curChar;
 	uint64_t scanCount;
@@ -42,14 +42,14 @@ struct SmmLexer {
 typedef struct SmmLexer* PSmmLexer;
 
 struct SmmSymbol {
-	char* name;
+	const char* name;
 	int kind;
 };
 typedef struct SmmSymbol* PSmmSymbol;
 
 struct SmmToken {
 	int kind;
-	char* repr;
+	const char* repr;
 	bool isFirstOnLine;
 	struct SmmFilePos filePos;
 	union {
@@ -67,10 +67,10 @@ typedef struct SmmToken* PSmmToken;
  * if given buffer is null. When scanning stdin end of file is signaled using
  * "Enter, CTRL+Z, Enter" on Windows and CTRL+D on *nix systems
  */
-PSmmLexer smmCreateLexer(char* buffer, char* filename, PSmmAllocator allocator);
+PSmmLexer smmCreateLexer(char* buffer, const char* filename, PSmmAllocator allocator);
 
 PSmmToken smmGetNextToken(PSmmLexer lex);
 
-char* smmTokenToString(PSmmToken token, char* buf);
+const char* smmTokenToString(PSmmToken token, char* buf);
 
 #endif

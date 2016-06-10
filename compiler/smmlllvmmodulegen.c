@@ -8,7 +8,7 @@
 
 struct SmmLLVMModuleGenData {
 	PSmmAstNode module;
-	char* filename;
+	const char* filename;
 	PSmmAllocator allocator;
 	PSmmDict localVars;
 	LLVMBuilderRef builder;
@@ -150,7 +150,6 @@ PSmmAstNode createLocalVars(PSmmLLVMModuleGenData data) {
 		LLVMValueRef var = LLVMBuildAlloca(data->builder, type, node->left->token->repr);
 		LLVMSetAlignment(var, node->left->type->sizeInBytes);
 		PSmmToken varToken = node->left->token;
-		// TODO(igors): maybe add storeKeyCopy to SmmDict
 		smmAddDictValue(data->localVars, varToken->repr, varToken->hash, var);
 		if (emptyDecl) {
 			LLVMBuildStore(data->builder, var, zero);
@@ -168,6 +167,7 @@ void smmGenLLVMModule(PSmmModuleData mdata, PSmmAllocator a) {
 	data->filename = mdata->filename;
 	data->module = mdata->module;
 	data->localVars = smmCreateDict(a, 512, NULL, NULL);
+	data->localVars->storeKeyCopy = false;
 
 	if (data->module->kind == nkSmmProgram) data->module = data->module->next;
 

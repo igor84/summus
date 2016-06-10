@@ -7,7 +7,7 @@
 // Structure used to pass data to all AST passes
 struct SmmModuleData {
 	PSmmAstNode module;
-	char* filename;
+	const char* filename;
 	PSmmAllocator allocator;
 };
 typedef struct SmmModuleData* PSmmModuleData;

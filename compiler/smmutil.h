@@ -55,14 +55,15 @@ struct SmmAllocator {
 
 typedef struct SmmDictEntry* PSmmDictEntry;
 struct SmmDictEntry {
-	char* key;
+	const char* key;
 	void* value;
 	PSmmDictEntry next;
 };
 
-typedef void* (*SmmElementCreateFunc)(char* key, PSmmAllocator a, void* context);
+typedef void* (*SmmElementCreateFunc)(const char* key, PSmmAllocator a, void* context);
 
 struct SmmDict {
+	bool storeKeyCopy; // True by default
 	void* elemCreateFuncContext;
 	SmmElementCreateFunc elemCreateFunc;
 };
@@ -70,15 +71,15 @@ typedef struct SmmDict* PSmmDict;
 
 uint32_t smmUpdateHash(uint32_t hash, char val);
 uint32_t smmCompleteHash(uint32_t hash);
-uint32_t smmHashString(char* value);
+uint32_t smmHashString(const char* value);
 
 PSmmDict smmCreateDict(PSmmAllocator allocator, size_t size, void* elemCreateFuncContext, SmmElementCreateFunc createFunc);
-PSmmDictEntry smmGetDictEntry(PSmmDict dict, char* key, uint32_t hash, bool createIfMissing);
-void* smmGetDictValue(PSmmDict dict, char* key, uint32_t hash, bool createIfMissing);
-void smmAddDictValue(PSmmDict dict, char* key, uint32_t hash, void* value);
-void smmFreeDictEntry(PSmmDict dict, char* key, uint32_t hash);
+PSmmDictEntry smmGetDictEntry(PSmmDict dict, const char* key, uint32_t hash, bool createIfMissing);
+void* smmGetDictValue(PSmmDict dict, const char* key, uint32_t hash, bool createIfMissing);
+void smmAddDictValue(PSmmDict dict, const char* key, uint32_t hash, void* value);
+void smmFreeDictEntry(PSmmDict dict, const char* key, uint32_t hash);
 
-PSmmAllocator smmCreatePermanentAllocator(char* name, size_t size);
+PSmmAllocator smmCreatePermanentAllocator(const char* name, size_t size);
 void smmFreePermanentAllocator(PSmmAllocator a);
 void smmPrintAllocatorInfo(const PSmmAllocator allocator);
 

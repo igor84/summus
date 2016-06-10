@@ -14,7 +14,7 @@ Type Definitions
 *********************************************************/
 
 // There should be one string corresponding to each value of SmmAstNodeKind enum
-char* nodeKindToString[] = {
+const char* nodeKindToString[] = {
 	"error", "Program", ":", "=", "Ident",
 	"+", "+.",
 	"-", "-.",
@@ -68,7 +68,7 @@ PSmmToken expect(PSmmParser parser, int type) {
 			char tmpRepr[2] = { (char)type, 0 };
 			struct SmmToken tmpToken = {type};
 			tmpToken.repr = tmpRepr;
-			char* expected = smmTokenToString(&tmpToken, expBuf);
+			const char* expected = smmTokenToString(&tmpToken, expBuf);
 			struct SmmFilePos filePos;
 			if (token->isFirstOnLine && parser->prevToken) {
 				filePos = parser->prevToken->filePos;
@@ -144,7 +144,7 @@ PSmmAstNode parseFactor(PSmmParser parser) {
 					if (!var) {
 						identToken = parser->curToken;
 					} else if (var->kind != nkSmmIdent) {
-						char* tokenStr = nodeKindToString[var->kind];
+						const char* tokenStr = nodeKindToString[var->kind];
 						smmPostMessage(errSmmIdentTaken, parser->lex->fileName, parser->curToken->filePos, parser->curToken->repr, tokenStr);
 					} else if (!var->type) {
 						res = var;
@@ -156,7 +156,7 @@ PSmmAstNode parseFactor(PSmmParser parser) {
 				}
 			} else if (!reportedError && parser->curToken->kind != tkSmmErr) {
 				char gotBuf[4];
-				char* got = smmTokenToString(parser->curToken, gotBuf);
+				const char* got = smmTokenToString(parser->curToken, gotBuf);
 				smmPostMessage(errSmmGotUnexpectedToken, parser->lex->fileName, parser->curToken->filePos, "identifier or literal", got);
 			}
 			getNextToken(parser);
@@ -349,7 +349,7 @@ PSmmAstNode parseStatement(PSmmParser parser) {
 		return parseAssignment(parser, lval);
 	}
 	else if (lval->kind == nkSmmIdent) {
-		char* expected;
+		const char* expected;
 		if (justCreatedLValIdent) expected = ": or =";
 		else expected = "=";
 		smmPostMessage(errSmmGotUnexpectedToken, parser->lex->fileName, parser->curToken->filePos, expected, parser->curToken->repr);

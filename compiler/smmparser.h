@@ -50,7 +50,7 @@ typedef enum {
 	nkSmmTerminator
 } SmmAstNodeKind;
 
-char* nodeKindToString[nkSmmTerminator];
+const char* nodeKindToString[nkSmmTerminator];
 
 /**
  * Each build in type info kind should have coresponding type info defined in smmparser.c.
@@ -75,7 +75,7 @@ enum SmmTypeInfoFlags {
 
 struct SmmTypeInfo {
 	int kind;
-	char* name;
+	const char* name;
 	int sizeInBytes;
 	uint32_t flags;
 };

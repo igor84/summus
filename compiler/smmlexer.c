@@ -13,7 +13,7 @@
 #define SMM_LEXER_DICT_SIZE 8 * 1024
 #define SMM_MAX_HEX_DIGITS 16
 
-static char* tokenTypeToString[] = {
+static const char* tokenTypeToString[] = {
 	"identifier",
 	"div", "mod", "and", "or", "xor",
 	"uint32", "uint64", "float64", "bool",
@@ -93,7 +93,7 @@ static void skipAlNum(PSmmLexer lex) {
 	} while (isalnum(cc));
 }
 
-static void* createSymbolElem(char* key, PSmmAllocator a, void* context) {
+static void* createSymbolElem(const char* key, PSmmAllocator a, void* context) {
 	PSmmSymbol res = (PSmmSymbol)a->alloc(a, sizeof(struct SmmSymbol));
 	res->name = key;
 	res->kind = tkSmmIdent; // By default it is ident but it can be changed later
@@ -102,11 +102,11 @@ static void* createSymbolElem(char* key, PSmmAllocator a, void* context) {
 
 static void initSymTableWithKeywords(PPrivLexer lex) {
 	struct Keywords {
-		char* name;
+		const char* name;
 		int kind;
 	};
 	static struct Keywords keywords[] = {
-		{"div", tkSmmIntDiv}, { "mod", tkSmmIntMod },
+		{ "div", tkSmmIntDiv }, { "mod", tkSmmIntMod },
 		{ "and", tkSmmAndOp }, { "or", tkSmmOrOp }, { "xor", tkSmmXorOp }
 	};
 	
@@ -274,7 +274,7 @@ API Functions
  * if given buffer is null. When scanning stdin end of file is signaled using
  * "Enter - CTRL+Z - Enter" on Windows and CTRL+D on *nix systems
  */
-PSmmLexer smmCreateLexer(char* buffer, char* fileName, PSmmAllocator allocator) {
+PSmmLexer smmCreateLexer(char* buffer, const char* fileName, PSmmAllocator allocator) {
 	PPrivLexer privLex = (PPrivLexer)allocator->alloc(allocator, sizeof(struct PrivLexer));
 
 	if (!buffer) {
@@ -345,8 +345,9 @@ PSmmToken smmGetNextToken(PSmmLexer lex) {
 
 	if (!token->repr) {
 		int cnt = (int)(lex->scanCount - pos);
-		token->repr = (char*)privLex->allocator->alloc(privLex->allocator, cnt + 1);
-		strncpy(token->repr, firstChar, cnt);
+		char* repr = (char*)privLex->allocator->alloc(privLex->allocator, cnt + 1);
+		strncpy(repr, firstChar, cnt);
+		token->repr = repr;
 	}
 	return token;
 }
@@ -356,7 +357,7 @@ PSmmToken smmGetNextToken(PSmmLexer lex) {
  * The buffer is needed in case token is a single character token so we can just
  * put "<quote>char<quote><null>" into the buffer and return it.
  */
-char* smmTokenToString(PSmmToken token, char* buf) {
+const char* smmTokenToString(PSmmToken token, char* buf) {
 	if (token->kind > 255) return tokenTypeToString[token->kind - 256];
 	if (token->kind == tkSmmErr) return token->repr;
 

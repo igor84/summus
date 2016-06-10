@@ -34,7 +34,7 @@ static const char* msgTypeToString[] = {
 static int errorCounter;
 
 void smmPostMessage(SmmMsgType msgType, const char* fileName, const struct SmmFilePos filePos, ...) {
-	char* lvl;
+	const char* lvl;
 	if (msgType < WARNING_START) {
 		errorCounter++;
 		lvl = "ERROR";

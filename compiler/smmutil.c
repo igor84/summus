@@ -21,7 +21,7 @@ struct PrivAllocator {
 	size_t used;
 	size_t size;
 	size_t free;
-	unsigned char memory[0];
+	unsigned char* memory;
 };
 typedef struct PrivAllocator* PPrivAllocator;
 
@@ -29,7 +29,7 @@ struct PrivDict {
 	struct SmmDict dict;
 	PSmmAllocator allocator;
 	size_t size;
-	PSmmDictEntry entries[0];
+	PSmmDictEntry* entries;
 };
 typedef struct PrivDict* PPrivDict;
 
@@ -80,9 +80,9 @@ uint32_t smmCompleteHash(uint32_t hash) {
 	return result + (result << 15);
 }
 
-uint32_t smmHashString(char* value) {
+uint32_t smmHashString(const char* value) {
 	uint32_t hash = 0;
-	char* cc = value;
+	const char* cc = value;
 	while (*cc != 0) {
 		hash = smmUpdateHash(hash, *cc);
 		cc++;
@@ -92,15 +92,17 @@ uint32_t smmHashString(char* value) {
 
 PSmmDict smmCreateDict(PSmmAllocator allocator, size_t size, void* elemCreateFuncContext, SmmElementCreateFunc createFunc) {
 	assert(size && !(size & (size - 1))); // Size must have only one bit set
-	PPrivDict privDict = allocator->alloc(allocator, sizeof(PPrivDict) + size * sizeof(PSmmDictEntry));
+	PPrivDict privDict = allocator->alloc(allocator, sizeof(struct PrivDict) + size * sizeof(PSmmDictEntry));
 	privDict->allocator = allocator;
 	privDict->size = size;
+	privDict->dict.storeKeyCopy = true;
 	privDict->dict.elemCreateFuncContext = elemCreateFuncContext;
 	privDict->dict.elemCreateFunc = createFunc;
+	privDict->entries = (PSmmDictEntry*)(privDict + 1);
 	return &privDict->dict;
 }
 
-PSmmDictEntry smmGetDictEntry(PSmmDict dict, char* key, uint32_t hash, bool createIfMissing) {
+PSmmDictEntry smmGetDictEntry(PSmmDict dict, const char* key, uint32_t hash, bool createIfMissing) {
 	PPrivDict privDict = (PPrivDict)dict;
 	hash = hash & (privDict->size - 1);
 	PSmmDictEntry* entries = privDict->entries;
@@ -122,24 +124,27 @@ PSmmDictEntry smmGetDictEntry(PSmmDict dict, char* key, uint32_t hash, bool crea
 	}
 
 	if (createIfMissing && dict->elemCreateFunc) {
-		size_t keyLength = strlen(key) + 1;
-		char* keyVal = (char*)privDict->allocator->alloc(privDict->allocator, keyLength);
-		strcpy(keyVal, key);
-		smmAddDictValue(dict, keyVal , hash, dict->elemCreateFunc(keyVal, privDict->allocator, dict->elemCreateFuncContext));
+		if (dict->storeKeyCopy) {
+			size_t keyLength = strlen(key) + 1;
+			char* keyVal = (char*)privDict->allocator->alloc(privDict->allocator, keyLength);
+			strcpy(keyVal, key);
+			key = keyVal;
+		}
+		smmAddDictValue(dict, key , hash, dict->elemCreateFunc(key, privDict->allocator, dict->elemCreateFuncContext));
 		return entries[hash];
 	}
 
 	return NULL;
 }
 
-void* smmGetDictValue(PSmmDict dict, char* key, uint32_t hash, bool createIfMissing) {
+void* smmGetDictValue(PSmmDict dict, const char* key, uint32_t hash, bool createIfMissing) {
 	PSmmDictEntry entry = smmGetDictEntry(dict, key, hash, createIfMissing);
 	assert(!createIfMissing || (entry != NULL));
 	if (entry == NULL) return NULL;
 	return entry->value;
 }
 
-void smmAddDictValue(PSmmDict dict, char* key, uint32_t hash, void* value) {
+void smmAddDictValue(PSmmDict dict, const char* key, uint32_t hash, void* value) {
 	PPrivDict privDict = (PPrivDict)dict;
 	PSmmAllocator a = privDict->allocator;
 	PSmmDictEntry result = (PSmmDictEntry)a->alloc(a, sizeof(struct SmmDictEntry));
@@ -150,7 +155,7 @@ void smmAddDictValue(PSmmDict dict, char* key, uint32_t hash, void* value) {
 	privDict->entries[hash] = result;
 }
 
-void smmFreeDictEntry(PSmmDict dict, char* key, uint32_t hash) {
+void smmFreeDictEntry(PSmmDict dict, const char* key, uint32_t hash) {
 	PPrivDict privDict;
 	PSmmDictEntry entry = smmGetDictEntry(dict, key, hash, false);
 	if (entry == NULL) return;
@@ -164,7 +169,7 @@ void smmFreeDictEntry(PSmmDict dict, char* key, uint32_t hash) {
 	a->free(a, entry);
 }
 
-PSmmAllocator smmCreatePermanentAllocator(char* name, size_t size) {
+PSmmAllocator smmCreatePermanentAllocator(const char* name, size_t size) {
 	size = (size + 0xfff) & (~0xfff); // We take memory in chunks of 4KB
 	PPrivAllocator smmAllocator = (PPrivAllocator)calloc(1, size);
 	if (smmAllocator == NULL) {
@@ -173,18 +178,20 @@ PSmmAllocator smmCreatePermanentAllocator(char* name, size_t size) {
 		smmAbortWithMessage(errSmmMemoryAllocationFailed, ainfo, __FILE__, __LINE__ - 4);
 	}
 	size_t skipBytes = sizeof(struct PrivAllocator);
-	skipBytes = ((skipBytes + 0xf) & (~0xf)) - skipBytes;
-	smmAllocator->allocator.name = (char*)&smmAllocator->memory[skipBytes];
+	skipBytes = (skipBytes + 0xf) & (~0xf);
+	smmAllocator->memory = (unsigned char*)smmAllocator + skipBytes;
+	smmAllocator->allocator.name = (char*)smmAllocator->memory;
 	strcpy(smmAllocator->allocator.name, name);
 	smmAllocator->allocator.alloc = globalAlloc;
 	smmAllocator->allocator.malloc = globalAlloc;
 	smmAllocator->allocator.calloc = globalCAlloc;
 	smmAllocator->allocator.free = globalFree;
-	smmAllocator->size = size;
 	skipBytes += (strlen(name) + 1 + 0xf) & (~0xf);
-	smmAllocator->free = smmAllocator->size - skipBytes;
+	smmAllocator->size = size - skipBytes;
+	smmAllocator->memory = (unsigned char*)smmAllocator + skipBytes;
+	smmAllocator->free = smmAllocator->size;
 	//We make sure we did setup everything so next mem alloc starts from 16 bytes aligned address
-	assert(((uintptr_t)&smmAllocator->memory[smmAllocator->size - smmAllocator->free] & 0xf) == 0);
+	assert(((uintptr_t)smmAllocator->memory & 0xf) == 0);
 	return &smmAllocator->allocator;
 }
 

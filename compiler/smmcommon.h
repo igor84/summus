@@ -19,7 +19,6 @@
 //		4141 - 'modifier': used more than once
 //		4146 - unary minus operator applied to unsigned type, result still unsigned
 //		4180 - qualifier applied to function type has no meaning; ignored
-// 4200 - variable length arrays in structs
 // 4201 - anonimous unions in structs
 // 4204 - non-constant aggregate initializer
 //		4244 - conversion from 'type1' to 'type2', possible loss of data
@@ -41,7 +40,7 @@
 //		4800 - 'type' : forcing value to bool 'true' or 'false' (performance warning)
 //		4805 - unsafe mix of two different types in operation
 // -w14062 - enumerator value in switch is not handled
-#pragma warning (disable : 4068 4100 4127 4200 4201 4204)
+#pragma warning (disable : 4068 4100 4127 4201 4204)
 
 
 #endif // if MSVC

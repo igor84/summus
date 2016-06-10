@@ -27,16 +27,14 @@ void printNode(PSmmAstNode node) {
 int main(void) {
 	/*
 	TODO:
-		How to force double calc and cast at the end in a:float32 = b *12.5/2.3; where b:float64. (Check if it works)
-		Think about supporting literals of all primitive types using suffixes and such
-		(when doing int / int how to specify if you want float32 or float64 result or how to smartly determine that)
+		Add casts and handle cast nodes in semtypes
 		Do complete code review and add all the comments
 		Add logical operators
 		Add bitwise operators
 		GlobalSettings
 	*/
 	char buf[64 * 1024] = { 0 };
-	char* filename = "test.smm";
+	const char* filename = "test.smm";
 	FILE* f = fopen(filename, "rb");
 	if (!f) {
 		printf("Can't find test.smm in the current folder!\n");
