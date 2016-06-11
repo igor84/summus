@@ -8,6 +8,7 @@
 #include <stdlib.h>
 
 void printNode(PSmmAstNode node) {
+	while (node->kind == nkSmmDecl) node = node->next;
 	fputs(nodeKindToString[node->kind], stdout);
 	if (node->type && node->type->kind != 0) {
 		fputs(":", stdout);
@@ -27,17 +28,20 @@ void printNode(PSmmAstNode node) {
 int main(int argc, char **argv) {
 	/*
 	TODO:
+		Try to use Operator precedence parsing
+		Add LLVM Context
 		Add casts and handle cast nodes in semtypes
 		Do complete code review and add all the comments
 		Add logical operators
 		Add bitwise operators
+		LLVM has validateFunction as well
 		GlobalSettings
 	*/
 	const char* filename = "console";
 	char* buf = NULL;
 	char filebuf[64 * 1024] = { 0 };
 	if (argc > 1) {
-		const char* filename = argv[1];
+		filename = argv[1];
 		FILE* f = fopen(filename, "rb");
 		if (!f) {
 			printf("Can't find %s in the current folder!\n", filename);

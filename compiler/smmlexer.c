@@ -53,6 +53,12 @@ static void skipWhitespaceFromBuffer(const PSmmLexer lex) {
 			cc = nextChar(lex);
 			thereMayBeMoreWhites = true;
 		}
+		if (cc == '/' && lex->curChar[1] == '/') {
+			while (cc != 0 && cc != '\n') {
+				cc = nextChar(lex);
+				thereMayBeMoreWhites = true;
+			}
+		}
 		if (cc == 0) return;
 		if (cc == '\r' || cc == '\n') {
 			if (cc + lex->curChar[1] == '\r' + '\n') nextChar(lex);
@@ -72,6 +78,12 @@ static void skipWhitespaceFromStdIn(const PSmmLexer lex) {
 		while (isspace(cc)) {
 			cc = nextChar(lex);
 			thereMayBeMoreWhites = true;
+		}
+		if (cc == '/' && lex->curChar[1] == '/') {
+			while (cc != 0 && cc != '\n') {
+				cc = nextChar(lex);
+				thereMayBeMoreWhites = true;
+			}
 		}
 		if (cc == 0) {
 			if (feof(stdin)) return;
