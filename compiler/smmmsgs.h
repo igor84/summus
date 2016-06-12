@@ -24,13 +24,14 @@ typedef enum {
 } SmmMsgType;
 
 struct SmmFilePos {
+	const char* filename;
 	int32_t lineNumber;
 	int32_t lineOffset;
 };
 typedef struct SmmFilePos* PSmmFilePos;
 
-void smmPostMessage(SmmMsgType msgType, const char* fileName, const struct SmmFilePos filePos, ...);
-void smmAbortWithMessage(SmmMsgType msgType, const char* additionalInfo, const char* fileName, const int line);
+void smmPostMessage(SmmMsgType msgType, const struct SmmFilePos filePos, ...);
+void smmAbortWithMessage(SmmMsgType msgType, const char* additionalInfo, const char* filename, const int line);
 
 bool smmHadErrors();
 

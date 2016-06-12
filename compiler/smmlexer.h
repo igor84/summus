@@ -26,13 +26,12 @@ typedef enum { smmLexTypeFile, smmLexTypeStdIn } SmmLexTypeEnum;
 typedef enum {
 	tkSmmErr,
 	tkSmmIdent = 256, // Because first 255 values are reserved for existing chars
-	tkSmmIntDiv, tkSmmIntMod, tkSmmAndOp, tkSmmOrOp, tkSmmXorOp,
+	tkSmmIntDiv, tkSmmIntMod, tkSmmAndOp, tkSmmXorOp, tkSmmOrOp,
 	tkSmmInt, tkSmmUInt, tkSmmFloat, tkSmmBool,
 	tkSmmEof
 } SmmTokenKind;
 
 struct SmmLexer {
-	const char* fileName; // Used only for error messages
 	char* buffer;
 	char* curChar;
 	uint64_t scanCount;

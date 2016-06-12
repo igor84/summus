@@ -17,7 +17,7 @@ static void fixExpressionTypes(PSmmModuleData data, PSmmAstNode node, PSmmAstNod
 			//if parent is int and node is float then warning and cast
 			PSmmTypeInfo type = node->type;
 			if (type->kind == tiSmmSoftFloat64) type -= 2;
-			smmPostMessage(wrnSmmConversionDataLoss, data->filename, parent->token->filePos, type->name, parent->type->name);
+			smmPostMessage(wrnSmmConversionDataLoss, parent->token->filePos, type->name, parent->type->name);
 			cast = getCastNode(data->allocator, node, parent->type);
 		} else if ((parent->type->flags & tifSmmFloat) && (node->type->flags & tifSmmInt)) {
 			// if parent is float and node is int change it if it is literal or cast it otherwise
@@ -47,7 +47,7 @@ static void fixExpressionTypes(PSmmModuleData data, PSmmAstNode node, PSmmAstNod
 						case tiSmmInt16: node->token->sintVal = (int8_t)node->token->sintVal; break;
 						case tiSmmInt32: node->token->sintVal = (int8_t)node->token->sintVal; break;
 						}
-						smmPostMessage(wrnSmmConversionDataLoss, data->filename, parent->token->filePos,
+						smmPostMessage(wrnSmmConversionDataLoss, parent->token->filePos,
 							node->type->name, parent->type->name);
 						node->type = parent->type;
 					} else {
@@ -69,7 +69,7 @@ static void fixExpressionTypes(PSmmModuleData data, PSmmAstNode node, PSmmAstNod
 					case tiSmmInt32: node->token->sintVal = (int32_t)node->token->uintVal; break;
 					}
 					if (oldVal < 0 || oldVal != node->token->sintVal) {
-						smmPostMessage(wrnSmmConversionDataLoss, data->filename, parent->token->filePos, node->type->name, parent->type->name);
+						smmPostMessage(wrnSmmConversionDataLoss, parent->token->filePos, node->type->name, parent->type->name);
 					}
 					node->token->kind = tkSmmUInt;
 					node->type = parent->type;

@@ -22,7 +22,7 @@ void TestParseIdent(CuTest *tc) {
 	PSmmToken token = smmGetNextToken(lex);
 	CuAssertIntEquals(tc, tkSmmIdent, token->kind);
 	CuAssertStrEquals(tc, "whatever", token->repr);
-	char* whatever = token->repr;
+	const char* whatever = token->repr;
 	
 	token = smmGetNextToken(lex);
 	CuAssertIntEquals(tc, tkSmmAndOp, token->kind);
@@ -74,18 +74,18 @@ void TestParseHexNumber(CuTest *tc) {
 	CuAssertTrue(tc, 0xFFFFFFFFFFFFFFFF == token->uintVal);
 
 	// 0x10000000000000000
-	struct SmmFilePos filepos = { 0 };
-	smmPostMessage(errSmmIntTooBig, (char*)tc, filepos);
+	struct SmmFilePos filepos = { (char*)tc };
+	smmPostMessage(errSmmIntTooBig, filepos);
 	token = smmGetNextToken(lex);
 	CuAssertIntEquals(tc, tkSmmErr, token->kind);
 
 	// 0xxrg
-	smmPostMessage(errSmmInvalidHexDigit, (char*)tc, filepos);
+	smmPostMessage(errSmmInvalidHexDigit, filepos);
 	token = smmGetNextToken(lex);
 	CuAssertIntEquals(tc, tkSmmErr, token->kind);
 
 	// 0x123asd
-	smmPostMessage(errSmmInvalidHexDigit, (char*)tc, filepos);
+	smmPostMessage(errSmmInvalidHexDigit, filepos);
 	token = smmGetNextToken(lex);
 	CuAssertIntEquals(tc, tkSmmErr, token->kind);
 
@@ -93,7 +93,7 @@ void TestParseHexNumber(CuTest *tc) {
 	token = smmGetNextToken(lex);
 	CuAssertIntEquals(tc, tkSmmUInt, token->kind);
 	CuAssertUIntEquals(tc, 0x123, token->uintVal);
-	smmPostMessage(errSmmInvalidCharacter, (char*)tc, filepos);
+	smmPostMessage(errSmmInvalidCharacter, filepos);
 	token = smmGetNextToken(lex);
 	CuAssertIntEquals(tc, tkSmmErr, token->kind);
 	CuAssertStrEquals(tc, ".", token->repr);
@@ -129,13 +129,13 @@ void TestParseNumber(CuTest *tc) {
 	CuAssertTrue(tc, 18446744073709551615U == token->uintVal);
 
 	// 18446744073709551616 MAX_UINT64 + 1
-	struct SmmFilePos filepos = { 0 };
-	smmPostMessage(errSmmIntTooBig, (char*)tc, filepos);
+	struct SmmFilePos filepos = { (char*)tc };
+	smmPostMessage(errSmmIntTooBig, filepos);
 	token = smmGetNextToken(lex);
 	CuAssertIntEquals(tc, tkSmmErr, token->kind);
 
 	// 02342
-	smmPostMessage(errSmmInvalid0Number, (char*)tc, filepos);
+	smmPostMessage(errSmmInvalid0Number, filepos);
 	token = smmGetNextToken(lex);
 	CuAssertIntEquals(tc, tkSmmErr, token->kind);
 
@@ -179,7 +179,7 @@ void TestParseNumber(CuTest *tc) {
 	CuAssertDblEquals(tc, 234.3434E-234, token->floatVal, 0);
 
 	// . (dot)
-	smmPostMessage(errSmmInvalidCharacter, (char*)tc, filepos);
+	smmPostMessage(errSmmInvalidCharacter, filepos);
 	token = smmGetNextToken(lex);
 	CuAssertIntEquals(tc, tkSmmErr, token->kind);
 
@@ -188,7 +188,7 @@ void TestParseNumber(CuTest *tc) {
 	CuAssertIntEquals(tc, tkSmmUInt, token->kind);
 
 	// 37.b
-	smmPostMessage(errSmmInvalidNumber, (char*)tc, filepos);
+	smmPostMessage(errSmmInvalidNumber, filepos);
 	token = smmGetNextToken(lex);
 	CuAssertIntEquals(tc, tkSmmUInt, token->kind);
 
@@ -204,7 +204,7 @@ void TestParseNumber(CuTest *tc) {
 void TestTokenToString(CuTest *tc) {
 	struct SmmToken token = { 0, "repr" };
 	char buf[4] = { 0 };
-	char* res = smmTokenToString(&token, buf);
+	const char* res = smmTokenToString(&token, buf);
 	CuAssertStrEquals(tc, "repr", res);
 	CuAssertStrEquals(tc, "", buf);
 

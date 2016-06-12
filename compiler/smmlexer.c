@@ -26,7 +26,6 @@ Type Definitions
 
 struct PrivLexer {
 	struct SmmLexer lex;
-	SmmLexTypeEnum lexType;
 	PSmmAllocator allocator;
 	void(*skipWhitespace)(const PSmmLexer);
 	PSmmDict symTable;
@@ -170,7 +169,7 @@ static void parseHexNumber(PSmmLexer lex, PSmmToken token) {
 			if (cc >= 'a' && cc <= 'f') {
 				res = (res << 4) + cc - 'a' + 10;
 			} else if (cc > 'f' && cc < 'z') {
-				smmPostMessage(errSmmInvalidHexDigit, lex->fileName, lex->filePos);
+				smmPostMessage(errSmmInvalidHexDigit, lex->filePos);
 				skipAlNum(lex);
 				return;
 			} else {
@@ -182,7 +181,7 @@ static void parseHexNumber(PSmmLexer lex, PSmmToken token) {
 	} while (digitsLeft > 0);
 
 	if (digitsLeft == 0 && isalnum(*lex->curChar)) {
-		smmPostMessage(errSmmIntTooBig, lex->fileName, lex->filePos);
+		smmPostMessage(errSmmIntTooBig, lex->filePos);
 		skipAlNum(lex);
 	} else {
 		token->kind = tkSmmUInt;
@@ -228,7 +227,7 @@ static void parseNumber(PSmmLexer lex, PSmmToken token) {
 			}
 		} else if (cc == '.' && part == smmMainInt) {
 			if (!isdigit(lex->curChar[1])) {
-				smmPostMessage(errSmmInvalidNumber, lex->fileName, lex->filePos);
+				smmPostMessage(errSmmInvalidNumber, lex->filePos);
 				nextChar(lex);
 				skipAlNum(lex);
 				break;
@@ -250,7 +249,7 @@ static void parseNumber(PSmmLexer lex, PSmmToken token) {
 				nextChar(lex);
 			}
 			if (!isdigit(lex->curChar[1])) {
-				smmPostMessage(errSmmInvalidFloatExponent, lex->fileName, lex->filePos);
+				smmPostMessage(errSmmInvalidFloatExponent, lex->filePos);
 				nextChar(lex);
 				skipAlNum(lex);
 				break;
@@ -273,7 +272,7 @@ static void parseNumber(PSmmLexer lex, PSmmToken token) {
 		token->floatVal = dres;
 	} else {
 		token->kind = tkSmmErr;
-		smmPostMessage(errSmmIntTooBig, lex->fileName, lex->filePos);
+		smmPostMessage(errSmmIntTooBig, lex->filePos);
 	}
 }
 
@@ -286,17 +285,16 @@ API Functions
  * if given buffer is null. When scanning stdin end of file is signaled using
  * "Enter - CTRL+Z - Enter" on Windows and CTRL+D on *nix systems
  */
-PSmmLexer smmCreateLexer(char* buffer, const char* fileName, PSmmAllocator allocator) {
+PSmmLexer smmCreateLexer(char* buffer, const char* filename, PSmmAllocator allocator) {
 	PPrivLexer privLex = (PPrivLexer)allocator->alloc(allocator, sizeof(struct PrivLexer));
 
 	if (!buffer) {
 		buffer = (char *)allocator->alloc(allocator, SMM_STDIN_BUFFER_LENGTH);
 		fgets(buffer, SMM_STDIN_BUFFER_LENGTH, stdin);
 		privLex->skipWhitespace = skipWhitespaceFromStdIn;
-		privLex->lexType = smmLexTypeStdIn;
 	} else {
 		privLex->skipWhitespace = skipWhitespaceFromBuffer;
-		privLex->lex.fileName = fileName;
+		privLex->lex.filePos.filename = filename;
 	}
 	privLex->allocator = allocator;
 	privLex->lex.buffer = buffer;
@@ -338,7 +336,7 @@ PSmmToken smmGetNextToken(PSmmLexer lex) {
 		} else if (!isalnum(lex->curChar[1])) {
 			parseNumber(lex, token);
 		} else {
-			smmPostMessage(errSmmInvalid0Number, lex->fileName, lex->filePos);
+			smmPostMessage(errSmmInvalid0Number, lex->filePos);
 			skipAlNum(lex);
 		}
 		break;
@@ -349,7 +347,7 @@ PSmmToken smmGetNextToken(PSmmLexer lex) {
 		if (isalpha(*firstChar)) {
 			parseIdent(privLex, token);
 		} else {
-			smmPostMessage(errSmmInvalidCharacter, lex->fileName, lex->filePos);
+			smmPostMessage(errSmmInvalidCharacter, lex->filePos);
 			nextChar(lex);
 		}
 		break;

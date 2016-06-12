@@ -33,7 +33,7 @@ static const char* msgTypeToString[] = {
 
 static int errorCounter;
 
-void smmPostMessage(SmmMsgType msgType, const char* fileName, const struct SmmFilePos filePos, ...) {
+void smmPostMessage(SmmMsgType msgType, const struct SmmFilePos filePos, ...) {
 	const char* lvl;
 	if (msgType < WARNING_START) {
 		errorCounter++;
@@ -48,15 +48,15 @@ void smmPostMessage(SmmMsgType msgType, const char* fileName, const struct SmmFi
 	vsnprintf(msg, MSG_BUFFER_LENGTH, msgTypeToString[msgType], argList);
 	va_end(argList);
 
-	if (fileName) {
-		printf("%s: %s (at %s:%d:%d)\n", lvl, msg, fileName, filePos.lineNumber, filePos.lineOffset);
+	if (filePos.filename) {
+		printf("%s: %s (at %s:%d:%d)\n", lvl, msg, filePos.filename, filePos.lineNumber, filePos.lineOffset);
 	} else {
 		printf("%s: %s (at %d:%d)\n", lvl, msg, filePos.lineNumber, filePos.lineOffset);
 	}
 }
 
-void smmAbortWithMessage(SmmMsgType msgType, const char* additionalInfo, const char* fileName, const int line) {
-	printf("Compiler Error: %s %s (at %s:%d)\n", msgTypeToString[msgType], additionalInfo, fileName, line);
+void smmAbortWithMessage(SmmMsgType msgType, const char* additionalInfo, const char* filename, const int line) {
+	printf("Compiler Error: %s %s (at %s:%d)\n", msgTypeToString[msgType], additionalInfo, filename, line);
 	exit(EXIT_FAILURE);
 }
 

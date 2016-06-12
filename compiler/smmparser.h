@@ -25,6 +25,15 @@
 #include "smmcommon.h"
 #include "smmlexer.h"
 
+typedef struct SmmAstNode* PSmmAstNode;
+typedef PSmmAstNode (*PSmmSetupBinOpNode)(PSmmAstNode binOp);
+
+struct SmmBinaryOperator {
+	PSmmSetupBinOpNode setupNode;
+	int precedence;
+};
+typedef struct SmmBinaryOperator* PSmmBinaryOperator;
+
 struct SmmParser {
 	PSmmLexer lex;
 	PSmmToken prevToken;
@@ -32,6 +41,7 @@ struct SmmParser {
 	PSmmDict idents;
 	int lastErrorLine;
 	PSmmAllocator allocator;
+	PSmmBinaryOperator* operatorPrecedences;
 };
 typedef struct SmmParser* PSmmParser;
 
@@ -81,7 +91,6 @@ struct SmmTypeInfo {
 };
 typedef struct SmmTypeInfo* PSmmTypeInfo;
 
-typedef struct SmmAstNode* PSmmAstNode;
 struct SmmAstNode {
 	SmmAstNodeKind kind;
 	PSmmTypeInfo type;

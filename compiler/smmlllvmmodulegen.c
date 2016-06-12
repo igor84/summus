@@ -8,7 +8,6 @@
 
 struct SmmLLVMModuleGenData {
 	PSmmAstNode module;
-	const char* filename;
 	PSmmAllocator allocator;
 	PSmmDict localVars;
 	LLVMBuilderRef builder;
@@ -98,9 +97,6 @@ LLVMValueRef convertToInstructions(PSmmLLVMModuleGenData data, PSmmAstNode node)
 		return LLVMBuildBinOp(builder, node->kind - nkSmmAdd + LLVMAdd, left, right, "");
 	}
 
-	bool signExtend;
-	LLVMTypeRef intType;
-
 	switch (node->kind) {
 	case nkSmmAssignment:
 		res = LLVMBuildStore(builder, right, left);
@@ -108,11 +104,12 @@ LLVMValueRef convertToInstructions(PSmmLLVMModuleGenData data, PSmmAstNode node)
 		res = left;
 		break;
 	case nkSmmNeg: res = LLVMBuildNeg(builder, left, ""); break;
-	case nkSmmInt:
-		signExtend = !(node->type->flags & tifSmmUnsigned);
-		intType = LLVMIntType(node->type->sizeInBytes << 3);
+	case nkSmmInt: {
+		bool signExtend = !(node->type->flags & tifSmmUnsigned);
+		LLVMTypeRef intType = LLVMIntType(node->type->sizeInBytes << 3);
 		res = LLVMConstInt(intType, node->token->uintVal, signExtend);
 		break;
+	}
 	case nkSmmFloat:
 		if (node->type->kind == tiSmmFloat32) {
 			res = LLVMConstReal(LLVMFloatType(), node->token->floatVal);
@@ -164,14 +161,13 @@ void smmGenLLVMModule(PSmmModuleData mdata, PSmmAllocator a) {
 
 	PSmmLLVMModuleGenData data = (PSmmLLVMModuleGenData)a->alloc(a, sizeof(struct SmmLLVMModuleGenData));
 	data->allocator = a;
-	data->filename = mdata->filename;
 	data->module = mdata->module;
 	data->localVars = smmCreateDict(a, 512, NULL, NULL);
 	data->localVars->storeKeyCopy = false;
 
 	if (data->module->kind == nkSmmProgram) data->module = data->module->next;
 
-	LLVMModuleRef mod = LLVMModuleCreateWithName(data->filename);
+	LLVMModuleRef mod = LLVMModuleCreateWithName(mdata->filename);
 	LLVMSetDataLayout(mod, "");
 	LLVMSetTarget(mod, LLVMGetDefaultTargetTriple());
 	

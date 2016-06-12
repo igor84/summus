@@ -69,6 +69,9 @@ int main(int argc, char **argv) {
 	printNode(program);
 	puts("\n");
 
+	if (smmHadErrors()) {
+		return 1;
+	}
 	smmGenLLVMModule(&data, allocator);
 	
 	smmPrintAllocatorInfo(allocator);
