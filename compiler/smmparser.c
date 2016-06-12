@@ -21,18 +21,18 @@ const char* nodeKindToString[] = {
 	"*", "*.",
 	"udiv", "sdiv", "/",
 	"umod", "smod", "%",
-	"-", "type", "int", "float",
+	"-", "type", "int", "float", "bool",
 	"cast"
 };
 
 static struct SmmTypeInfo builtInTypes[] = {
 	{ tiSmmUnknown, "/unknown/", 0},
-	{ tiSmmUInt8, "uint8", tifSmmUnsignedInt }, { tiSmmUInt16, "uint16", 2, tifSmmUnsignedInt },
+	{ tiSmmUInt8, "uint8", 1, tifSmmUnsignedInt }, { tiSmmUInt16, "uint16", 2, tifSmmUnsignedInt },
 	{ tiSmmUInt32, "uint32", 4, tifSmmUnsignedInt }, { tiSmmUInt64, "uint64", 8, tifSmmUnsignedInt },
 	{ tiSmmInt8, "int8", 1, tifSmmInt },{ tiSmmInt16, "int16", 2, tifSmmInt },
 	{ tiSmmInt32, "int32", 4, tifSmmInt },{ tiSmmInt64, "int64", 8, tifSmmInt },
 	{ tiSmmFloat32, "float32", 4, tifSmmFloat }, { tiSmmFloat64, "float64", 8, tifSmmFloat },
-	{ tiSmmSoftFloat64, "/sfloat64/", 8, tifSmmFloat }, { tiSmmBool, "bool", 1 }
+	{ tiSmmSoftFloat64, "/sfloat64/", 8, tifSmmFloat }, { tiSmmBool, "bool", 1, tifSmmBool }
 };
 
 static struct SmmAstNode errorNode = { nkSmmError, &builtInTypes[0] };
@@ -84,6 +84,37 @@ PSmmToken expect(PSmmParser parser, int type) {
 	return token;
 }
 
+PSmmAstNode parseIdentFactor(PSmmParser parser) {
+	PSmmToken identToken = NULL;
+	PSmmAstNode res = &errorNode;
+	PSmmAstNode var = (PSmmAstNode)smmGetDictValue(parser->idents, parser->curToken->repr, parser->curToken->hash, false);
+	if (!var) {
+		identToken = parser->curToken;
+	} else if (var->kind != nkSmmIdent) {
+		const char* tokenStr = nodeKindToString[var->kind];
+		smmPostMessage(errSmmIdentTaken, parser->curToken->filePos, parser->curToken->repr, tokenStr);
+	} else if (!var->type) {
+		smmPostMessage(errSmmUndefinedIdentifier, parser->curToken->filePos, parser->curToken->repr);
+	} else {
+		res = newSmmAstNode();
+		*res = *var;
+		res->token = parser->curToken;
+	}
+	getNextToken(parser);
+	if (identToken) {
+		if (parser->curToken->kind == ':') {
+			// This is declaration
+			res = newSmmAstNode();
+			res->kind = nkSmmIdent;
+			res->token = identToken;
+			smmAddDictValue(parser->idents, res->token->repr, res->token->hash, res);
+		} else {
+			smmPostMessage(errSmmUndefinedIdentifier, identToken->filePos, identToken->repr);
+		}
+	}
+	return res;
+}
+
 PSmmTypeInfo getLiteralTokenType(PSmmToken token) {
 	switch (token->kind) {
 	case tkSmmBool: return &builtInTypes[tiSmmBool];
@@ -95,10 +126,21 @@ PSmmTypeInfo getLiteralTokenType(PSmmToken token) {
 		if (token->uintVal <= INT64_MAX) return &builtInTypes[tiSmmInt64];
 		return &builtInTypes[tiSmmUInt64];
 	default:
-		// Should never happen
 		assert(false && "Got literal of unknown kind!");
 		return &builtInTypes[tiSmmUnknown];
 	}
+}
+
+PSmmAstNode getLiteralNode(PSmmParser parser) {
+	PSmmAstNode res = newSmmAstNode();
+	res->type = getLiteralTokenType(parser->curToken);
+	if (res->type->flags & tifSmmInt) res->kind = nkSmmInt;
+	else if (res->type->flags & tifSmmFloat) res->kind = nkSmmFloat;
+	else if (res->type->flags & tifSmmBool) res->kind = nkSmmBool;
+	else assert(false && "Got unimplemented literal type");
+	res->token = parser->curToken;
+	getNextToken(parser);
+	return res;
 }
 
 bool isNegFactor(PSmmParser parser) {
@@ -122,56 +164,25 @@ PSmmAstNode parseFactor(PSmmParser parser) {
 		if (!expect(parser, ')')) return &errorNode;
 	} else {
 		bool reportedError = parser->lastErrorLine == parser->curToken->filePos.lineNumber;
-		SmmAstNodeKind kind;
 		do {
 			doNeg = doNeg || isNegFactor(parser);
-			PSmmToken identToken = NULL;
-			kind = nkSmmError;
+
 			switch (parser->curToken->kind) {
-			case tkSmmIdent: kind = nkSmmIdent; break;
-			case tkSmmUInt: kind = nkSmmInt; break;
-			case tkSmmFloat: kind = nkSmmFloat; break;
-			default: break;
-			}
-			if (kind != nkSmmError) {
-				if (kind != nkSmmIdent) {
-					res = newSmmAstNode();
-					res->kind = kind;
-					res->type = getLiteralTokenType(parser->curToken);
-					res->token = parser->curToken;
-				} else {
-					PSmmAstNode var = (PSmmAstNode)smmGetDictValue(parser->idents, parser->curToken->repr, parser->curToken->hash, false);
-					if (!var) {
-						identToken = parser->curToken;
-					} else if (var->kind != nkSmmIdent) {
-						const char* tokenStr = nodeKindToString[var->kind];
-						smmPostMessage(errSmmIdentTaken, parser->curToken->filePos, parser->curToken->repr, tokenStr);
-					} else if (!var->type) {
-						res = var;
-					} else {
-						res = newSmmAstNode();
-						*res = *var;
-						res->token = parser->curToken;
-					}
+			case tkSmmIdent: res = parseIdentFactor(parser); break;
+			case tkSmmUInt: case tkSmmFloat: case tkSmmBool:
+				res = getLiteralNode(parser);
+				break;
+			default: 
+				if (!reportedError && parser->curToken->kind != tkSmmErr) {
+					reportedError = true;
+					char gotBuf[4];
+					const char* got = smmTokenToString(parser->curToken, gotBuf);
+					smmPostMessage(errSmmGotUnexpectedToken, parser->curToken->filePos, "identifier or literal", got);
 				}
-			} else if (!reportedError && parser->curToken->kind != tkSmmErr) {
-				char gotBuf[4];
-				const char* got = smmTokenToString(parser->curToken, gotBuf);
-				smmPostMessage(errSmmGotUnexpectedToken, parser->curToken->filePos, "identifier or literal", got);
+				getNextToken(parser);
+				break;
 			}
-			getNextToken(parser);
-			if (identToken) {
-				if (parser->curToken->kind == ':') {
-					// This is declaration
-					res = newSmmAstNode();
-					res->kind = nkSmmIdent;
-					res->token = identToken;
-					smmAddDictValue(parser->idents, res->token->repr, res->token->hash, res);
-				} else {
-					smmPostMessage(errSmmUndefinedIdentifier, identToken->filePos, identToken->repr);
-				}
-			}
-		} while (kind == nkSmmError && parser->curToken->kind != ';' && parser->curToken->kind != tkSmmEof);
+		} while (res == &errorNode && parser->curToken->kind != ';' && parser->curToken->kind != tkSmmEof);
 	}
 
 	if (doNeg) {
@@ -183,15 +194,17 @@ PSmmAstNode parseFactor(PSmmParser parser) {
 			case tiSmmInt32: if (res->token->sintVal == INT16_MIN) res->type = &builtInTypes[tiSmmInt16]; break;
 			case tiSmmInt64: if (res->token->sintVal == INT32_MIN) res->type = &builtInTypes[tiSmmInt32]; break;
 			case tiSmmUInt64:
-				res->type = &builtInTypes[tiSmmInt64];
 				if (res->token->sintVal != INT64_MIN) {
 					smmPostMessage(wrnSmmConversionDataLoss,
 						res->token->filePos,
 						res->type->name,
 						builtInTypes[tiSmmInt64].name);
 				}
+				res->type = &builtInTypes[tiSmmInt64];
 				break;
 			}
+		} else if (res->kind == nkSmmFloat) {
+			res->token->floatVal = -res->token->floatVal;
 		} else {
 			PSmmAstNode neg = newSmmAstNode();
 			neg->kind = nkSmmNeg;
@@ -268,14 +281,17 @@ PSmmAstNode parseAssignment(PSmmParser parser, PSmmAstNode lval) {
 PSmmAstNode parseDeclaration(PSmmParser parser, PSmmAstNode lval) {
 	PSmmToken declToken = parser->curToken;
 	expect(parser, ':');
+	PSmmAstNode typeInfo = NULL;
 	if (parser->curToken->kind == tkSmmIdent) {
 		//Type is given in declaration so use it
-		PSmmAstNode typeInfo = (PSmmAstNode)smmGetDictValue(parser->idents, parser->curToken->repr, parser->curToken->hash, false);
-		if (!typeInfo || typeInfo->kind != nkSmmType) {
-			smmPostMessage(errSmmUnknownType, parser->curToken->filePos, parser->curToken->repr);
-		}
-		else if (!lval->type) {
-			lval->type = typeInfo->type;
+		if (lval->type) {
+			smmPostMessage(errSmmRedefinition, declToken->filePos, lval->token->repr);
+		} else {
+			typeInfo = (PSmmAstNode)smmGetDictValue(parser->idents, parser->curToken->repr, parser->curToken->hash, false);
+			if (!typeInfo || typeInfo->kind != nkSmmType) {
+				smmPostMessage(errSmmUnknownType, parser->curToken->filePos, parser->curToken->repr);
+				typeInfo = NULL;
+			}
 		}
 		getNextToken(parser);
 	}
@@ -285,6 +301,12 @@ PSmmAstNode parseDeclaration(PSmmParser parser, PSmmAstNode lval) {
 	decl->left = lval;
 	if (parser->curToken->kind == '=') {
 		decl->right = parseAssignment(parser, lval);
+	}
+	if (typeInfo) {
+		// We do this here so that parseAssignment and parseExpression that follows it
+		// can detect usage of undeclared identifier in expressions like x : int8 = x + 1;
+		lval->type = typeInfo->type;
+		if (decl->right) decl->right->type = lval->type;
 	}
 	// Otherwise it should just be declaration so ';' is expected next
 	return decl;
@@ -305,14 +327,10 @@ PSmmAstNode parseStatement(PSmmParser parser) {
 	}
 
 	if (parser->curToken->kind == ':') {
-		if ((lval->kind == nkSmmIdent) && (lval->type != NULL)) {
-			smmPostMessage(errSmmRedefinition, lval->token->filePos, lval->token->repr);
-		}
 		return parseDeclaration(parser, lval);
 	} else if (parser->curToken->kind == '=') {
 		return parseAssignment(parser, lval);
-	}
-	else if (lval->kind == nkSmmIdent) {
+	} else if (lval->kind == nkSmmIdent) {
 		const char* expected;
 		if (justCreatedLValIdent) expected = ": or =";
 		else expected = "=";

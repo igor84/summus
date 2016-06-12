@@ -28,8 +28,6 @@ void printNode(PSmmAstNode node) {
 int main(int argc, char **argv) {
 	/*
 	TODO:
-		Try to use Operator precedence parsing
-		Add LLVM Context
 		Add casts and handle cast nodes in semtypes
 		Do complete code review and add all the comments
 		Add logical operators

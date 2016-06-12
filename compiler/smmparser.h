@@ -54,7 +54,7 @@ typedef enum {
 	nkSmmUDiv, nkSmmSDiv, nkSmmFDiv,
 	nkSmmURem, nkSmmSRem, nkSmmFRem,
 	nkSmmNeg,
-	nkSmmType, nkSmmInt, nkSmmFloat,
+	nkSmmType, nkSmmInt, nkSmmFloat, nkSmmBool,
 	nkSmmCast,
 
 	nkSmmTerminator
