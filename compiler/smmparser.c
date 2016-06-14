@@ -83,13 +83,89 @@ PSmmToken expect(PSmmParser parser, int type) {
 	getNextToken(parser);
 	return token;
 }
+/**
+ * When func node is read from identDict it is copied to a new node whose "left"
+ * is then setup to point to original func node and is given here. Original func
+ * node is linked with other overloaded funcs (funcs with same name but different
+ * parameters) over the "next" pointer. Each func node in its "left" pointer has
+ * a list of its formal parameters which are all linked through their "left"
+ * pointer. The given node also has a list of given arguments in its "right"
+ * pointer and they are linked through their "right" pointers. This function goes
+ * through all overloaded funcs and tries to match given arguments with that
+ * function's parameters. If exact match is not found but a match where some
+ * arguments can be upcast to bigger type of the same kind (like from int8 to
+ * int32 but not to uint32) that func will be used. If there are multiple such
+ * funcs we will say that it is undefined which one will be called (because
+ * compiler implementation can change) and that explicit casts should be used in
+ * such cases.
+ *
+ * Example:
+ * func : (int32, float64, bool) -> int8;
+ * func : (int32, float32) -> int16;
+ * func(1000, 54.234, true);
+ * Received node:                      ___node___
+ *                              ___func          int16___
+ *                      ___int32     |                   softFloat64___
+ *               float32        ___func                                bool
+ *                      ___int32
+ *            ___float64
+ *        bool
+ * Output node:                        ___node___
+ *                             ___int32          int16___
+ *                   ___float64                          softFloat64___
+ *               bool                                               bool
+ */
+PSmmAstNode resolveCall(PSmmParser parser, PSmmAstNode node) {
+	PSmmAstNode curCall = node->left;
+	PSmmAstNode softCall = NULL;
+	while (curCall) {
+		PSmmAstNode curArg = node->right;
+		PSmmAstNode curParam = curCall->left;
+		PSmmAstNode tmpSoftCall = NULL;
+		while (curParam && curArg) {
+			bool differentTypes = curParam->type->kind != curArg->type->kind;
+			if (differentTypes) {
+				bool bothInts = (curParam->type->flags == curArg->type->flags) && (curArg->type->flags | tifSmmInt);
+				bool bothFloats = curParam->type->flags & curArg->type->flags & tifSmmFloat;
+				bool floatAndSoftFloat = curArg->type->kind == tiSmmSoftFloat64 && (curParam->type->flags & tifSmmFloat);
+				bool upcastPossible = floatAndSoftFloat || ((bothInts || bothFloats) && (curParam->type->kind > curArg->type->kind));
+				if (upcastPossible) {
+					tmpSoftCall = curCall;
+				} else {
+					tmpSoftCall = NULL;
+					break;
+				}
+			}
+			curParam = curParam->left;
+			curArg = curArg->right;
+		}
+		if (!curParam && !curArg && !tmpSoftCall) {
+			break;
+		} else {
+			if (tmpSoftCall) softCall = tmpSoftCall;
+			curCall = curCall->next;
+		}
+	}
+	if (!curCall && softCall) curCall = softCall;
+	if (curCall) {
+		node->type = curCall->type;
+		node->left = curCall->left;
+		return node;
+	}
+	//Report error expected one of
+	return &errorNode;
+}
 
 PSmmAstNode parseIdentFactor(PSmmParser parser) {
 	PSmmToken identToken = NULL;
+	PSmmTypeInfo castType = NULL;
 	PSmmAstNode res = &errorNode;
 	PSmmAstNode var = (PSmmAstNode)smmGetDictValue(parser->idents, parser->curToken->repr, parser->curToken->hash, false);
 	if (!var) {
 		identToken = parser->curToken;
+	} else if (var->kind == nkSmmType) {
+		identToken = parser->curToken;
+		castType = var->type;
 	} else if (var->kind != nkSmmIdent) {
 		const char* tokenStr = nodeKindToString[var->kind];
 		smmPostMessage(errSmmIdentTaken, parser->curToken->filePos, parser->curToken->repr, tokenStr);
@@ -101,7 +177,34 @@ PSmmAstNode parseIdentFactor(PSmmParser parser) {
 		res->token = parser->curToken;
 	}
 	getNextToken(parser);
-	if (identToken) {
+	if (parser->curToken->kind == '(') {
+		// Function call or cast
+		if (castType) {
+			// Since we pass '(' to parse expression it will also handle ')'
+			PSmmAstNode expr = parseExpression(parser);
+			if (expr == &errorNode) return expr;
+			res = newSmmAstNode();
+			res->kind = nkSmmCast;
+			res->left = expr;
+			res->token = identToken;
+			res->type = castType;
+		} else if (res != &errorNode) {
+			getNextToken(parser);
+			res->kind = nkSmmCall;
+			res->left = var; // Left points to root node of func overload data
+			res->next = NULL;
+			PSmmAstNode lastArg = res;
+			while (parser->curToken->kind != ')' && parser->curToken->kind != ';') {
+				// func left pointer points to formal args and their types
+				lastArg->right = parseExpression(parser);
+				lastArg = lastArg->right;
+			}
+			if (!expect(parser, ')')) return &errorNode;
+			res = resolveCall(parser, res);
+		} else if (identToken) {
+			smmPostMessage(errSmmUndefinedIdentifier, identToken->filePos, identToken->repr);
+		}
+	} else if (identToken && !castType) {
 		if (parser->curToken->kind == ':') {
 			// This is declaration
 			res = newSmmAstNode();

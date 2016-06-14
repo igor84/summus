@@ -55,7 +55,7 @@ typedef enum {
 	nkSmmURem, nkSmmSRem, nkSmmFRem,
 	nkSmmNeg,
 	nkSmmType, nkSmmInt, nkSmmFloat, nkSmmBool,
-	nkSmmCast,
+	nkSmmCast, nkSmmCall,
 
 	nkSmmTerminator
 } SmmAstNodeKind;

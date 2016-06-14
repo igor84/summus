@@ -2,11 +2,12 @@
 
 #include <assert.h>
 
-static PSmmAstNode getCastNode(PSmmAllocator a, PSmmAstNode node, PSmmTypeInfo type) {
+static PSmmAstNode getCastNode(PSmmAllocator a, PSmmAstNode node, PSmmAstNode parent) {
+	if (parent->kind == nkSmmCast) return NULL;
 	PSmmAstNode cast = (PSmmAstNode)a->alloc(a, sizeof(struct SmmAstNode));
 	cast->kind = nkSmmCast;
 	cast->left = node;
-	cast->type = type;
+	cast->type = parent->type;
 	return cast;
 }
 
@@ -18,7 +19,7 @@ static void fixExpressionTypes(PSmmModuleData data, PSmmAstNode node, PSmmAstNod
 			PSmmTypeInfo type = node->type;
 			if (type->kind == tiSmmSoftFloat64) type -= 2;
 			smmPostMessage(wrnSmmConversionDataLoss, parent->token->filePos, type->name, parent->type->name);
-			cast = getCastNode(data->allocator, node, parent->type);
+			cast = getCastNode(data->allocator, node, parent);
 		} else if ((parent->type->flags & tifSmmFloat) && (node->type->flags & tifSmmInt)) {
 			// if parent is float and node is int change it if it is literal or cast it otherwise
 			if (node->kind == nkSmmInt) {
@@ -26,7 +27,7 @@ static void fixExpressionTypes(PSmmModuleData data, PSmmAstNode node, PSmmAstNod
 				node->type = parent->type;
 				node->token->floatVal = (double)node->token->uintVal;
 			} else {
-				cast = getCastNode(data->allocator, node, parent->type);
+				cast = getCastNode(data->allocator, node, parent);
 			}
 		} else if ((parent->type->flags & node->type->flags & tifSmmInt)) {
 			// if both are ints just fix the sizes
@@ -35,7 +36,7 @@ static void fixExpressionTypes(PSmmModuleData data, PSmmAstNode node, PSmmAstNod
 					if (node->kind == nkSmmInt || node->right) {
 						node->type = parent->type; // if literal or operator
 					} else {
-						cast = getCastNode(data->allocator, node, parent->type);
+						cast = getCastNode(data->allocator, node, parent);
 					}
 				} else { // if parent type < node type
 					if (node->kind == nkSmmInt) {
@@ -52,12 +53,12 @@ static void fixExpressionTypes(PSmmModuleData data, PSmmAstNode node, PSmmAstNod
 						node->type = parent->type;
 					} else {
 						// No warning because operations on big numbers can give small numbers
-						cast = getCastNode(data->allocator, node, parent->type);
+						cast = getCastNode(data->allocator, node, parent);
 					}
 				}
 			} else { // if one is uint and other is int
 				if (node->kind != nkSmmInt) {
-					cast = getCastNode(data->allocator, node, parent->type);
+					cast = getCastNode(data->allocator, node, parent);
 				} else {
 					int64_t oldVal = node->token->sintVal;
 					switch (parent->type->kind) {
@@ -80,7 +81,7 @@ static void fixExpressionTypes(PSmmModuleData data, PSmmAstNode node, PSmmAstNod
 			if (node->type->kind == tiSmmSoftFloat64) {
 				node->type = parent->type;
 			} else { // if they are different size
-				cast = getCastNode(data->allocator, node, parent->type);
+				cast = getCastNode(data->allocator, node, parent);
 			}
 		} else if ((parent->type->flags & node->type->flags & tifSmmBool) == 0) {
 			// TODO(igors): If only one is bool then Err
@@ -100,8 +101,18 @@ static void fixExpressionTypes(PSmmModuleData data, PSmmAstNode node, PSmmAstNod
 		}
 	}
 
-	if (node->left) fixExpressionTypes(data, node->left, node);
-	if (node->right) fixExpressionTypes(data, node->right, node);
+	if (node->kind == nkSmmCall) {	
+		PSmmAstNode curArg = node->right;
+		PSmmAstNode curParam = node->left;
+		while (curParam && curArg) {
+			fixExpressionTypes(data, curArg, curParam);
+			curParam = curParam->left;
+			curArg = curArg->right;
+		}
+	} else {
+		if (node->left) fixExpressionTypes(data, node->left, node);
+		if (node->right) fixExpressionTypes(data, node->right, node);
+	}
 }
 
 /********************************************************
