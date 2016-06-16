@@ -19,6 +19,7 @@ typedef enum {
 
 	errSmmNoExpectedToken, errSmmGotUnexpectedToken, errSmmUndefinedIdentifier, errSmmRedefinition,
 	errSmmOperandMustBeLVal, errSmmUnknownType, errSmmIdentTaken, errSmmBadOperandsType,
+	errSmmGotSomeArgsButExpectedOneOf,
 
 	wrnSmmConversionDataLoss
 } SmmMsgType;

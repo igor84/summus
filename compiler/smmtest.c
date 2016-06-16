@@ -28,7 +28,7 @@ void printNode(PSmmAstNode node) {
 int main(int argc, char **argv) {
 	/*
 	TODO:
-		Add casts and handle cast nodes in semtypes
+		Add consts and function defs
 		Do complete code review and add all the comments
 		Add logical operators
 		Add bitwise operators

@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <assert.h>
+#include <string.h>
 
 #define SMM_PARSER_IDENTS_DICT_SIZE 8 * 1024
 
@@ -83,6 +84,56 @@ PSmmToken expect(PSmmParser parser, int type) {
 	getNextToken(parser);
 	return token;
 }
+
+#define FUNC_SIGNATURE_LENGTH 4 * 1024
+
+char* getFuncsSignatureAsString(PSmmAstNode funcs, PSmmAllocator a) {
+	char callWithParams[8 * FUNC_SIGNATURE_LENGTH] = { 0 };
+	PSmmAstNode curFunc = funcs;
+	size_t len = 0;
+	while (curFunc) {
+		size_t l = strlen(curFunc->token->repr);
+		strncpy(&callWithParams[len], curFunc->token->repr, l);
+		len += l;
+		callWithParams[len++] = '(';
+		PSmmAstNode curParam = curFunc->left;
+		while (curParam) {
+			l = strlen(curParam->type->name);
+			strncpy(&callWithParams[len], curParam->type->name, l);
+			len += l;
+			callWithParams[len++] = ',';
+			curParam = curParam->left;
+		}
+		if (callWithParams[len - 1] != '(') len--;
+		callWithParams[len++] = ')';
+		callWithParams[len++] = '\n';
+		curFunc = curFunc->next;
+	}
+	callWithParams[len - 1] = 0;
+	char* buf = a->alloc(a, len);
+	strncpy(buf, callWithParams, len - 1);
+	return buf;
+}
+
+char* getFuncCallAsString(const char* name, PSmmAstNode args, char* buf) {
+	char callWithArgs[FUNC_SIGNATURE_LENGTH] = { 0 };
+	size_t len = strlen(name);
+	strncpy(callWithArgs, name, len);
+	callWithArgs[len++] = '(';
+	PSmmAstNode curArg = args;
+	while (curArg) {
+		size_t l = strlen(curArg->type->name);
+		strncpy(&callWithArgs[len], curArg->type->name, l);
+		len += l;
+		callWithArgs[len++] = ',';
+		curArg = curArg->right;
+	}
+	if (callWithArgs[len - 1] != '(') len--;
+	callWithArgs[len++] = ')';
+	strncpy(buf, callWithArgs, len);
+	return buf;
+}
+
 /**
  * When func node is read from identDict it is copied to a new node whose "left"
  * is then setup to point to original func node and is given here. Original func
@@ -152,7 +203,13 @@ PSmmAstNode resolveCall(PSmmParser parser, PSmmAstNode node) {
 		node->left = curCall->left;
 		return node;
 	}
-	//Report error expected one of
+	// Report error that we got a call with certain arguments but expected one of...
+	char callWithArgsBuf[FUNC_SIGNATURE_LENGTH] = { 0 };
+	char* callWithArgs = getFuncCallAsString(node->token->repr, node->right, callWithArgsBuf);
+	if (!node->left->right) {
+		node->left->right = (PSmmAstNode)getFuncsSignatureAsString(node->left, parser->allocator);
+	}
+	smmPostMessage(errSmmGotSomeArgsButExpectedOneOf, node->token->filePos, callWithArgs, (char*)node->left->right);
 	return &errorNode;
 }
 
@@ -195,7 +252,7 @@ PSmmAstNode parseIdentFactor(PSmmParser parser) {
 			res->next = NULL;
 			PSmmAstNode lastArg = res;
 			while (parser->curToken->kind != ')' && parser->curToken->kind != ';') {
-				// func left pointer points to formal args and their types
+				// func left pointer points to formal params and their types
 				lastArg->right = parseExpression(parser);
 				lastArg = lastArg->right;
 			}

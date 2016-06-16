@@ -28,7 +28,8 @@ static const char* msgTypeToString[] = {
 	"identifier '%s' is already taken as %s",
 	"operator %s not defined for operands of type %s",
 
-	"possible loss of data in conversion from %s to %s"
+	"possible loss of data in conversion from %s to %s",
+	"got %s but expected one of: \n %s"
 };
 
 static int errorCounter;
