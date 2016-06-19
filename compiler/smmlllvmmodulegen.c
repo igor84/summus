@@ -122,6 +122,9 @@ LLVMValueRef convertToInstructions(PSmmLLVMModuleGenData data, PSmmAstNode node)
 		res = LLVMBuildLoad(builder, res, "");
 		LLVMSetAlignment(res, node->type->sizeInBytes);
 		break;
+	case nkSmmConst:
+		res = smmGetDictValue(data->localVars, node->token->repr, node->token->hash, false);
+		break;
 	case nkSmmCast:
 		res = getCastInstruction(data, node->type, node->left->type, left);
 		break;
@@ -144,12 +147,19 @@ PSmmAstNode createLocalVars(PSmmLLVMModuleGenData data) {
 			type = getLLVMType(node->left->type);
 		}
 
-		LLVMValueRef var = LLVMBuildAlloca(data->builder, type, node->left->token->repr);
-		LLVMSetAlignment(var, node->left->type->sizeInBytes);
+		LLVMValueRef var = NULL;
+		if (node->left->kind == nkSmmIdent) {
+			var = LLVMBuildAlloca(data->builder, type, node->left->token->repr);
+			LLVMSetAlignment(var, node->left->type->sizeInBytes);
+		} else if (node->left->kind == nkSmmConst) {
+			var = convertToInstructions(data, node->right);
+		} else {
+			assert(false && "Declaration of unknown node kind");
+		}
 		PSmmToken varToken = node->left->token;
 		smmAddDictValue(data->localVars, varToken->repr, varToken->hash, var);
 		if (emptyDecl) {
-			LLVMBuildStore(data->builder, var, zero);
+			LLVMBuildStore(data->builder, zero, var);
 		}
 		node = node->next;
 	}

@@ -13,10 +13,12 @@ static PSmmAstNode getCastNode(PSmmAllocator a, PSmmAstNode node, PSmmAstNode pa
 
 static void fixExpressionTypes(PSmmModuleData data, PSmmAstNode node, PSmmAstNode parent) {
 	PSmmAstNode cast = NULL;
+	// TODO(igors): See if we can loose cast node from code if we manage to lower it or just ignore it and let LLVM do it
 	if (parent->type != node->type) {
 		if ((parent->type->flags & tifSmmInt) && (node->type->flags & tifSmmFloat)) {
 			//if parent is int and node is float then warning and cast
 			PSmmTypeInfo type = node->type;
+			// If we need to cast arbitrary float expression to int we will treat expression as float32
 			if (type->kind == tiSmmSoftFloat64) type -= 2;
 			smmPostMessage(wrnSmmConversionDataLoss, parent->token->filePos, type->name, parent->type->name);
 			cast = getCastNode(data->allocator, node, parent);
@@ -124,7 +126,7 @@ void smmAnalyzeTypes(PSmmModuleData data) {
 	PSmmAstNode parent = data->module;
 	if (parent->kind == nkSmmProgram) parent = parent->next;
 	while (parent) {
-		if (parent->kind == nkSmmAssignment) {
+		if (parent->kind == nkSmmAssignment || (parent->kind == nkSmmDecl && parent->left->kind == nkSmmConst)) {
 			assert(parent->type == parent->left->type);
 			fixExpressionTypes(data, parent->right, parent);
 		} else if (parent->kind != nkSmmDecl) {

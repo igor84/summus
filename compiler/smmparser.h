@@ -47,7 +47,8 @@ typedef struct SmmParser* PSmmParser;
 
 // Each enum value should have coresponding string in smmparser.c
 typedef enum {
-	nkSmmError, nkSmmProgram, nkSmmDecl, nkSmmAssignment, nkSmmIdent,
+	nkSmmError, nkSmmProgram, nkSmmDecl, nkSmmIdent, nkSmmConst,
+	nkSmmAssignment,
 	nkSmmAdd , nkSmmFAdd,
 	nkSmmSub, nkSmmFSub,
 	nkSmmMul, nkSmmFMul,
@@ -75,12 +76,16 @@ typedef enum {
 } SmmTypInfoKind;
 
 enum SmmTypeInfoFlags {
-	tifSmmUnknown = 0,
-	tifSmmInt = 1,
-	tifSmmUnsigned = 2,
-	tifSmmUnsignedInt = 3,
-	tifSmmFloat = 4,
-	tifSmmBool = 8
+	tifSmmUnknown = 0x0,
+	tifSmmInt = 0x1,
+	tifSmmUnsigned = 0x2,
+	tifSmmUnsignedInt = 0x3,
+	tifSmmFloat = 0x4,
+	tifSmmBool = 0x8
+};
+
+enum SmmNodeFlags {
+	nfSmmConst = 0x1
 };
 
 struct SmmTypeInfo {
@@ -94,6 +99,7 @@ typedef struct SmmTypeInfo* PSmmTypeInfo;
 struct SmmAstNode {
 	SmmAstNodeKind kind;
 	PSmmTypeInfo type;
+	uint32_t flags;
 	PSmmToken token;
 	PSmmAstNode next;
 	PSmmAstNode left;

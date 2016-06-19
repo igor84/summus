@@ -16,7 +16,8 @@ Type Definitions
 
 // There should be one string corresponding to each value of SmmAstNodeKind enum
 const char* nodeKindToString[] = {
-	"error", "Program", ":", "=", "Ident",
+	"error", "Program", ":", "Ident", "Const",
+	"=",
 	"+", "+.",
 	"-", "-.",
 	"*", "*.",
@@ -223,7 +224,7 @@ PSmmAstNode parseIdentFactor(PSmmParser parser) {
 	} else if (var->kind == nkSmmType) {
 		identToken = parser->curToken;
 		castType = var->type;
-	} else if (var->kind != nkSmmIdent) {
+	} else if (var->kind != nkSmmIdent && var->kind != nkSmmConst) {
 		const char* tokenStr = nodeKindToString[var->kind];
 		smmPostMessage(errSmmIdentTaken, parser->curToken->filePos, parser->curToken->repr, tokenStr);
 	} else if (!var->type) {
@@ -245,6 +246,7 @@ PSmmAstNode parseIdentFactor(PSmmParser parser) {
 			res->left = expr;
 			res->token = identToken;
 			res->type = castType;
+			res->flags = expr->flags & nfSmmConst;
 		} else if (res != &errorNode) {
 			getNextToken(parser);
 			res->kind = nkSmmCall;
@@ -299,6 +301,7 @@ PSmmAstNode getLiteralNode(PSmmParser parser) {
 	else if (res->type->flags & tifSmmBool) res->kind = nkSmmBool;
 	else assert(false && "Got unimplemented literal type");
 	res->token = parser->curToken;
+	res->flags = nfSmmConst;
 	getNextToken(parser);
 	return res;
 }
@@ -317,7 +320,9 @@ bool isNegFactor(PSmmParser parser) {
 PSmmAstNode parseFactor(PSmmParser parser) {
 	PSmmAstNode res = &errorNode;
 	bool doNeg = false;
-	if (parser->curToken->kind == '(') {
+	if (parser->curToken->kind == ';') {
+		smmPostMessage(errSmmGotUnexpectedToken, parser->curToken->filePos, "identifier or literal", ";");
+	} else if (parser->curToken->kind == '(') {
 		doNeg = isNegFactor(parser);
 		getNextToken(parser);
 		res = parseExpression(parser);
@@ -373,6 +378,7 @@ PSmmAstNode parseFactor(PSmmParser parser) {
 			if (neg->type->flags & tifSmmUnsigned) {
 				neg->type = &builtInTypes[neg->type->kind - tiSmmUInt8 + tiSmmInt8];
 			}
+			neg->flags |= res->flags & nfSmmConst;
 			res = neg;
 		}
 	}
@@ -406,6 +412,7 @@ PSmmAstNode parseBinOp(PSmmParser parser, PSmmAstNode left, int prec) {
 		res->left = left;
 		res->right = right;
 		res->token = resToken;
+		res->flags = left->flags & right->flags & nfSmmConst;
 		left = binOp->setupNode(res);
 	}
 }
@@ -420,15 +427,22 @@ PSmmAstNode parseExpression(PSmmParser parser) {
 
 PSmmAstNode parseAssignment(PSmmParser parser, PSmmAstNode lval) {
 	PSmmToken eqToken = parser->curToken;
-	expect(parser, '=');
+	if (lval->kind == nkSmmConst && eqToken->kind == '=') {
+		smmPostMessage(errCantAssignToConst, eqToken->filePos);
+		findToken(parser, ';');
+		return &errorNode;
+	}
+	getNextToken(parser);
 	PSmmAstNode val = parseExpression(parser);
 	if (lval == &errorNode || val == &errorNode) return &errorNode;
 	if (!lval->type) {
 		if (val->type->kind == tiSmmSoftFloat64) {
-			val->type = &builtInTypes[tiSmmFloat64];
+			lval->type = &builtInTypes[tiSmmFloat64];
+		} else {
+			lval->type = val->type;
 		}
-		lval->type = val->type;
 	}
+	if (lval->kind == nkSmmConst) return val;
 	PSmmAstNode assignment = newSmmAstNode();
 	assignment->kind = nkSmmAssignment;
 	assignment->left = lval;
@@ -441,33 +455,56 @@ PSmmAstNode parseAssignment(PSmmParser parser, PSmmAstNode lval) {
 PSmmAstNode parseDeclaration(PSmmParser parser, PSmmAstNode lval) {
 	PSmmToken declToken = parser->curToken;
 	expect(parser, ':');
+	if (lval->type) {
+		smmPostMessage(errSmmRedefinition, declToken->filePos, lval->token->repr);
+		findToken(parser, ';');
+		return &errorNode;
+	}
+
 	PSmmAstNode typeInfo = NULL;
 	if (parser->curToken->kind == tkSmmIdent) {
 		//Type is given in declaration so use it
-		if (lval->type) {
-			smmPostMessage(errSmmRedefinition, declToken->filePos, lval->token->repr);
-		} else {
-			typeInfo = (PSmmAstNode)smmGetDictValue(parser->idents, parser->curToken->repr, parser->curToken->hash, false);
-			if (!typeInfo || typeInfo->kind != nkSmmType) {
-				smmPostMessage(errSmmUnknownType, parser->curToken->filePos, parser->curToken->repr);
-				typeInfo = NULL;
-			}
+		typeInfo = (PSmmAstNode)smmGetDictValue(parser->idents, parser->curToken->repr, parser->curToken->hash, false);
+		if (!typeInfo || typeInfo->kind != nkSmmType) {
+			smmPostMessage(errSmmUnknownType, parser->curToken->filePos, parser->curToken->repr);
+			typeInfo = NULL;
 		}
 		getNextToken(parser);
 	}
+	
+	PSmmAstNode expr = NULL;
+	if (parser->curToken->kind == '=') {
+		expr = parseAssignment(parser, lval);
+	} else if (parser->curToken->kind == ':') {
+		PSmmToken constAssignToken = parser->curToken;
+		lval->kind = nkSmmConst;
+		lval->flags |= nfSmmConst;
+		expr = parseAssignment(parser, lval);
+		if (expr != &errorNode && (expr->flags & nfSmmConst) == 0) {
+			smmPostMessage(errNonConstInConstExpression, constAssignToken->filePos);
+		}
+	} else if (parser->curToken->kind != ';') {
+		expr = &errorNode;
+		smmPostMessage(errSmmGotUnexpectedToken, parser->curToken->filePos, "':', '=' or type", parser->curToken->repr);
+	}
+
+	if (expr == &errorNode) return expr;
+
 	PSmmAstNode decl = newSmmAstNode();
 	decl->kind = nkSmmDecl;
 	decl->token = declToken;
 	decl->left = lval;
-	if (parser->curToken->kind == '=') {
-		decl->right = parseAssignment(parser, lval);
-	}
+	decl->right = expr;
+
 	if (typeInfo) {
-		// We do this here so that parseAssignment and parseExpression that follows it
+		// We do this here so that parseAssignment and parseExpression above
 		// can detect usage of undeclared identifier in expressions like x : int8 = x + 1;
 		lval->type = typeInfo->type;
-		if (decl->right) decl->right->type = lval->type;
+		if (decl->right && decl->right->kind == nkSmmAssignment) {
+			decl->right->type = lval->type;
+		}
 	}
+	decl->type = lval->type;
 	// Otherwise it should just be declaration so ';' is expected next
 	return decl;
 }
@@ -480,7 +517,7 @@ PSmmAstNode parseStatement(PSmmParser parser) {
 
 	bool justCreatedLValIdent = (lval->kind == nkSmmIdent) && (lval->type == NULL);
 	
-	if (lval->kind != nkSmmIdent && (parser->curToken->kind == ':' || parser->curToken->kind == '=')) {
+	if (lval->kind != nkSmmIdent && lval->kind != nkSmmConst && (parser->curToken->kind == ':' || parser->curToken->kind == '=')) {
 		smmPostMessage(errSmmOperandMustBeLVal, fpos);
 		findToken(parser, ';');
 		return &errorNode;
@@ -633,8 +670,10 @@ PSmmAstNode smmParse(PSmmParser parser) {
 			curStmt = newSmmAstNode();
 			*curStmt = errorNode;
 		}
-		lastStmt->next = curStmt;
-		lastStmt = curStmt;
+		if (curStmt != NULL) {
+			lastStmt->next = curStmt;
+			lastStmt = curStmt;
+		}
 	}
 	return program;
 }

@@ -27,9 +27,11 @@ static const char* msgTypeToString[] = {
 	"undefined type '%s'",
 	"identifier '%s' is already taken as %s",
 	"operator %s not defined for operands of type %s",
+	"got %s but expected one of: \n %s",
+	"can't assign a value to a constant",
+	"non constant values are not allowed in constant expressions",
 
-	"possible loss of data in conversion from %s to %s",
-	"got %s but expected one of: \n %s"
+	"possible loss of data in conversion from %s to %s"
 };
 
 static int errorCounter;

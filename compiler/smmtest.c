@@ -8,17 +8,27 @@
 #include <stdlib.h>
 
 void printNode(PSmmAstNode node) {
-	while (node->kind == nkSmmDecl) node = node->next;
-	fputs(nodeKindToString[node->kind], stdout);
-	if (node->type && node->type->kind != 0) {
+	//while (node->kind == nkSmmDecl) node = node->next;
+	if (node->left) printNode(node->left);
+
+	if (node->kind == nkSmmIdent || node->kind == nkSmmConst) {
+		fputs(node->token->repr, stdout);
+	} else {
+		fputs(nodeKindToString[node->kind], stdout);
+	}
+	if (node->type && node->type->kind != 0 /*&& (
+		node->kind == nkSmmIdent || node->kind == nkSmmConst ||
+		node->kind == nkSmmInt || node->kind == nkSmmFloat || node->kind == nkSmmCast)*/) {
 		fputs(":", stdout);
 		fputs(node->type->name, stdout);
 	}
 	if (node->kind != nkSmmNeg) {
 		fputs(" ", stdout);
 	}
-	if (node->left) printNode(node->left);
-	if (node->right) printNode(node->right);
+	
+	if (node->kind != nkSmmDecl && node->right) {
+		printNode(node->right);
+	}
 	if (node->next) {
 		puts("");
 		printNode(node->next);
@@ -28,13 +38,14 @@ void printNode(PSmmAstNode node) {
 int main(int argc, char **argv) {
 	/*
 	TODO:
-		Add consts and function defs
+		Add function defs
 		Do complete code review and add all the comments
 		Add logical operators
 		Add bitwise operators
 		LLVM has validateFunction as well
 		GlobalSettings
 	*/
+
 	const char* filename = "console";
 	char* buf = NULL;
 	char filebuf[64 * 1024] = { 0 };
