@@ -10,7 +10,6 @@
 #include <math.h>
 
 #define SMM_STDIN_BUFFER_LENGTH 64 * 1024
-#define SMM_LEXER_DICT_SIZE 8 * 1024
 #define SMM_MAX_HEX_DIGITS 16
 
 static const char* tokenTypeToString[] = {
@@ -124,36 +123,30 @@ static void initSymTableWithKeywords(PPrivLexer lex) {
 	int count = sizeof(keywords) / sizeof(struct Keywords);
 	for (int i = 0; i < count; i++) {
 		struct Keywords k = keywords[i];
-		PSmmSymbol symbol = (PSmmSymbol)smmGetDictValue(lex->symTable, k.name, smmHashString(k.name), true);
+		PSmmSymbol symbol = (PSmmSymbol)smmGetDictValue(lex->symTable, k.name, true);
 		symbol->kind = k.kind;
 	}
 }
 
 static bool parseIdent(PPrivLexer privLex, PSmmToken token) {
-	uint32_t hash = 0;
 	char* cc = privLex->lex.curChar;
 	char* ident = cc;
 	int i = 0;
 	do {
-		hash = smmUpdateHash(hash, *cc);
 		i++;
-		cc++;
-	} while (isalnum(*cc));
-	hash = smmCompleteHash(hash);
+	} while (isalnum(cc[i]));
+	cc += i;
 	privLex->lex.curChar = cc;
 	privLex->lex.filePos.lineOffset += i;
 	privLex->lex.scanCount += i;
 
 	char old = *cc;
 	*cc = 0; // Temporarily set the end of string here so we can just use ident pointer bellow
-	PSmmSymbol symbol = smmGetDictValue(privLex->symTable, ident, hash, true);
+	PSmmSymbol symbol = smmGetDictValue(privLex->symTable, ident, true);
 	*cc = old;
 
 	token->kind = symbol->kind;
 	token->repr = symbol->name;
-	if (symbol->kind == tkSmmIdent) {
-		token->hash = hash;
-	}
 	return true;
 }
 
@@ -301,7 +294,7 @@ PSmmLexer smmCreateLexer(char* buffer, const char* filename, PSmmAllocator alloc
 	privLex->lex.curChar = buffer;
 	privLex->lex.filePos.lineNumber = 1;
 	privLex->lex.filePos.lineOffset = 1;
-	privLex->symTable = smmCreateDict(allocator, SMM_LEXER_DICT_SIZE, privLex, createSymbolElem);
+	privLex->symTable = smmCreateDict(allocator, privLex, createSymbolElem);
 	initSymTableWithKeywords(privLex);
 	return &privLex->lex;
 }

@@ -85,7 +85,7 @@ LLVMValueRef convertToInstructions(PSmmLLVMModuleGenData data, PSmmAstNode node)
 	if (node->left) {
 		if (node->kind == nkSmmAssignment) {
 			PSmmToken varToken = node->left->token;
-			left = smmGetDictValue(data->localVars, varToken->repr, varToken->hash, false);
+			left = smmGetDictValue(data->localVars, varToken->repr, false);
 		} else {
 			left = convertToInstructions(data, node->left);
 		}
@@ -118,12 +118,12 @@ LLVMValueRef convertToInstructions(PSmmLLVMModuleGenData data, PSmmAstNode node)
 		}
 		break;
 	case nkSmmIdent:
-		res = smmGetDictValue(data->localVars, node->token->repr, node->token->hash, false);
+		res = smmGetDictValue(data->localVars, node->token->repr, false);
 		res = LLVMBuildLoad(builder, res, "");
 		LLVMSetAlignment(res, node->type->sizeInBytes);
 		break;
 	case nkSmmConst:
-		res = smmGetDictValue(data->localVars, node->token->repr, node->token->hash, false);
+		res = smmGetDictValue(data->localVars, node->token->repr, false);
 		break;
 	case nkSmmCast:
 		res = getCastInstruction(data, node->type, node->left->type, left);
@@ -157,7 +157,7 @@ PSmmAstNode createLocalVars(PSmmLLVMModuleGenData data) {
 			assert(false && "Declaration of unknown node kind");
 		}
 		PSmmToken varToken = node->left->token;
-		smmAddDictValue(data->localVars, varToken->repr, varToken->hash, var);
+		smmAddDictValue(data->localVars, varToken->repr, var);
 		if (emptyDecl) {
 			LLVMBuildStore(data->builder, zero, var);
 		}
@@ -172,7 +172,7 @@ void smmGenLLVMModule(PSmmModuleData mdata, PSmmAllocator a) {
 	PSmmLLVMModuleGenData data = (PSmmLLVMModuleGenData)a->alloc(a, sizeof(struct SmmLLVMModuleGenData));
 	data->allocator = a;
 	data->module = mdata->module;
-	data->localVars = smmCreateDict(a, 512, NULL, NULL);
+	data->localVars = smmCreateDict(a, NULL, NULL);
 	data->localVars->storeKeyCopy = false;
 
 	if (data->module->kind == nkSmmProgram) data->module = data->module->next;

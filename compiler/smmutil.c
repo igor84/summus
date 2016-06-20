@@ -28,8 +28,7 @@ typedef struct PrivAllocator* PPrivAllocator;
 struct PrivDict {
 	struct SmmDict dict;
 	PSmmAllocator allocator;
-	size_t size;
-	PSmmDictEntry* entries;
+	PSmmDictEntry entries;
 };
 typedef struct PrivDict* PPrivDict;
 
@@ -64,115 +63,142 @@ void globalFree(PSmmAllocator allocator, void* ptr) {
 	// Does nothing
 }
 
+// This is used as a temp dict create elem func in smmAddDictValue
+void* getValueToAdd(const char* key, PSmmAllocator a, void* context) {
+	return context;
+}
+
+PSmmDictEntry createNewEntry(PPrivDict privDict, const char* origKey, const char* keyPart) {
+	PSmmAllocator a = privDict->allocator;
+	PSmmDictEntry newElem = a->alloc(a, sizeof(struct SmmDictEntry));
+	newElem->keyPartLength = strlen(keyPart);
+	if (privDict->dict.storeKeyCopy) {
+		size_t len = strlen(origKey);
+		char* newKey = a->alloc(a, len + 1);
+		strncpy(newKey, origKey, len);
+		newElem->keyPart = &newKey[keyPart - origKey];
+		origKey = newKey;
+	} else {
+		newElem->keyPart = keyPart;
+	}
+	newElem->value = privDict->dict.elemCreateFunc(origKey, privDict->allocator, privDict->dict.elemCreateFuncContext);
+	return newElem;
+}
+
 /********************************************************
 API Functions
 *********************************************************/
 
-uint32_t smmUpdateHash(uint32_t hash, char val) {
-	uint32_t result = hash + val;
-	result = result + (result << 10);
-	return result ^ (result >> 6);
-}
-
-uint32_t smmCompleteHash(uint32_t hash) {
-	uint32_t result = hash + (hash << 3);
-	result = result ^ (result >> 11);
-	return result + (result << 15);
-}
-
-uint32_t smmHashString(const char* value) {
-	uint32_t hash = 0;
-	const char* cc = value;
-	while (*cc != 0) {
-		hash = smmUpdateHash(hash, *cc);
-		cc++;
-	}
-	return smmCompleteHash(hash);
-}
-
-PSmmDict smmCreateDict(PSmmAllocator allocator, size_t size, void* elemCreateFuncContext, SmmElementCreateFunc createFunc) {
-	assert(size && !(size & (size - 1))); // Size must have only one bit set
-	PPrivDict privDict = allocator->alloc(allocator, sizeof(struct PrivDict) + size * sizeof(PSmmDictEntry));
+PSmmDict smmCreateDict(PSmmAllocator allocator, void* elemCreateFuncContext, SmmElementCreateFunc createFunc) {
+	PPrivDict privDict = allocator->alloc(allocator, sizeof(struct PrivDict));
 	privDict->allocator = allocator;
-	privDict->size = size;
 	privDict->dict.storeKeyCopy = true;
 	privDict->dict.elemCreateFuncContext = elemCreateFuncContext;
 	privDict->dict.elemCreateFunc = createFunc;
-	privDict->entries = (PSmmDictEntry*)(privDict + 1);
 	return &privDict->dict;
 }
 
-PSmmDictEntry smmGetDictEntry(PSmmDict dict, const char* key, uint32_t hash, bool createIfMissing) {
+PSmmDictEntry smmGetDictEntry(PSmmDict dict, const char* key, bool createIfMissing) {
+	if (key == NULL) return NULL;
+	createIfMissing = createIfMissing && dict->elemCreateFunc;
+
 	PPrivDict privDict = (PPrivDict)dict;
-	hash = hash & (privDict->size - 1);
-	PSmmDictEntry* entries = privDict->entries;
-	PSmmDictEntry result = entries[hash];
-	PSmmDictEntry last = NULL;
+	PSmmAllocator a = privDict->allocator;
+	
+	PSmmDictEntry* el = &privDict->entries;
+	PSmmDictEntry entry;
+	const char* origKey = key;
 
-	while (result) {
-		if (key == result->key || strcmp(key, result->key) == 0) {
-			// Put the found element on start of the list so next search is faster
-			if (last) {
-				last->next = result->next;
-				result->next = entries[hash];
-				entries[hash] = result;
+	while (*el) {
+		entry = *el;
+		int i = 0;
+		while (key[i] == entry->keyPart[i] && key[i] != 0 && entry->keyPartLength > i) {
+			i++;
+		}
+
+		if (key[i] == 0 || (i > 0 && i < entry->keyPartLength)) {
+			if (entry->keyPartLength == i) {
+				// Existing key so create a value if it doesn't exist and return it
+				if (!entry->value && createIfMissing) {
+					if (dict->storeKeyCopy) {
+						size_t len = strlen(origKey);
+						char* newKey = a->alloc(a, len + 1);
+						strncpy(newKey, origKey, len);
+						origKey = newKey;
+					}
+					entry->value = dict->elemCreateFunc(origKey, privDict->allocator, dict->elemCreateFuncContext);
+				}
+				return entry;
 			}
-			return result;
+			if (!createIfMissing) return NULL;
+			// We got a key that is a part of existing key so we need to split existing into parts
+			PSmmDictEntry newElem = a->alloc(a, sizeof(struct SmmDictEntry));
+			newElem->keyPart = &entry->keyPart[i];
+			newElem->keyPartLength = entry->keyPartLength - i;
+			newElem->value = entry->value;
+			newElem->children = entry->children;
+			entry->children = newElem;
+			entry->keyPartLength = i;
+			if (key[i] == 0) {
+				if (privDict->dict.storeKeyCopy) {
+					size_t len = strlen(origKey);
+					char* newKey = a->alloc(a, len + 1);
+					strncpy(newKey, origKey, len);
+					origKey = newKey;
+				}
+				entry->value = dict->elemCreateFunc(origKey, privDict->allocator, dict->elemCreateFuncContext);
+				return entry;
+			}
+			entry->value = NULL;
+			newElem = createNewEntry(privDict, origKey, &key[i]);
+			newElem->next = entry->children;
+			entry->children = newElem;
+			return newElem;
 		}
-		last = result;
-		result = result->next;
+		if (entry->keyPartLength == i) {
+			PSmmDictEntry* nextField = &entry->children;
+			while (*nextField && (*nextField)->keyPart[0] != key[i]) nextField = &(*nextField)->next;
+			if (!*nextField) {
+				if (!createIfMissing) return NULL;
+				PSmmDictEntry newElem = createNewEntry(privDict, origKey, &key[i]);
+				*nextField = newElem;
+				return newElem;
+			}
+			key = &key[i];
+			el = nextField;
+		} else {
+			el = &entry->next;
+		}
 	}
 
-	if (createIfMissing && dict->elemCreateFunc) {
-		if (dict->storeKeyCopy) {
-			size_t keyLength = strlen(key) + 1;
-			char* keyVal = (char*)privDict->allocator->alloc(privDict->allocator, keyLength);
-			strcpy(keyVal, key);
-			key = keyVal;
-		}
-		smmAddDictValue(dict, key , hash, dict->elemCreateFunc(key, privDict->allocator, dict->elemCreateFuncContext));
-		return entries[hash];
-	}
-
-	return NULL;
+	if (!createIfMissing) return NULL;
+	entry = createNewEntry(privDict, origKey, origKey);
+	*el = entry;
+	return entry;
 }
 
-void* smmGetDictValue(PSmmDict dict, const char* key, uint32_t hash, bool createIfMissing) {
-	PSmmDictEntry entry = smmGetDictEntry(dict, key, hash, createIfMissing);
+void* smmGetDictValue(PSmmDict dict, const char* key, bool createIfMissing) {
+	PSmmDictEntry entry = smmGetDictEntry(dict, key, createIfMissing);
 	assert(!createIfMissing || (entry != NULL));
 	if (entry == NULL) return NULL;
 	return entry->value;
 }
 
-void smmAddDictValue(PSmmDict dict, const char* key, uint32_t hash, void* value) {
-	PPrivDict privDict = (PPrivDict)dict;
-	PSmmAllocator a = privDict->allocator;
-	PSmmDictEntry result = (PSmmDictEntry)a->alloc(a, sizeof(struct SmmDictEntry));
-	hash = hash & (privDict->size - 1);
-	result->key = key;
-	result->value = value;
-	result->next = privDict->entries[hash];
-	privDict->entries[hash] = result;
-}
-
-void smmFreeDictEntry(PSmmDict dict, const char* key, uint32_t hash) {
-	PPrivDict privDict;
-	PSmmDictEntry entry = smmGetDictEntry(dict, key, hash, false);
-	if (entry == NULL) return;
-	privDict = (PPrivDict)dict;
-	hash = hash & (privDict->size - 1);
-	privDict->entries[hash] = entry->next;
-	PSmmAllocator a = ((PPrivDict)dict)->allocator;
-	// Even though new key is created for new entry it is not freed here because
-	// it is usually later used in different places
-	a->free(a, entry->value);
-	a->free(a, entry);
+void smmAddDictValue(PSmmDict dict, const char* key, void* value) {
+	SmmElementCreateFunc oldFunc = dict->elemCreateFunc;
+	void* oldContext = dict->elemCreateFuncContext;
+	dict->elemCreateFuncContext = value;
+	dict->elemCreateFunc = getValueToAdd;
+	PSmmDictEntry entry = smmGetDictEntry(dict, key, true);
+	if (entry->value != value) entry->value = value;
+	dict->elemCreateFuncContext = oldContext;
+	dict->elemCreateFunc = oldFunc;
 }
 
 PSmmAllocator smmCreatePermanentAllocator(const char* name, size_t size) {
 	size = (size + 0xfff) & (~0xfff); // We take memory in chunks of 4KB
 	PPrivAllocator smmAllocator = (PPrivAllocator)calloc(1, size);
-	if (smmAllocator == NULL) {
+	if (!smmAllocator) {
 		char ainfo[MSG_BUFFER_LENGTH] = { 0 };
 		snprintf(ainfo, MSG_BUFFER_LENGTH, "; Creating allocator %s with size %zu", name, size);
 		smmAbortWithMessage(errSmmMemoryAllocationFailed, ainfo, __FILE__, __LINE__ - 4);

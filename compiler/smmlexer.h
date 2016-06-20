@@ -56,7 +56,6 @@ struct SmmToken {
 		int64_t sintVal;
 		double floatVal;
 		bool boolVal;
-		uint32_t hash;
 	};
 };
 typedef struct SmmToken* PSmmToken;

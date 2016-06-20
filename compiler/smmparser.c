@@ -8,8 +8,6 @@
 #include <assert.h>
 #include <string.h>
 
-#define SMM_PARSER_IDENTS_DICT_SIZE 8 * 1024
-
 /********************************************************
 Type Definitions
 *********************************************************/
@@ -218,7 +216,7 @@ PSmmAstNode parseIdentFactor(PSmmParser parser) {
 	PSmmToken identToken = NULL;
 	PSmmTypeInfo castType = NULL;
 	PSmmAstNode res = &errorNode;
-	PSmmAstNode var = (PSmmAstNode)smmGetDictValue(parser->idents, parser->curToken->repr, parser->curToken->hash, false);
+	PSmmAstNode var = (PSmmAstNode)smmGetDictValue(parser->idents, parser->curToken->repr, false);
 	if (!var) {
 		identToken = parser->curToken;
 	} else if (var->kind == nkSmmType) {
@@ -269,7 +267,7 @@ PSmmAstNode parseIdentFactor(PSmmParser parser) {
 			res = newSmmAstNode();
 			res->kind = nkSmmIdent;
 			res->token = identToken;
-			smmAddDictValue(parser->idents, res->token->repr, res->token->hash, res);
+			smmAddDictValue(parser->idents, res->token->repr, res);
 		} else {
 			smmPostMessage(errSmmUndefinedIdentifier, identToken->filePos, identToken->repr);
 		}
@@ -464,7 +462,7 @@ PSmmAstNode parseDeclaration(PSmmParser parser, PSmmAstNode lval) {
 	PSmmAstNode typeInfo = NULL;
 	if (parser->curToken->kind == tkSmmIdent) {
 		//Type is given in declaration so use it
-		typeInfo = (PSmmAstNode)smmGetDictValue(parser->idents, parser->curToken->repr, parser->curToken->hash, false);
+		typeInfo = (PSmmAstNode)smmGetDictValue(parser->idents, parser->curToken->repr, false);
 		if (!typeInfo || typeInfo->kind != nkSmmType) {
 			smmPostMessage(errSmmUnknownType, parser->curToken->filePos, parser->curToken->repr);
 			typeInfo = NULL;
@@ -609,13 +607,13 @@ PSmmParser smmCreateParser(PSmmLexer lex, PSmmAllocator allocator) {
 	parser->allocator = allocator;
 
 	// Init idents dict
-	parser->idents = smmCreateDict(parser->allocator, SMM_PARSER_IDENTS_DICT_SIZE, NULL, NULL);
+	parser->idents = smmCreateDict(parser->allocator, NULL, NULL);
 	int cnt = sizeof(builtInTypes) / sizeof(struct SmmTypeInfo);
 	for (int i = 0; i < cnt; i++) {
 		PSmmAstNode typeNode = newSmmAstNode();
 		typeNode->kind = nkSmmType;
 		typeNode->type = &builtInTypes[i];
-		smmAddDictValue(parser->idents, typeNode->type->name, smmHashString(typeNode->type->name), typeNode);
+		smmAddDictValue(parser->idents, typeNode->type->name, typeNode);
 	}
 
 	static struct SmmBinaryOperator mulDivModOp = { setupMulDivModNode, 120 };
