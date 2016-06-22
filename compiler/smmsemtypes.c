@@ -104,12 +104,12 @@ static void fixExpressionTypes(PSmmModuleData data, PSmmAstNode node, PSmmAstNod
 	}
 
 	if (node->kind == nkSmmCall) {	
-		PSmmAstNode curArg = node->right;
-		PSmmAstNode curParam = node->left;
+		PSmmAstNode curArg = node->nextArg;
+		PSmmAstNode curParam = node->nextParam;
 		while (curParam && curArg) {
 			fixExpressionTypes(data, curArg, curParam);
-			curParam = curParam->left;
-			curArg = curArg->right;
+			curParam = curParam->nextParam;
+			curArg = curArg->nextArg;
 		}
 	} else {
 		if (node->left) fixExpressionTypes(data, node->left, node);

@@ -101,9 +101,24 @@ struct SmmAstNode {
 	PSmmTypeInfo type;
 	uint32_t flags;
 	PSmmToken token;
-	PSmmAstNode next;
-	PSmmAstNode left;
-	PSmmAstNode right;
+	union {
+		PSmmAstNode next;
+		PSmmAstNode body; // Pointer to func definition's body
+	};
+	union {
+		PSmmAstNode left;
+		PSmmAstNode funcDeclaration; // Used on function call node until overloading is resolved
+		PSmmAstNode nextParam; // Used for func declaration
+		PSmmAstNode scope; // Used for block nodes
+		PSmmAstNode prevScope; // Used for scope nodes
+	};
+	union {
+		PSmmAstNode right;
+		PSmmAstNode nextOverload; // Used for connecting overloaded func declarations
+		PSmmAstNode nextArg; // Used for func calls
+		PSmmAstNode prevFuncScope; // Used for scope nodes
+
+	};
 };
 
 PSmmParser smmCreateParser(PSmmLexer lex, PSmmAllocator allocator);

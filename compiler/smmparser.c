@@ -86,68 +86,61 @@ PSmmToken expect(PSmmParser parser, int type) {
 
 #define FUNC_SIGNATURE_LENGTH 4 * 1024
 
-char* getFuncsSignatureAsString(PSmmAstNode funcs, PSmmAllocator a) {
-	char callWithParams[8 * FUNC_SIGNATURE_LENGTH] = { 0 };
+char* getFuncsSignatureAsString(PSmmAstNode funcs, char* buf) {
 	PSmmAstNode curFunc = funcs;
 	size_t len = 0;
 	while (curFunc) {
 		size_t l = strlen(curFunc->token->repr);
-		strncpy(&callWithParams[len], curFunc->token->repr, l);
+		strncpy(&buf[len], curFunc->token->repr, l);
 		len += l;
-		callWithParams[len++] = '(';
-		PSmmAstNode curParam = curFunc->left;
+		buf[len++] = '(';
+		PSmmAstNode curParam = curFunc->nextParam;
 		while (curParam) {
 			l = strlen(curParam->type->name);
-			strncpy(&callWithParams[len], curParam->type->name, l);
+			strncpy(&buf[len], curParam->type->name, l);
 			len += l;
-			callWithParams[len++] = ',';
-			curParam = curParam->left;
+			buf[len++] = ',';
+			curParam = curParam->nextParam;
 		}
-		if (callWithParams[len - 1] != '(') len--;
-		callWithParams[len++] = ')';
-		callWithParams[len++] = '\n';
+		if (buf[len - 1] != '(') len--;
+		buf[len++] = ')';
+		buf[len++] = '\n';
 		curFunc = curFunc->next;
 	}
-	callWithParams[len - 1] = 0;
-	char* buf = a->alloc(a, len);
-	strncpy(buf, callWithParams, len - 1);
+	buf[len - 1] = 0;
 	return buf;
 }
 
 char* getFuncCallAsString(const char* name, PSmmAstNode args, char* buf) {
-	char callWithArgs[FUNC_SIGNATURE_LENGTH] = { 0 };
 	size_t len = strlen(name);
-	strncpy(callWithArgs, name, len);
-	callWithArgs[len++] = '(';
+	strncpy(buf, name, len);
+	buf[len++] = '(';
 	PSmmAstNode curArg = args;
 	while (curArg) {
 		size_t l = strlen(curArg->type->name);
-		strncpy(&callWithArgs[len], curArg->type->name, l);
+		strncpy(&buf[len], curArg->type->name, l);
 		len += l;
-		callWithArgs[len++] = ',';
-		curArg = curArg->right;
+		buf[len++] = ',';
+		curArg = curArg->nextArg;
 	}
-	if (callWithArgs[len - 1] != '(') len--;
-	callWithArgs[len++] = ')';
-	strncpy(buf, callWithArgs, len);
+	if (buf[len - 1] != '(') len--;
+	buf[len] = ')';
 	return buf;
 }
 
 /**
- * When func node is read from identDict it is copied to a new node whose "left"
- * is then setup to point to original func node and is given here. Original func
- * node is linked with other overloaded funcs (funcs with same name but different
- * parameters) over the "next" pointer. Each func node in its "left" pointer has
- * a list of its formal parameters which are all linked through their "left"
- * pointer. The given node also has a list of given arguments in its "right"
- * pointer and they are linked through their "right" pointers. This function goes
- * through all overloaded funcs and tries to match given arguments with that
- * function's parameters. If exact match is not found but a match where some
- * arguments can be upcast to bigger type of the same kind (like from int8 to
- * int32 but not to uint32) that func will be used. If there are multiple such
- * funcs we will say that it is undefined which one will be called (because
- * compiler implementation can change) and that explicit casts should be used in
- * such cases.
+ * When func node is read from identDict it is copied to a new node whose funcDeclaration
+ * is then setup to point to original func node and is given here. Original func node is
+ * linked with other overloaded funcs (funcs with same name but different parameters) over
+ * the next pointer. Each func node in its nextParam pointer has a list of its formal
+ * parameters which are all linked through their nextParam pointer. The given node also
+ * has a list of given arguments in its nextArg pointer and they are linked through their
+ * nextArg pointers. This function goes through all overloaded funcs and tries to match
+ * given arguments with that function's parameters. If exact match is not found but a
+ * match where some arguments can be upcast to bigger type of the same kind (like from
+ * int8 to int32 but not to uint32) that func will be used. If there are multiple such
+ * funcs we will say that it is undefined which one will be called (because compiler
+ * implementation can change) and that explicit casts should be used in such cases.
  *
  * Example:
  * func : (int32, float64, bool) -> int8;
@@ -166,11 +159,11 @@ char* getFuncCallAsString(const char* name, PSmmAstNode args, char* buf) {
  *               bool                                               bool
  */
 PSmmAstNode resolveCall(PSmmParser parser, PSmmAstNode node) {
-	PSmmAstNode curCall = node->left;
+	PSmmAstNode curCall = node->funcDeclaration;
 	PSmmAstNode softCall = NULL;
 	while (curCall) {
-		PSmmAstNode curArg = node->right;
-		PSmmAstNode curParam = curCall->left;
+		PSmmAstNode curArg = node->nextArg;
+		PSmmAstNode curParam = curCall->nextParam;
 		PSmmAstNode tmpSoftCall = NULL;
 		while (curParam && curArg) {
 			bool differentTypes = curParam->type->kind != curArg->type->kind;
@@ -186,8 +179,8 @@ PSmmAstNode resolveCall(PSmmParser parser, PSmmAstNode node) {
 					break;
 				}
 			}
-			curParam = curParam->left;
-			curArg = curArg->right;
+			curParam = curParam->nextParam;
+			curArg = curArg->nextArg;
 		}
 		if (!curParam && !curArg && !tmpSoftCall) {
 			break;
@@ -199,16 +192,15 @@ PSmmAstNode resolveCall(PSmmParser parser, PSmmAstNode node) {
 	if (!curCall && softCall) curCall = softCall;
 	if (curCall) {
 		node->type = curCall->type;
-		node->left = curCall->left;
+		node->nextParam = curCall->nextParam;
 		return node;
 	}
 	// Report error that we got a call with certain arguments but expected one of...
 	char callWithArgsBuf[FUNC_SIGNATURE_LENGTH] = { 0 };
-	char* callWithArgs = getFuncCallAsString(node->token->repr, node->right, callWithArgsBuf);
-	if (!node->left->right) {
-		node->left->right = (PSmmAstNode)getFuncsSignatureAsString(node->left, parser->allocator);
-	}
-	smmPostMessage(errSmmGotSomeArgsButExpectedOneOf, node->token->filePos, callWithArgs, (char*)node->left->right);
+	char funcSignatures[8 * FUNC_SIGNATURE_LENGTH] = { 0 };
+	char* callWithArgs = getFuncCallAsString(node->token->repr, node->nextArg, callWithArgsBuf);
+	char* signatures = getFuncsSignatureAsString(node->funcDeclaration, funcSignatures);
+	smmPostMessage(errSmmGotSomeArgsButExpectedOneOf, node->token->filePos, callWithArgs, signatures);
 	return &errorNode;
 }
 
@@ -248,13 +240,12 @@ PSmmAstNode parseIdentFactor(PSmmParser parser) {
 		} else if (res != &errorNode) {
 			getNextToken(parser);
 			res->kind = nkSmmCall;
-			res->left = var; // Left points to root node of func overload data
+			res->funcDeclaration = var;
 			res->next = NULL;
 			PSmmAstNode lastArg = res;
 			while (parser->curToken->kind != ')' && parser->curToken->kind != ';') {
-				// func left pointer points to formal params and their types
-				lastArg->right = parseExpression(parser);
-				lastArg = lastArg->right;
+				lastArg->nextArg = parseExpression(parser);
+				lastArg = lastArg->nextArg;
 			}
 			if (!expect(parser, ')')) return &errorNode;
 			res = resolveCall(parser, res);
