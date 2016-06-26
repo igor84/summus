@@ -134,8 +134,8 @@ LLVMValueRef convertToInstructions(PSmmLLVMModuleGenData data, PSmmAstNode node)
 	return res;
 }
 
-void createLocalVars(PSmmLLVMModuleGenData data, PSmmAstNode scope) {
-	PSmmAstNode decl = scope->next;
+void createLocalVars(PSmmLLVMModuleGenData data, PSmmAstScopeNode scope) {
+	PSmmAstNode decl = scope->decls;
 	while (decl) {
 		LLVMTypeRef type = NULL;
 		LLVMValueRef zero = NULL;
@@ -192,7 +192,7 @@ void smmGenLLVMModule(PSmmModuleData mdata, PSmmAllocator a) {
 	PSmmAstNode curStmt = data->module;
 	while (curStmt) {
 		if (curStmt->kind == nkSmmBlock) {
-			createLocalVars(data, curStmt->scope);
+			createLocalVars(data, ((PSmmAstBlockNode)curStmt)->scope);
 		} else if (curStmt->kind != nkSmmError) {
 			lastVal = convertToInstructions(data, curStmt);
 		}

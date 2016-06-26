@@ -49,6 +49,7 @@ static void fixExpressionTypes(PSmmModuleData data, PSmmAstNode node, PSmmAstNod
 						case tiSmmInt8: node->token->sintVal = (int8_t)node->token->sintVal; break;
 						case tiSmmInt16: node->token->sintVal = (int8_t)node->token->sintVal; break;
 						case tiSmmInt32: node->token->sintVal = (int8_t)node->token->sintVal; break;
+						default: break;
 						}
 						smmPostMessage(wrnSmmConversionDataLoss, parent->token->filePos,
 							node->type->name, parent->type->name);
@@ -70,6 +71,7 @@ static void fixExpressionTypes(PSmmModuleData data, PSmmAstNode node, PSmmAstNod
 					case tiSmmInt8: node->token->sintVal = (int8_t)node->token->uintVal; break;
 					case tiSmmInt16: node->token->sintVal = (int16_t)node->token->uintVal; break;
 					case tiSmmInt32: node->token->sintVal = (int32_t)node->token->uintVal; break;
+					default: break;
 					}
 					if (oldVal < 0 || oldVal != node->token->sintVal) {
 						smmPostMessage(wrnSmmConversionDataLoss, parent->token->filePos, node->type->name, parent->type->name);
@@ -103,13 +105,14 @@ static void fixExpressionTypes(PSmmModuleData data, PSmmAstNode node, PSmmAstNod
 		}
 	}
 
-	if (node->kind == nkSmmCall) {	
-		PSmmAstNode curArg = node->nextArg;
-		PSmmAstNode curParam = node->nextParam;
+	if (node->kind == nkSmmCall) {
+		PSmmAstCallNode callNode = (PSmmAstCallNode)node;
+		PSmmAstArgNode curArg = callNode->args;
+		PSmmAstParamNode curParam = callNode->params;
 		while (curParam && curArg) {
-			fixExpressionTypes(data, curArg, curParam);
-			curParam = curParam->nextParam;
-			curArg = curArg->nextArg;
+			fixExpressionTypes(data, (PSmmAstNode)curArg, (PSmmAstNode)curParam);
+			curParam = curParam->next;
+			curArg = curArg->next;
 		}
 	} else {
 		if (node->left) fixExpressionTypes(data, node->left, node);
@@ -127,7 +130,7 @@ void smmAnalyzeTypes(PSmmModuleData data) {
 	if (parent->kind == nkSmmProgram) parent = parent->next;
 	while (parent) {
 		if (parent->kind == nkSmmBlock) {
-			PSmmAstNode curDecl = parent->scope->next;
+			PSmmAstNode curDecl = ((PSmmAstBlockNode)parent)->scope->decls;
 			while (curDecl) {
 				if (curDecl->left->kind == nkSmmConst) {
 					assert(curDecl->type == curDecl->left->type);

@@ -26,6 +26,14 @@
 #include "smmlexer.h"
 
 typedef struct SmmAstNode* PSmmAstNode;
+
+typedef struct SmmAstScopeNode* PSmmAstScopeNode;
+typedef struct SmmAstBlockNode* PSmmAstBlockNode;
+typedef struct SmmAstParamNode* PSmmAstParamNode;
+typedef struct SmmAstArgNode* PSmmAstArgNode;
+typedef struct SmmAstFuncDeclNode* PSmmAstFuncDeclNode;
+typedef struct SmmAstCallNode* PSmmAstCallNode;
+
 typedef PSmmAstNode (*PSmmSetupBinOpNode)(PSmmAstNode binOp);
 
 struct SmmBinaryOperator {
@@ -39,7 +47,7 @@ struct SmmParser {
 	PSmmToken prevToken;
 	PSmmToken curToken;
 	PSmmDict idents;
-	PSmmAstNode curScope;
+	PSmmAstScopeNode curScope;
 	int lastErrorLine;
 	PSmmAllocator allocator;
 	PSmmBinaryOperator* operatorPrecedences;
@@ -67,7 +75,7 @@ typedef enum {
 const char* nodeKindToString[nkSmmTerminator];
 
 /**
- * Each build in type info kind should have coresponding type info defined in smmparser.c.
+ * Each built in type info kind should have coresponding type info defined in smmparser.c.
  * SoftFloat64 type is for literals that depending on the context could be interpreted as
  * Float32 or Float64 and will be converted to those types eventually.
  */
@@ -99,34 +107,85 @@ struct SmmTypeInfo {
 };
 typedef struct SmmTypeInfo* PSmmTypeInfo;
 
+/**
+ * SmmAstNode is base "class" of AstNodes so all following types of AstNodes
+ * must begin with identical structure which is:
+ * 1. SmmAstNodeKind kind;
+ * 2. 32bit value
+ * 3. pointer value that should point to token
+ * 4. 4 more pointer values where first one should point to type
+ * 5. Arbitraty additional fields may be added
+ * That way we can freely cast between these types although in a few situations
+ * we need to be aware what field in "derived" type matches what field in AstNode.
+ */
 struct SmmAstNode {
 	SmmAstNodeKind kind;
-	union {
-		PSmmTypeInfo type;
-		PSmmAstNode lastDecl; // Last decl in scope node
-	};
-	union {
-		uint32_t flags; // Node type flags, like is it an int or float
-		uint32_t level; // Current scope level for scope nodes
-	};
+	uint32_t flags; // Node flags, like does it represent a const expression
 	PSmmToken token;
-	union {
-		PSmmAstNode next;
-		PSmmAstNode body; // Pointer to block's body
-	};
-	union {
-		PSmmAstNode left;
-		PSmmAstNode funcDeclaration; // Used on function call node until overloading is resolved
-		PSmmAstNode nextParam; // Used for func declaration
-		PSmmAstNode scope; // Used for block nodes
-		PSmmAstNode prevScope; // Used for scope nodes
-	};
-	union {
-		PSmmAstNode right;
-		PSmmAstNode nextOverload; // Used for connecting overloaded func declarations
-		PSmmAstNode nextArg; // Used for func calls
+	PSmmTypeInfo type;
+	PSmmAstNode next;
+	PSmmAstNode left;
+	PSmmAstNode right;
+};
 
-	};
+struct SmmAstScopeNode {
+	SmmAstNodeKind kind;
+	uint32_t level; // Scope nesting level
+	PSmmToken zzNotUsed1;
+	PSmmAstNode lastDecl; // Last decl in scope node so we can add new ones at the end
+	PSmmAstNode decls;
+	PSmmAstScopeNode prevScope;
+	PSmmAstNode zzNotUsed2;
+};
+
+struct SmmAstBlockNode {
+	SmmAstNodeKind kind;
+	uint32_t zzNotUsed1;
+	PSmmToken token;
+	PSmmTypeInfo zzNotUsed2;
+	PSmmAstNode stmts;
+	PSmmAstScopeNode scope;
+	PSmmAstNode zzNotUsed3;
+};
+
+struct SmmAstParamNode {
+	SmmAstNodeKind kind;
+	uint32_t flags;
+	PSmmToken token;
+	PSmmTypeInfo type;
+	PSmmAstNode zzNotUsed1;
+	PSmmAstParamNode next;
+	PSmmAstNode zzNotUsed2;
+};
+
+struct SmmAstArgNode {
+	SmmAstNodeKind kind;
+	uint32_t flags;
+	PSmmToken token;
+	PSmmTypeInfo type;
+	PSmmAstNode zzNotUsed1;
+	PSmmAstNode zzNotUsed2;
+	PSmmAstArgNode next;
+};
+
+struct SmmAstFuncDeclNode {
+	SmmAstNodeKind kind;
+	uint32_t flags;
+	PSmmToken token;
+	PSmmTypeInfo returnType;
+	PSmmAstBlockNode body;
+	PSmmAstParamNode params;
+	PSmmAstFuncDeclNode nextOverload;
+};
+
+struct SmmAstCallNode {
+	SmmAstNodeKind kind;
+	uint32_t flags;
+	PSmmToken token;
+	PSmmTypeInfo returnType;
+	PSmmAstNode zzNotUsed1;
+	PSmmAstParamNode params;
+	PSmmAstArgNode args;
 };
 
 PSmmParser smmCreateParser(PSmmLexer lex, PSmmAllocator allocator);

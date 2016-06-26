@@ -111,7 +111,7 @@ PSmmDictEntry smmGetDictEntry(PSmmDict dict, const char* key, bool createIfMissi
 
 	while (*el) {
 		entry = *el;
-		int i = 0;
+		size_t i = 0;
 		while (key[i] == entry->keyPart[i] && key[i] != 0 && entry->keyPartLength > i) {
 			i++;
 		}
