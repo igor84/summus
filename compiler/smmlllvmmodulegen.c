@@ -134,36 +134,35 @@ LLVMValueRef convertToInstructions(PSmmLLVMModuleGenData data, PSmmAstNode node)
 	return res;
 }
 
-PSmmAstNode createLocalVars(PSmmLLVMModuleGenData data) {
-	PSmmAstNode node = data->module;
-	while (node && node->kind == nkSmmDecl) {
+void createLocalVars(PSmmLLVMModuleGenData data, PSmmAstNode scope) {
+	PSmmAstNode decl = scope->next;
+	while (decl) {
 		LLVMTypeRef type = NULL;
 		LLVMValueRef zero = NULL;
-		bool emptyDecl = !node->right;
+		bool emptyDecl = !decl->right;
 		if (emptyDecl) {
-			zero = getZeroForType(node->left->type);
+			zero = getZeroForType(decl->left->type);
 			type = LLVMTypeOf(zero);
 		} else {
-			type = getLLVMType(node->left->type);
+			type = getLLVMType(decl->left->type);
 		}
 
 		LLVMValueRef var = NULL;
-		if (node->left->kind == nkSmmIdent) {
-			var = LLVMBuildAlloca(data->builder, type, node->left->token->repr);
-			LLVMSetAlignment(var, node->left->type->sizeInBytes);
-		} else if (node->left->kind == nkSmmConst) {
-			var = convertToInstructions(data, node->right);
+		if (decl->left->kind == nkSmmIdent) {
+			var = LLVMBuildAlloca(data->builder, type, decl->left->token->repr);
+			LLVMSetAlignment(var, decl->left->type->sizeInBytes);
+		} else if (decl->left->kind == nkSmmConst) {
+			var = convertToInstructions(data, decl->right);
 		} else {
 			assert(false && "Declaration of unknown node kind");
 		}
-		PSmmToken varToken = node->left->token;
+		PSmmToken varToken = decl->left->token;
 		smmAddDictValue(data->localVars, varToken->repr, var);
 		if (emptyDecl) {
 			LLVMBuildStore(data->builder, zero, var);
 		}
-		node = node->next;
+		decl = decl->next;
 	}
-	return node;
 }
 
 void smmGenLLVMModule(PSmmModuleData mdata, PSmmAllocator a) {
@@ -190,9 +189,11 @@ void smmGenLLVMModule(PSmmModuleData mdata, PSmmAllocator a) {
 	LLVMPositionBuilderAtEnd(data->builder, entry);
 
 	LLVMValueRef lastVal = NULL;
-	PSmmAstNode curStmt = createLocalVars(data);
+	PSmmAstNode curStmt = data->module;
 	while (curStmt) {
-		if (curStmt->kind != nkSmmError) {
+		if (curStmt->kind == nkSmmBlock) {
+			createLocalVars(data, curStmt->scope);
+		} else if (curStmt->kind != nkSmmError) {
 			lastVal = convertToInstructions(data, curStmt);
 		}
 		curStmt = curStmt->next;

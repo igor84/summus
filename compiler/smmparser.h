@@ -39,6 +39,7 @@ struct SmmParser {
 	PSmmToken prevToken;
 	PSmmToken curToken;
 	PSmmDict idents;
+	PSmmAstNode curScope;
 	int lastErrorLine;
 	PSmmAllocator allocator;
 	PSmmBinaryOperator* operatorPrecedences;
@@ -47,7 +48,9 @@ typedef struct SmmParser* PSmmParser;
 
 // Each enum value should have coresponding string in smmparser.c
 typedef enum {
-	nkSmmError, nkSmmProgram, nkSmmDecl, nkSmmIdent, nkSmmConst,
+	nkSmmError, nkSmmProgram,
+	nkSmmBlock, nkSmmScope,
+	nkSmmDecl, nkSmmIdent, nkSmmConst,
 	nkSmmAssignment,
 	nkSmmAdd , nkSmmFAdd,
 	nkSmmSub, nkSmmFSub,
@@ -89,7 +92,7 @@ enum SmmNodeFlags {
 };
 
 struct SmmTypeInfo {
-	int kind;
+	SmmTypInfoKind kind;
 	const char* name;
 	int sizeInBytes;
 	uint32_t flags;
@@ -98,12 +101,18 @@ typedef struct SmmTypeInfo* PSmmTypeInfo;
 
 struct SmmAstNode {
 	SmmAstNodeKind kind;
-	PSmmTypeInfo type;
-	uint32_t flags;
+	union {
+		PSmmTypeInfo type;
+		PSmmAstNode lastDecl; // Last decl in scope node
+	};
+	union {
+		uint32_t flags; // Node type flags, like is it an int or float
+		uint32_t level; // Current scope level for scope nodes
+	};
 	PSmmToken token;
 	union {
 		PSmmAstNode next;
-		PSmmAstNode body; // Pointer to func definition's body
+		PSmmAstNode body; // Pointer to block's body
 	};
 	union {
 		PSmmAstNode left;
@@ -116,7 +125,6 @@ struct SmmAstNode {
 		PSmmAstNode right;
 		PSmmAstNode nextOverload; // Used for connecting overloaded func declarations
 		PSmmAstNode nextArg; // Used for func calls
-		PSmmAstNode prevFuncScope; // Used for scope nodes
 
 	};
 };

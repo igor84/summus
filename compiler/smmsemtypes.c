@@ -126,11 +126,23 @@ void smmAnalyzeTypes(PSmmModuleData data) {
 	PSmmAstNode parent = data->module;
 	if (parent->kind == nkSmmProgram) parent = parent->next;
 	while (parent) {
-		if (parent->kind == nkSmmAssignment || (parent->kind == nkSmmDecl && parent->left->kind == nkSmmConst)) {
+		if (parent->kind == nkSmmBlock) {
+			PSmmAstNode curDecl = parent->scope->next;
+			while (curDecl) {
+				if (curDecl->left->kind == nkSmmConst) {
+					assert(curDecl->type == curDecl->left->type);
+					fixExpressionTypes(data, curDecl->right, curDecl);
+				}
+				curDecl = curDecl->next;
+			}
+		} else if (parent->kind == nkSmmAssignment) {
 			assert(parent->type == parent->left->type);
 			fixExpressionTypes(data, parent->right, parent);
-		} else if (parent->kind != nkSmmDecl) {
-			fixExpressionTypes(data, parent, parent);
+		} else {
+			// We treat softFloat as float 32 in order to be consistent
+			if (parent->type->kind == tiSmmSoftFloat64) parent->type -= 2;
+			if (parent->left) fixExpressionTypes(data, parent->left, parent);
+			if (parent->right) fixExpressionTypes(data, parent->right, parent);
 		}
 		parent = parent->next;
 	}

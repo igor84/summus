@@ -14,7 +14,9 @@ Type Definitions
 
 // There should be one string corresponding to each value of SmmAstNodeKind enum
 const char* nodeKindToString[] = {
-	"error", "Program", ":", "Ident", "Const",
+	"error", "Program",
+	"Block:", "Scope:",
+	":", "Ident", "Const",
 	"=",
 	"+", "+.",
 	"-", "-.",
@@ -22,7 +24,7 @@ const char* nodeKindToString[] = {
 	"udiv", "sdiv", "/",
 	"umod", "smod", "%",
 	"-", "type", "int", "float", "bool",
-	"cast"
+	"cast", "call"
 };
 
 static struct SmmTypeInfo builtInTypes[] = {
@@ -42,6 +44,20 @@ Private Functions
 *********************************************************/
 
 #define newSmmAstNode() parser->allocator->alloc(parser->allocator, sizeof(struct SmmAstNode))
+
+PSmmAstNode newAstNode(PSmmParser parser, SmmAstNodeKind kind) {
+	PSmmAstNode res = parser->allocator->alloc(parser->allocator, sizeof(struct SmmAstNode));
+	res->kind = kind;
+	return res;
+}
+
+PSmmAstNode newScopeNode(PSmmParser parser, uint32_t level, PSmmAstNode prevScope) {
+	PSmmAstNode scope = newAstNode(parser, nkSmmScope);
+	scope->lastDecl = scope;
+	scope->level = level;
+	scope->prevScope = prevScope;
+	return scope;
+}
 
 PSmmAstNode parseExpression(PSmmParser parser);
 
@@ -220,7 +236,7 @@ PSmmAstNode parseIdentFactor(PSmmParser parser) {
 	} else if (!var->type) {
 		smmPostMessage(errSmmUndefinedIdentifier, parser->curToken->filePos, parser->curToken->repr);
 	} else {
-		res = newSmmAstNode();
+		res = newAstNode(parser, nkSmmIdent);
 		*res = *var;
 		res->token = parser->curToken;
 	}
@@ -231,8 +247,7 @@ PSmmAstNode parseIdentFactor(PSmmParser parser) {
 			// Since we pass '(' to parse expression it will also handle ')'
 			PSmmAstNode expr = parseExpression(parser);
 			if (expr == &errorNode) return expr;
-			res = newSmmAstNode();
-			res->kind = nkSmmCast;
+			res = newAstNode(parser, nkSmmCast);
 			res->left = expr;
 			res->token = identToken;
 			res->type = castType;
@@ -255,8 +270,7 @@ PSmmAstNode parseIdentFactor(PSmmParser parser) {
 	} else if (identToken && !castType) {
 		if (parser->curToken->kind == ':') {
 			// This is declaration
-			res = newSmmAstNode();
-			res->kind = nkSmmIdent;
+			res = newAstNode(parser, nkSmmIdent);
 			res->token = identToken;
 			smmAddDictValue(parser->idents, res->token->repr, res);
 		} else {
@@ -283,7 +297,7 @@ PSmmTypeInfo getLiteralTokenType(PSmmToken token) {
 }
 
 PSmmAstNode getLiteralNode(PSmmParser parser) {
-	PSmmAstNode res = newSmmAstNode();
+	PSmmAstNode res = newAstNode(parser, nkSmmError);
 	res->type = getLiteralTokenType(parser->curToken);
 	if (res->type->flags & tifSmmInt) res->kind = nkSmmInt;
 	else if (res->type->flags & tifSmmFloat) res->kind = nkSmmFloat;
@@ -360,8 +374,7 @@ PSmmAstNode parseFactor(PSmmParser parser) {
 		} else if (res->kind == nkSmmFloat) {
 			res->token->floatVal = -res->token->floatVal;
 		} else {
-			PSmmAstNode neg = newSmmAstNode();
-			neg->kind = nkSmmNeg;
+			PSmmAstNode neg = newAstNode(parser, nkSmmNeg);
 			neg->left = res;
 			neg->type = res->type;
 			if (neg->type->flags & tifSmmUnsigned) {
@@ -397,7 +410,7 @@ PSmmAstNode parseBinOp(PSmmParser parser, PSmmAstNode left, int prec) {
 			}
 		}
 
-		PSmmAstNode res = newSmmAstNode();
+		PSmmAstNode res = newAstNode(parser, nkSmmError);
 		res->left = left;
 		res->right = right;
 		res->token = resToken;
@@ -432,8 +445,7 @@ PSmmAstNode parseAssignment(PSmmParser parser, PSmmAstNode lval) {
 		}
 	}
 	if (lval->kind == nkSmmConst) return val;
-	PSmmAstNode assignment = newSmmAstNode();
-	assignment->kind = nkSmmAssignment;
+	PSmmAstNode assignment = newAstNode(parser, nkSmmAssignment);
 	assignment->left = lval;
 	assignment->right = val;
 	assignment->type = lval->type;
@@ -479,8 +491,7 @@ PSmmAstNode parseDeclaration(PSmmParser parser, PSmmAstNode lval) {
 
 	if (expr == &errorNode) return expr;
 
-	PSmmAstNode decl = newSmmAstNode();
-	decl->kind = nkSmmDecl;
+	PSmmAstNode decl = newAstNode(parser, nkSmmDecl);
 	decl->token = declToken;
 	decl->left = lval;
 	decl->right = expr;
@@ -494,8 +505,11 @@ PSmmAstNode parseDeclaration(PSmmParser parser, PSmmAstNode lval) {
 		}
 	}
 	decl->type = lval->type;
-	// Otherwise it should just be declaration so ';' is expected next
-	return decl;
+	parser->curScope->lastDecl->next = decl;
+	parser->curScope->lastDecl = decl;
+
+	if (lval->kind == nkSmmConst) return NULL;
+	return expr;
 }
 
 PSmmAstNode parseStatement(PSmmParser parser) {
@@ -601,8 +615,7 @@ PSmmParser smmCreateParser(PSmmLexer lex, PSmmAllocator allocator) {
 	parser->idents = smmCreateDict(parser->allocator, NULL, NULL);
 	int cnt = sizeof(builtInTypes) / sizeof(struct SmmTypeInfo);
 	for (int i = 0; i < cnt; i++) {
-		PSmmAstNode typeNode = newSmmAstNode();
-		typeNode->kind = nkSmmType;
+		PSmmAstNode typeNode = newAstNode(parser, nkSmmType);
 		typeNode->type = &builtInTypes[i];
 		smmAddDictValue(parser->idents, typeNode->type->name, typeNode);
 	}
@@ -640,20 +653,14 @@ PSmmParser smmCreateParser(PSmmLexer lex, PSmmAllocator allocator) {
 
 
 PSmmAstNode smmParse(PSmmParser parser) {
-	PSmmAstNode program = newSmmAstNode();
-	program->kind = nkSmmProgram;
-	PSmmAstNode lastStmt = program;
-	PSmmAstNode lastDecl = program;
+	PSmmAstNode program = newAstNode(parser, nkSmmProgram);
+	PSmmAstNode lastStmt = newAstNode(parser, nkSmmBlock);
+	lastStmt->scope = newScopeNode(parser, 0, NULL);
+	program->body = lastStmt;
+	parser->curScope = lastStmt->scope;
 	
 	while (parser->curToken->kind != tkSmmEof) {
 		PSmmAstNode curStmt = parseStatement(parser);
-		if (curStmt->kind == nkSmmDecl) {
-			curStmt->next = lastDecl->next;
-			lastDecl->next = curStmt;
-			if (lastDecl == lastStmt) lastStmt = curStmt;
-			lastDecl = curStmt;
-			curStmt = curStmt->right;
-		}
 		if (!expect(parser, ';')) curStmt = &errorNode;
 		if (curStmt == &errorNode) {
 			curStmt = newSmmAstNode();

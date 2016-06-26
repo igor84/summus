@@ -9,14 +9,13 @@
 
 void printNode(PSmmAstNode node) {
 	//while (node->kind == nkSmmDecl) node = node->next;
-	if (node->left) printNode(node->left);
 
 	if (node->kind == nkSmmIdent || node->kind == nkSmmConst) {
 		fputs(node->token->repr, stdout);
 	} else {
 		fputs(nodeKindToString[node->kind], stdout);
 	}
-	if (node->type && node->type->kind != 0 /*&& (
+	if (node->kind != nkSmmScope && node->type && node->type->kind != 0 /*&& (
 		node->kind == nkSmmIdent || node->kind == nkSmmConst ||
 		node->kind == nkSmmInt || node->kind == nkSmmFloat || node->kind == nkSmmCast)*/) {
 		fputs(":", stdout);
@@ -26,8 +25,11 @@ void printNode(PSmmAstNode node) {
 		fputs(" ", stdout);
 	}
 	
-	if (node->kind != nkSmmDecl && node->right) {
-		printNode(node->right);
+	if (node->left) printNode(node->left);
+
+	if (node->right) {
+		if (node->kind == nkSmmDecl) fputs("hasRight", stdout);
+		else printNode(node->right);
 	}
 	if (node->next) {
 		puts("");
