@@ -81,7 +81,8 @@ PSmmDictEntry createNewEntry(PPrivDict privDict, const char* origKey, const char
 	} else {
 		newElem->keyPart = keyPart;
 	}
-	newElem->value = privDict->dict.elemCreateFunc(origKey, privDict->allocator, privDict->dict.elemCreateFuncContext);
+	newElem->values = privDict->allocator->alloc(privDict->allocator, sizeof(struct SmmDictEntryValue));
+	newElem->values->value = privDict->dict.elemCreateFunc(origKey, privDict->allocator, privDict->dict.elemCreateFuncContext);
 	return newElem;
 }
 
@@ -119,14 +120,15 @@ PSmmDictEntry smmGetDictEntry(PSmmDict dict, const char* key, bool createIfMissi
 		if (key[i] == 0 || (i > 0 && i < entry->keyPartLength)) {
 			if (entry->keyPartLength == i) {
 				// Existing key so create a value if it doesn't exist and return it
-				if (!entry->value && createIfMissing) {
+				if (!entry->values && createIfMissing) {
 					if (dict->storeKeyCopy) {
 						size_t len = strlen(origKey);
 						char* newKey = a->alloc(a, len + 1);
 						strncpy(newKey, origKey, len);
 						origKey = newKey;
 					}
-					entry->value = dict->elemCreateFunc(origKey, privDict->allocator, dict->elemCreateFuncContext);
+					entry->values = a->alloc(a, sizeof(struct SmmDictEntryValue));
+					entry->values->value = dict->elemCreateFunc(origKey, privDict->allocator, dict->elemCreateFuncContext);
 				}
 				return entry;
 			}
@@ -135,7 +137,7 @@ PSmmDictEntry smmGetDictEntry(PSmmDict dict, const char* key, bool createIfMissi
 			PSmmDictEntry newElem = a->alloc(a, sizeof(struct SmmDictEntry));
 			newElem->keyPart = &entry->keyPart[i];
 			newElem->keyPartLength = entry->keyPartLength - i;
-			newElem->value = entry->value;
+			newElem->values = entry->values;
 			newElem->children = entry->children;
 			entry->children = newElem;
 			entry->keyPartLength = i;
@@ -146,10 +148,11 @@ PSmmDictEntry smmGetDictEntry(PSmmDict dict, const char* key, bool createIfMissi
 					strncpy(newKey, origKey, len);
 					origKey = newKey;
 				}
-				entry->value = dict->elemCreateFunc(origKey, privDict->allocator, dict->elemCreateFuncContext);
+				entry->values = a->alloc(a, sizeof(struct SmmDictEntryValue));
+				entry->values->value = dict->elemCreateFunc(origKey, privDict->allocator, dict->elemCreateFuncContext);
 				return entry;
 			}
-			entry->value = NULL;
+			entry->values = NULL;
 			newElem = createNewEntry(privDict, origKey, &key[i]);
 			newElem->next = entry->children;
 			entry->children = newElem;
@@ -179,9 +182,9 @@ PSmmDictEntry smmGetDictEntry(PSmmDict dict, const char* key, bool createIfMissi
 
 void* smmGetDictValue(PSmmDict dict, const char* key, bool createIfMissing) {
 	PSmmDictEntry entry = smmGetDictEntry(dict, key, createIfMissing);
-	assert(!createIfMissing || (entry != NULL));
-	if (entry == NULL) return NULL;
-	return entry->value;
+	assert(!createIfMissing || (entry != NULL && entry->values != NULL));
+	if (entry == NULL || entry->values == NULL) return NULL;
+	return entry->values->value;
 }
 
 void smmAddDictValue(PSmmDict dict, const char* key, void* value) {
@@ -190,9 +193,34 @@ void smmAddDictValue(PSmmDict dict, const char* key, void* value) {
 	dict->elemCreateFuncContext = value;
 	dict->elemCreateFunc = getValueToAdd;
 	PSmmDictEntry entry = smmGetDictEntry(dict, key, true);
-	if (entry->value != value) entry->value = value;
+	if (entry->values->value != value) entry->values->value = value;
 	dict->elemCreateFuncContext = oldContext;
 	dict->elemCreateFunc = oldFunc;
+}
+
+void smmPushDictValue(PSmmDict dict, const char* key, void* value) {
+	SmmElementCreateFunc oldFunc = dict->elemCreateFunc;
+	void* oldContext = dict->elemCreateFuncContext;
+	dict->elemCreateFuncContext = value;
+	dict->elemCreateFunc = getValueToAdd;
+	PSmmDictEntry entry = smmGetDictEntry(dict, key, true);
+	if (entry->values->value != value) {
+		PSmmAllocator a = ((PPrivDict)dict)->allocator;
+		PSmmDictEntryValue newValue = a->alloc(a, sizeof(struct SmmDictEntryValue));
+		newValue->next = entry->values->value;
+		newValue->value = value;
+		entry->values = newValue;
+	}
+	dict->elemCreateFuncContext = oldContext;
+	dict->elemCreateFunc = oldFunc;
+}
+
+void* smmPopDictValue(PSmmDict dict, const char* key) {
+	PSmmDictEntry entry = smmGetDictEntry(dict, key, false);
+	if (!entry || !entry->values) return NULL;
+	void* value = entry->values;
+	entry->values = entry->values->next;
+	return value;
 }
 
 PSmmAllocator smmCreatePermanentAllocator(const char* name, size_t size) {

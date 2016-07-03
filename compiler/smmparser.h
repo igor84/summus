@@ -27,11 +27,12 @@
 
 typedef struct SmmAstNode* PSmmAstNode;
 
+typedef struct SmmAstIdentNode* PSmmAstIdentNode;
 typedef struct SmmAstScopeNode* PSmmAstScopeNode;
 typedef struct SmmAstBlockNode* PSmmAstBlockNode;
 typedef struct SmmAstParamNode* PSmmAstParamNode;
 typedef struct SmmAstArgNode* PSmmAstArgNode;
-typedef struct SmmAstFuncDeclNode* PSmmAstFuncDeclNode;
+typedef struct SmmAstFuncDefNode* PSmmAstFuncDefNode;
 typedef struct SmmAstCallNode* PSmmAstCallNode;
 
 typedef PSmmAstNode (*PSmmSetupBinOpNode)(PSmmAstNode binOp);
@@ -48,15 +49,16 @@ struct SmmParser {
 	PSmmToken curToken;
 	PSmmDict idents;
 	PSmmAstScopeNode curScope;
-	int lastErrorLine;
+	PSmmAstNode nodePool;
 	PSmmAllocator allocator;
 	PSmmBinaryOperator* operatorPrecedences;
+	int lastErrorLine;
 };
 typedef struct SmmParser* PSmmParser;
 
 // Each enum value should have coresponding string in smmparser.c
 typedef enum {
-	nkSmmError, nkSmmProgram,
+	nkSmmError, nkSmmProgram, nkSmmFunc,
 	nkSmmBlock, nkSmmScope,
 	nkSmmDecl, nkSmmIdent, nkSmmConst,
 	nkSmmAssignment,
@@ -67,7 +69,7 @@ typedef enum {
 	nkSmmURem, nkSmmSRem, nkSmmFRem,
 	nkSmmNeg,
 	nkSmmType, nkSmmInt, nkSmmFloat, nkSmmBool,
-	nkSmmCast, nkSmmCall,
+	nkSmmCast, nkSmmParam, nkSmmCall, nkSmmReturn,
 
 	nkSmmTerminator
 } SmmAstNodeKind;
@@ -96,13 +98,14 @@ enum SmmTypeInfoFlags {
 };
 
 enum SmmNodeFlags {
-	nfSmmConst = 0x1
+	nfSmmIdent = 0x1,
+	nfSmmConst = 0x3
 };
 
 struct SmmTypeInfo {
 	SmmTypInfoKind kind;
-	const char* name;
 	int sizeInBytes;
+	const char* name;
 	uint32_t flags;
 };
 typedef struct SmmTypeInfo* PSmmTypeInfo;
@@ -128,14 +131,24 @@ struct SmmAstNode {
 	PSmmAstNode right;
 };
 
+struct SmmAstIdentNode {
+	SmmAstNodeKind kind;
+	uint32_t flags;
+	PSmmToken token;
+	PSmmTypeInfo type;
+	PSmmAstNode next;
+	PSmmAstNode left;
+	uintptr_t level; // Scope level ident is created in (must be int which is the same size as pointer)
+};
+
 struct SmmAstScopeNode {
 	SmmAstNodeKind kind;
 	uint32_t level; // Scope nesting level
 	PSmmToken zzNotUsed1;
-	PSmmAstNode lastDecl; // Last decl in scope node so we can add new ones at the end
+	PSmmTypeInfo returnType; // Return type of the function this scope is part of
 	PSmmAstNode decls;
 	PSmmAstScopeNode prevScope;
-	PSmmAstNode zzNotUsed2;
+	PSmmAstNode lastDecl; // Last decl in scope node so we can add new ones at the end
 };
 
 struct SmmAstBlockNode {
@@ -143,9 +156,9 @@ struct SmmAstBlockNode {
 	uint32_t zzNotUsed1;
 	PSmmToken token;
 	PSmmTypeInfo zzNotUsed2;
-	PSmmAstNode stmts;
+	PSmmAstNode next;
 	PSmmAstScopeNode scope;
-	PSmmAstNode zzNotUsed3;
+	PSmmAstNode stmts;
 };
 
 struct SmmAstParamNode {
@@ -153,9 +166,9 @@ struct SmmAstParamNode {
 	uint32_t flags;
 	PSmmToken token;
 	PSmmTypeInfo type;
-	PSmmAstNode zzNotUsed1;
 	PSmmAstParamNode next;
-	PSmmAstNode zzNotUsed2;
+	uintptr_t count; // Set on first param in FuncDef to tell us how many params there are in total
+	uintptr_t level; // We need this so we can easily check if same param is defined twice
 };
 
 struct SmmAstArgNode {
@@ -163,19 +176,19 @@ struct SmmAstArgNode {
 	uint32_t flags;
 	PSmmToken token;
 	PSmmTypeInfo type;
+	PSmmAstArgNode next;
 	PSmmAstNode zzNotUsed1;
 	PSmmAstNode zzNotUsed2;
-	PSmmAstArgNode next;
 };
 
-struct SmmAstFuncDeclNode {
+struct SmmAstFuncDefNode {
 	SmmAstNodeKind kind;
 	uint32_t flags;
 	PSmmToken token;
 	PSmmTypeInfo returnType;
 	PSmmAstBlockNode body;
 	PSmmAstParamNode params;
-	PSmmAstFuncDeclNode nextOverload;
+	PSmmAstFuncDefNode nextOverload;
 };
 
 struct SmmAstCallNode {

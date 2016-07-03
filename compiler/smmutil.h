@@ -61,11 +61,17 @@ struct SmmAllocator {
 	void  (*free)(PSmmAllocator allocator, void* ptr);
 };
 
+typedef struct SmmDictEntryValue* PSmmDictEntryValue;
+struct SmmDictEntryValue {
+	void* value;
+	PSmmDictEntryValue next;
+};
+
 typedef struct SmmDictEntry* PSmmDictEntry;
 struct SmmDictEntry {
 	const char* keyPart;
 	size_t keyPartLength;
-	void* value;
+	PSmmDictEntryValue values;
 	PSmmDictEntry children;
 	PSmmDictEntry next;
 };
@@ -83,6 +89,8 @@ PSmmDict smmCreateDict(PSmmAllocator allocator, void* elemCreateFuncContext, Smm
 PSmmDictEntry smmGetDictEntry(PSmmDict dict, const char* key, bool createIfMissing);
 void* smmGetDictValue(PSmmDict dict, const char* key, bool createIfMissing);
 void smmAddDictValue(PSmmDict dict, const char* key, void* value);
+void smmPushDictValue(PSmmDict dict, const char* key, void* value);
+void* smmPopDictValue(PSmmDict dict, const char* key);
 
 PSmmAllocator smmCreatePermanentAllocator(const char* name, size_t size);
 void smmFreePermanentAllocator(PSmmAllocator a);

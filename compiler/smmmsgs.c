@@ -11,7 +11,8 @@
 #define WARNING_START wrnSmmConversionDataLoss
 
 static const char* msgTypeToString[] = {
-	"unknown error", "failed allocating memory",
+	"unknown error",
+	"failed allocating memory",
 	"invalid hex digit",
 	"integer literal too big",
 	"invalid exponent in float literal",
@@ -20,7 +21,7 @@ static const char* msgTypeToString[] = {
 	"invalid character",
 
 	"missing expected %s",
-	"expected %s but got '%s'",
+	"expected %s but got %s",
 	"identifier '%s' is undefined",
 	"identifier '%s' is already defined",
 	"operand must be l-value",
@@ -30,6 +31,7 @@ static const char* msgTypeToString[] = {
 	"got %s but expected one of: \n %s",
 	"can't assign a value to a constant",
 	"non constant values are not allowed in constant expressions",
+	"type of return expression: %s doesn't match function return type: %s",
 
 	"possible loss of data in conversion from %s to %s"
 };

@@ -1,3 +1,7 @@
+bla :: (a: int16, b: int16) -> int32 {
+	return a + b;
+}
+
 z : int8 : 18446744073709551615;
 x :: 2- 4 * 0x817972143abcdef div 12312 -3 * z;
 //x := 123;
@@ -11,3 +15,5 @@ b:float64 = 123 + x / y;
 a:float32 = b * 323.23 / 54.543;
 b = a * 2143.23/543.23;
 r:int32=float64(b+32.34);
+r = r + bla(2,3);
+return r;

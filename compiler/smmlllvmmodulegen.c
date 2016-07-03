@@ -8,6 +8,7 @@
 
 struct SmmLLVMModuleGenData {
 	PSmmAstNode module;
+	LLVMModuleRef llvmModule;
 	PSmmAllocator allocator;
 	PSmmDict localVars;
 	LLVMBuilderRef builder;
@@ -82,16 +83,18 @@ LLVMValueRef convertToInstructions(PSmmLLVMModuleGenData data, PSmmAstNode node)
 	LLVMValueRef left = NULL;
 	LLVMValueRef right = NULL;
 	LLVMBuilderRef builder = data->builder;
-	if (node->left) {
-		if (node->kind == nkSmmAssignment) {
-			PSmmToken varToken = node->left->token;
-			left = smmGetDictValue(data->localVars, varToken->repr, false);
-		} else {
-			left = convertToInstructions(data, node->left);
+	if (node->kind != nkSmmParam) {
+		if (node->left) {
+			if (node->kind == nkSmmAssignment) {
+				PSmmToken varToken = node->left->token;
+				left = smmGetDictValue(data->localVars, varToken->repr, false);
+			} else {
+				left = convertToInstructions(data, node->left);
+			}
 		}
-	}
-	if (node->right) {
-		right = convertToInstructions(data, node->right);
+		if (node->right) {
+			right = convertToInstructions(data, node->right);
+		}
 	}
 	if (node->kind >= nkSmmAdd && node->kind <= nkSmmFRem) {
 		return LLVMBuildBinOp(builder, node->kind - nkSmmAdd + LLVMAdd, left, right, "");
@@ -117,7 +120,7 @@ LLVMValueRef convertToInstructions(PSmmLLVMModuleGenData data, PSmmAstNode node)
 			res = LLVMConstReal(LLVMDoubleType(), node->token->floatVal);
 		}
 		break;
-	case nkSmmIdent:
+	case nkSmmIdent: case nkSmmParam:
 		res = smmGetDictValue(data->localVars, node->token->repr, false);
 		res = LLVMBuildLoad(builder, res, "");
 		LLVMSetAlignment(res, node->type->sizeInBytes);
@@ -128,8 +131,33 @@ LLVMValueRef convertToInstructions(PSmmLLVMModuleGenData data, PSmmAstNode node)
 	case nkSmmCast:
 		res = getCastInstruction(data, node->type, node->left->type, left);
 		break;
+	case nkSmmReturn:
+		if (left) res = LLVMBuildRet(data->builder, left);
+		else res = LLVMBuildRetVoid(data->builder);
+		break;
+	case nkSmmCall:
+		{
+			LLVMValueRef func = smmGetDictValue(data->localVars, node->token->repr, false);
+			LLVMValueRef* args = NULL;
+			size_t argCount = 0;
+			PSmmAstCallNode callNode = (PSmmAstCallNode)node;
+			if (callNode->params) {
+				argCount = callNode->params->count;
+				PSmmAstArgNode astArg = callNode->args;
+				args = data->allocator->alloc(data->allocator, argCount * sizeof(LLVMValueRef));
+				int i = 0;
+				while (astArg) {
+					args[i] = convertToInstructions(data, (PSmmAstNode)astArg);
+					astArg = astArg->next;
+					i++;
+				}
+			}
+			res = LLVMBuildCall(data->builder, func, args, (unsigned)argCount, "");
+			break;
+		}
 	default:
 		assert(false && "Encountered unknown node type!");
+		break;
 	}
 	return res;
 }
@@ -165,10 +193,101 @@ void createLocalVars(PSmmLLVMModuleGenData data, PSmmAstScopeNode scope) {
 	}
 }
 
+void convertBlock(PSmmLLVMModuleGenData data, PSmmAstBlockNode block) {
+	createLocalVars(data, block->scope);
+	PSmmAstNode stmt = block->stmts;
+	while (stmt) {
+		convertToInstructions(data, stmt);
+		stmt = stmt->next;
+	}
+}
+
+#define MAX_FUNC_PARAMS 20
+
+void createFunc(PSmmLLVMModuleGenData data, PSmmAstFuncDefNode astFunc) {
+	LLVMTypeRef returnType = getLLVMType(astFunc->returnType);
+	LLVMTypeRef* params = NULL;
+	size_t paramsCount = 0;
+	if (astFunc->params) {
+		PSmmAstParamNode param = astFunc->params;
+		paramsCount = param->count;
+		params = data->allocator->alloc(data->allocator, paramsCount * sizeof(LLVMTypeRef));
+		for (size_t i = 0; i < paramsCount; i++) {
+			params[i] = getLLVMType(param->type);
+			param = param->next;
+		}
+	}
+	LLVMTypeRef funcType = LLVMFunctionType(returnType, params, (unsigned)paramsCount, false);
+	LLVMValueRef func = LLVMAddFunction(data->llvmModule, astFunc->token->repr, funcType);
+
+	smmPushDictValue(data->localVars, astFunc->token->repr, func);
+	
+	if (astFunc->body) {
+		LLVMBasicBlockRef entry = LLVMAppendBasicBlock(func, "entry");
+
+		LLVMPositionBuilderAtEnd(data->builder, entry);
+
+		if (paramsCount > 0) {
+			LLVMValueRef* paramVals = data->allocator->alloc(data->allocator, paramsCount * sizeof(LLVMValueRef));;
+			LLVMGetParams(func, paramVals);
+			PSmmAstParamNode param = astFunc->params;
+			for (size_t i = 0; i < paramsCount; i++) {
+				LLVMValueRef paramStore = LLVMBuildAlloca(data->builder, LLVMTypeOf(paramVals[i]), param->token->repr);
+				LLVMBuildStore(data->builder, paramVals[i], paramStore);
+				smmPushDictValue(data->localVars, param->token->repr, paramStore);
+				param = param->next;
+			}
+		}
+
+
+		convertBlock(data, astFunc->body);
+
+		PSmmAstParamNode param = astFunc->params;
+		while (param) {
+			smmPopDictValue(data->localVars, param->token->repr);
+			param = param->next;
+		}
+
+		LLVMVerifyFunction(func, LLVMPrintMessageAction);
+	}
+}
+
+void createGlobalVars(PSmmLLVMModuleGenData data, PSmmAstScopeNode scope) {
+	PSmmAstNode decl = scope->decls;
+	while (decl) {
+		LLVMTypeRef type = getLLVMType(decl->left->type);
+
+		if (decl->left->kind == nkSmmFunc) {
+			LLVMBasicBlockRef curBlock = LLVMGetInsertBlock(data->builder);
+			createFunc(data, (PSmmAstFuncDefNode)decl->left);
+			LLVMPositionBuilderAtEnd(data->builder, curBlock);
+		} else {
+			LLVMValueRef val = NULL;
+			if (decl->right && (decl->right->flags & nfSmmConst)) {
+				val = convertToInstructions(data, decl->right);
+				decl->right->kind = nkSmmError; // TODO(igors): improve this; So it will be skipped later
+			}
+
+			LLVMValueRef globalVar = NULL;
+			if (decl->left->kind == nkSmmConst) {
+				globalVar = val;
+			} else {
+				globalVar = LLVMAddGlobal(data->llvmModule, type, decl->left->token->repr);
+				LLVMSetGlobalConstant(globalVar, false);
+				LLVMSetInitializer(globalVar, val);
+			}
+
+			PSmmToken varToken = decl->left->token;
+			smmAddDictValue(data->localVars, varToken->repr, globalVar);
+		}
+		decl = decl->next;
+	}
+}
+
 void smmGenLLVMModule(PSmmModuleData mdata, PSmmAllocator a) {
 	if (!mdata || !mdata->module) return;
 
-	PSmmLLVMModuleGenData data = (PSmmLLVMModuleGenData)a->alloc(a, sizeof(struct SmmLLVMModuleGenData));
+	PSmmLLVMModuleGenData data = a->alloc(a, sizeof(struct SmmLLVMModuleGenData));
 	data->allocator = a;
 	data->module = mdata->module;
 	data->localVars = smmCreateDict(a, NULL, NULL);
@@ -176,41 +295,39 @@ void smmGenLLVMModule(PSmmModuleData mdata, PSmmAllocator a) {
 
 	if (data->module->kind == nkSmmProgram) data->module = data->module->next;
 
-	LLVMModuleRef mod = LLVMModuleCreateWithName(mdata->filename);
-	LLVMSetDataLayout(mod, "");
-	LLVMSetTarget(mod, LLVMGetDefaultTargetTriple());
+	data->llvmModule = LLVMModuleCreateWithName(mdata->filename);
+	LLVMSetDataLayout(data->llvmModule, "");
+	LLVMSetTarget(data->llvmModule, LLVMGetDefaultTargetTriple());
 	
 	LLVMTypeRef funcType = LLVMFunctionType(LLVMInt32Type(), NULL, 0, 0);
-	LLVMValueRef mainfunc = LLVMAddFunction(mod, "main", funcType);
+	LLVMValueRef mainfunc = LLVMAddFunction(data->llvmModule, "main", funcType);
 
 	LLVMBasicBlockRef entry = LLVMAppendBasicBlock(mainfunc, "entry");
 
 	data->builder = LLVMCreateBuilder();
 	LLVMPositionBuilderAtEnd(data->builder, entry);
 
-	LLVMValueRef lastVal = NULL;
 	PSmmAstNode curStmt = data->module;
+	if (curStmt && curStmt->kind == nkSmmBlock) {
+		PSmmAstBlockNode astBlock = (PSmmAstBlockNode)curStmt;
+		createGlobalVars(data, astBlock->scope);
+		curStmt = astBlock->stmts;
+	}
 	while (curStmt) {
 		if (curStmt->kind == nkSmmBlock) {
-			createLocalVars(data, ((PSmmAstBlockNode)curStmt)->scope);
+			convertBlock(data, (PSmmAstBlockNode)curStmt);
 		} else if (curStmt->kind != nkSmmError) {
-			lastVal = convertToInstructions(data, curStmt);
+			convertToInstructions(data, curStmt);
 		}
 		curStmt = curStmt->next;
 	}
-	if (!lastVal) {
-		lastVal = LLVMConstInt(LLVMInt32Type(), 0, true);
-	} else {
-		lastVal = LLVMBuildLoad(data->builder, lastVal, "");
-	}
-	LLVMBuildRet(data->builder, lastVal);
-
+	
 	char *error = NULL;
-	LLVMVerifyModule(mod, LLVMAbortProcessAction, &error);
+	LLVMVerifyModule(data->llvmModule, LLVMAbortProcessAction, &error);
 	LLVMDisposeMessage(error);
 
 	char* err = NULL;
-	LLVMPrintModuleToFile(mod, "test.ll", &err);
+	LLVMPrintModuleToFile(data->llvmModule, "test.ll", &err);
 	if (err) {
 		printf("\nError Saving Module: %s\n", err);
 	} else {

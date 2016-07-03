@@ -16,6 +16,7 @@ static const char* tokenTypeToString[] = {
 	"identifier",
 	"div", "mod", "and", "or", "xor",
 	"uint32", "uint64", "float64", "bool",
+	"->", "return",
 	"eof"
 };
 
@@ -104,7 +105,7 @@ static void skipAlNum(PSmmLexer lex) {
 }
 
 static void* createSymbolElem(const char* key, PSmmAllocator a, void* context) {
-	PSmmSymbol res = (PSmmSymbol)a->alloc(a, sizeof(struct SmmSymbol));
+	PSmmSymbol res = a->alloc(a, sizeof(struct SmmSymbol));
 	res->name = key;
 	res->kind = tkSmmIdent; // By default it is ident but it can be changed later
 	return res;
@@ -117,13 +118,14 @@ static void initSymTableWithKeywords(PPrivLexer lex) {
 	};
 	static struct Keywords keywords[] = {
 		{ "div", tkSmmIntDiv }, { "mod", tkSmmIntMod },
-		{ "and", tkSmmAndOp }, { "or", tkSmmOrOp }, { "xor", tkSmmXorOp }
+		{ "and", tkSmmAndOp }, { "or", tkSmmOrOp }, { "xor", tkSmmXorOp },
+		{ "return", tkSmmReturn }
 	};
 	
 	int count = sizeof(keywords) / sizeof(struct Keywords);
 	for (int i = 0; i < count; i++) {
 		struct Keywords k = keywords[i];
-		PSmmSymbol symbol = (PSmmSymbol)smmGetDictValue(lex->symTable, k.name, true);
+		PSmmSymbol symbol = smmGetDictValue(lex->symTable, k.name, true);
 		symbol->kind = k.kind;
 	}
 }
@@ -279,10 +281,10 @@ API Functions
  * "Enter - CTRL+Z - Enter" on Windows and CTRL+D on *nix systems
  */
 PSmmLexer smmCreateLexer(char* buffer, const char* filename, PSmmAllocator allocator) {
-	PPrivLexer privLex = (PPrivLexer)allocator->alloc(allocator, sizeof(struct PrivLexer));
+	PPrivLexer privLex = allocator->alloc(allocator, sizeof(struct PrivLexer));
 
 	if (!buffer) {
-		buffer = (char *)allocator->alloc(allocator, SMM_STDIN_BUFFER_LENGTH);
+		buffer = allocator->alloc(allocator, SMM_STDIN_BUFFER_LENGTH);
 		fgets(buffer, SMM_STDIN_BUFFER_LENGTH, stdin);
 		privLex->skipWhitespace = skipWhitespaceFromStdIn;
 	} else {
@@ -306,7 +308,7 @@ PSmmToken smmGetNextToken(PSmmLexer lex) {
 	PSmmAllocator a = privLex->allocator;
 
 	uint64_t pos = lex->scanCount;
-	PSmmToken token = (PSmmToken)a->alloc(a, sizeof(struct SmmToken));
+	PSmmToken token = a->alloc(a, sizeof(struct SmmToken));
 	token->filePos = lex->filePos;
 	// It should be false for first token on first line, but true for first token on following lines
 	token->isFirstOnLine = lastLine != lex->filePos.lineNumber;
@@ -316,8 +318,16 @@ PSmmToken smmGetNextToken(PSmmLexer lex) {
 	case 0:
 		token->kind = tkSmmEof;
 		return token;
-	case '+': case '-': case '*': case '/': case '%': case '=':
-	case ':': case ';': case '(': case ')':
+	case '-':
+		token->kind = *firstChar;
+		nextChar(lex);
+		if (lex->curChar[0] == '>') {
+			token->kind = tkSmmRArrow;
+			nextChar(lex);
+		}
+		break;
+	case '+': case '*': case '/': case '%': case '=': case ':':
+	case ';': case '(': case ')': case '{': case '}': case ',':
 		token->kind = *firstChar;
 		nextChar(lex);
 		break;
@@ -348,7 +358,7 @@ PSmmToken smmGetNextToken(PSmmLexer lex) {
 
 	if (!token->repr) {
 		int cnt = (int)(lex->scanCount - pos);
-		char* repr = (char*)privLex->allocator->alloc(privLex->allocator, cnt + 1);
+		char* repr = privLex->allocator->alloc(privLex->allocator, cnt + 1);
 		strncpy(repr, firstChar, cnt);
 		token->repr = repr;
 	}

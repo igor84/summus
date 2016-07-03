@@ -23,11 +23,13 @@ Type Definitions
 
 typedef enum { smmLexTypeFile, smmLexTypeStdIn } SmmLexTypeEnum;
 
+// Each enum value above 255 should have coresponding string in smmlexer.c
 typedef enum {
 	tkSmmErr,
 	tkSmmIdent = 256, // Because first 255 values are reserved for existing chars
 	tkSmmIntDiv, tkSmmIntMod, tkSmmAndOp, tkSmmXorOp, tkSmmOrOp,
 	tkSmmInt, tkSmmUInt, tkSmmFloat, tkSmmBool,
+	tkSmmRArrow, tkSmmReturn,
 	tkSmmEof
 } SmmTokenKind;
 

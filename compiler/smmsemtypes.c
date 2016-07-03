@@ -4,7 +4,7 @@
 
 static PSmmAstNode getCastNode(PSmmAllocator a, PSmmAstNode node, PSmmAstNode parent) {
 	if (parent->kind == nkSmmCast) return NULL;
-	PSmmAstNode cast = (PSmmAstNode)a->alloc(a, sizeof(struct SmmAstNode));
+	PSmmAstNode cast = a->alloc(a, sizeof(struct SmmAstNode));
 	cast->kind = nkSmmCast;
 	cast->left = node;
 	cast->type = parent->type;
@@ -35,7 +35,7 @@ static void fixExpressionTypes(PSmmModuleData data, PSmmAstNode node, PSmmAstNod
 			// if both are ints just fix the sizes
 			if (parent->type->flags == node->type->flags) {
 				if (parent->type->kind > node->type->kind) {
-					if (node->kind == nkSmmInt || node->right) {
+					if (node->kind == nkSmmInt || (node->kind != nkSmmParam && node->right)) {
 						node->type = parent->type; // if literal or operator
 					} else {
 						cast = getCastNode(data->allocator, node, parent);
@@ -114,30 +114,28 @@ static void fixExpressionTypes(PSmmModuleData data, PSmmAstNode node, PSmmAstNod
 			curParam = curParam->next;
 			curArg = curArg->next;
 		}
-	} else {
+	} else if (node->kind != nkSmmParam) {
 		if (node->left) fixExpressionTypes(data, node->left, node);
 		if (node->right) fixExpressionTypes(data, node->right, node);
 	}
 }
 
-/********************************************************
-API Functions
-*********************************************************/
-
-void smmAnalyzeTypes(PSmmModuleData data) {
-	if (!data || !data->module) return;
-	PSmmAstNode parent = data->module;
-	if (parent->kind == nkSmmProgram) parent = parent->next;
+void analyzeTypesInBlock(PSmmModuleData data, PSmmAstBlockNode block) {
+	PSmmAstNode curDecl = block->scope->decls;
+	while (curDecl) {
+		if (curDecl->left->kind == nkSmmConst) {
+			assert(curDecl->type == curDecl->left->type);
+			fixExpressionTypes(data, curDecl->right, curDecl);
+		} else if (curDecl->left->kind == nkSmmFunc) {
+			PSmmAstFuncDefNode func = (PSmmAstFuncDefNode)curDecl->left;
+			if (func->body)	analyzeTypesInBlock(data, func->body);
+		}
+		curDecl = curDecl->next;
+	}
+	PSmmAstNode parent = block->stmts;
 	while (parent) {
 		if (parent->kind == nkSmmBlock) {
-			PSmmAstNode curDecl = ((PSmmAstBlockNode)parent)->scope->decls;
-			while (curDecl) {
-				if (curDecl->left->kind == nkSmmConst) {
-					assert(curDecl->type == curDecl->left->type);
-					fixExpressionTypes(data, curDecl->right, curDecl);
-				}
-				curDecl = curDecl->next;
-			}
+			analyzeTypesInBlock(data, (PSmmAstBlockNode)parent);
 		} else if (parent->kind == nkSmmAssignment) {
 			assert(parent->type == parent->left->type);
 			fixExpressionTypes(data, parent->right, parent);
@@ -149,4 +147,15 @@ void smmAnalyzeTypes(PSmmModuleData data) {
 		}
 		parent = parent->next;
 	}
+}
+
+/********************************************************
+API Functions
+*********************************************************/
+
+void smmAnalyzeTypes(PSmmModuleData data) {
+	if (!data || !data->module) return;
+	PSmmAstNode parent = data->module;
+	if (parent->kind == nkSmmProgram) parent = parent->next;
+	analyzeTypesInBlock(data, (PSmmAstBlockNode)parent);
 }
