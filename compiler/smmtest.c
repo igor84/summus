@@ -65,7 +65,6 @@ void printNode(PSmmAstNode node, int align) {
 int main(int argc, char **argv) {
 	/*
 	TODO:
-		Handle missing return statement from functions
 		Do complete code review and add all the comments
 		Add logical operators
 		Add bitwise operators

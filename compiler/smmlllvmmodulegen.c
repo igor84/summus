@@ -83,7 +83,7 @@ LLVMValueRef convertToInstructions(PSmmLLVMModuleGenData data, PSmmAstNode node)
 	LLVMValueRef left = NULL;
 	LLVMValueRef right = NULL;
 	LLVMBuilderRef builder = data->builder;
-	if (node->kind != nkSmmParam) {
+	if (node->kind != nkSmmParam && node->kind != nkSmmCall) {
 		if (node->left) {
 			if (node->kind == nkSmmAssignment) {
 				PSmmToken varToken = node->left->token;
@@ -266,6 +266,8 @@ void createGlobalVars(PSmmLLVMModuleGenData data, PSmmAstScopeNode scope) {
 			if (decl->right && (decl->right->flags & nfSmmConst)) {
 				val = convertToInstructions(data, decl->right);
 				decl->right->kind = nkSmmError; // TODO(igors): improve this; So it will be skipped later
+			} else {
+				val = getZeroForType(decl->left->type);
 			}
 
 			LLVMValueRef globalVar = NULL;

@@ -32,6 +32,8 @@ static const char* msgTypeToString[] = {
 	"can't assign a value to a constant",
 	"non constant values are not allowed in constant expressions",
 	"type of return expression: %s doesn't match function return type: %s",
+	"function must return a value",
+	"unreachable code",
 
 	"possible loss of data in conversion from %s to %s"
 };

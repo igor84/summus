@@ -1,10 +1,10 @@
 ; ModuleID = 'test.smm'
 target triple = "x86_64-pc-windows-msvc"
 
-@y = external global i64
-@b = external global double
-@a = external global float
-@r = external global i32
+@y = global i64 0
+@b = global double 0.000000e+00
+@a = global float 0.000000e+00
+@r = global i32 0
 
 define i32 @main() {
 entry:
@@ -30,12 +30,13 @@ entry:
   %14 = fptosi double %13 to i32
   store i32 %14, i32* @r, align 4
   %15 = load i32, i32* @r, align 4
-  %16 = load float, float* @a, align 2
-  %17 = call i32 @bla(i16 2, i16 3)
-  %18 = add i32 %15, %17
-  store i32 %18, i32* @r, align 4
-  %19 = load i32, i32* @r, align 4
-  ret i32 %19
+  %16 = call i32 @bla(i16 2, i16 3)
+  %17 = add i32 %15, %16
+  store i32 %17, i32* @r, align 4
+  %18 = call i32 @putchar(i32 65)
+  %19 = call i32 @putchar(i32 10)
+  %20 = load i32, i32* @r, align 4
+  ret i32 %20
 }
 
 define i32 @bla(i16, i16) {
@@ -51,3 +52,5 @@ entry:
   %6 = add i32 %3, %5
   ret i32 %6
 }
+
+declare i32 @putchar(i32)

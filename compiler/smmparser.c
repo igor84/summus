@@ -468,9 +468,14 @@ PSmmAstNode parseFactor(PSmmParser parser, bool canBeFuncDefn) {
 				return &errorNode;
 			}
 		}
-		if (res == &errorNode || (!expect(parser, ')') && parser->curToken->kind != tkSmmRArrow)) {
-			// TODO(igors): What if we ecounter expression like a := (b + c -> d;
-			return &errorNode;
+		if (res != &errorNode && !expect(parser, ')')) {
+			int tk = parser->curToken->kind;
+			if (res->kind != nkSmmParam || (tk != tkSmmRArrow && tk != '{' && tk != ';')) {
+				findToken(parser, ';');
+				return &errorNode;
+			}
+			// If res is param and we encounter '->', '{' or ';' we assume this is func def
+			// with forgoten ')' so we continue parsing under that assumption.
 		}
 	} else {
 		bool reportedError = parser->lastErrorLine == parser->curToken->filePos.lineNumber;
@@ -602,21 +607,32 @@ void removeScopeVars(PSmmParser parser, PSmmAstScopeNode scope) {
 	}
 }
 
-PSmmAstBlockNode parseBlock(PSmmParser parser, PSmmTypeInfo curFuncReturnType) {
+PSmmAstBlockNode parseBlock(PSmmParser parser, PSmmTypeInfo curFuncReturnType, bool isFuncBlock) {
 	getNextToken(parser); // Skip '{'
 	PSmmAstBlockNode block = newAstNode(parser, nkSmmBlock);
 	block->scope = newScopeNode(parser);
 	block->scope->returnType = curFuncReturnType;
 	PSmmAstNode* nextStmt = &block->stmts;
+	PSmmAstNode curStmt = NULL;
 	while (parser->curToken->kind != tkSmmEof && parser->curToken->kind != '}') {
-		PSmmAstNode curStmt = parseStatement(parser);
+		if (curStmt && curStmt->kind == nkSmmReturn) {
+			smmPostMessage(errSmmUnreachableCode, parser->curToken->filePos);
+		}
+		curStmt = parseStatement(parser);
 		if (curStmt != NULL && curStmt != &errorNode) {
 			*nextStmt = curStmt;
 			nextStmt = &curStmt->next;
 		}
 	}
+
+	if (isFuncBlock && curFuncReturnType && curStmt && curStmt->kind != nkSmmReturn) {
+		smmPostMessage(errSmmFuncMustReturnValue, parser->curToken->filePos);
+	}
+
 	expect(parser, '}');
 	removeScopeVars(parser, block->scope);
+
+
 	return block;
 }
 
@@ -649,7 +665,7 @@ PSmmAstNode parseFunction(PSmmParser parser, PSmmAstFuncDefNode func) {
 	func->returnType = typeInfo;
 	if (parser->curToken->kind == '{' || parser->curToken->kind == ';') {
 		if (parser->curToken->kind == '{') {
-			func->body = parseBlock(parser, typeInfo);
+			func->body = parseBlock(parser, typeInfo, true);
 		}
 		PSmmAstParamNode param = func->params;
 		while (param) {
@@ -742,18 +758,25 @@ PSmmAstNode parseStatement(PSmmParser parser) {
 	if (parser->curToken->kind == tkSmmReturn) {
 		PSmmToken retToken = parser->curToken;
 		getNextToken(parser);
-		lval = parseExpression(parser, false);
-		if (lval == &errorNode) {
-			if (findToken(parser, ';')) getNextToken(parser);
-			return &errorNode;
-		}
-		if ((lval->kind == nkSmmIdent) && (lval->type == NULL)) {
-			smmPostMessage(errSmmUndefinedIdentifier, lval->token->filePos, lval->token->repr);
-			if (findToken(parser, ';')) getNextToken(parser);
-			return &errorNode;
-		}
-		if (lval->type != parser->curScope->returnType && !isUpcastPossible(lval->type, parser->curScope->returnType)) {
-			smmPostMessage(errSmmBadReturnStmtType, retToken->filePos, lval->type->name, parser->curScope->returnType);
+		if (parser->curToken->kind != ';') {
+			lval = parseExpression(parser, false);
+			if (lval == &errorNode) {
+				if (findToken(parser, ';')) getNextToken(parser);
+				return &errorNode;
+			}
+			if ((lval->kind == nkSmmIdent) && (lval->type == NULL)) {
+				smmPostMessage(errSmmUndefinedIdentifier, lval->token->filePos, lval->token->repr);
+				if (findToken(parser, ';')) getNextToken(parser);
+				return &errorNode;
+			}
+			if (lval->type != parser->curScope->returnType && !isUpcastPossible(lval->type, parser->curScope->returnType)) {
+				smmPostMessage(errSmmBadReturnStmtType, retToken->filePos, lval->type->name, parser->curScope->returnType);
+			}
+		} else {
+			lval = NULL;
+			if (parser->curScope->returnType) {
+				smmPostMessage(errSmmGotUnexpectedToken, retToken->filePos, "expression", ";");
+			}
 		}
 		PSmmAstNode res = newAstNode(parser, nkSmmReturn);
 		res->left = lval;
@@ -774,7 +797,7 @@ PSmmAstNode parseStatement(PSmmParser parser) {
 		return &errorNode;
 	}
 
-	// TODO(igors): Handle case when there is functionCall; with msg "expected '('"
+	// TODO(igors): Handle case when there is functionCall; with msg "expected '('" or report error about stmts without effect
 	if (parser->curToken->kind == ':') {
 		lval = parseDeclaration(parser, lval);
 	} else if (parser->curToken->kind == '=') {
