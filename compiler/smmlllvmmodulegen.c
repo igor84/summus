@@ -143,13 +143,11 @@ LLVMValueRef convertToInstructions(PSmmLLVMModuleGenData data, PSmmAstNode node)
 			PSmmAstCallNode callNode = (PSmmAstCallNode)node;
 			if (callNode->params) {
 				argCount = callNode->params->count;
-				PSmmAstArgNode astArg = callNode->args;
+				PSmmAstNode astArg = callNode->args;
 				args = data->allocator->alloc(data->allocator, argCount * sizeof(LLVMValueRef));
-				int i = 0;
-				while (astArg) {
-					args[i] = convertToInstructions(data, (PSmmAstNode)astArg);
+				for (size_t i = 0; i < argCount; i++) {
+					args[i] = convertToInstructions(data, astArg);
 					astArg = astArg->next;
-					i++;
 				}
 			}
 			res = LLVMBuildCall(data->builder, func, args, (unsigned)argCount, "");
@@ -165,15 +163,7 @@ LLVMValueRef convertToInstructions(PSmmLLVMModuleGenData data, PSmmAstNode node)
 void createLocalVars(PSmmLLVMModuleGenData data, PSmmAstScopeNode scope) {
 	PSmmAstNode decl = scope->decls;
 	while (decl) {
-		LLVMTypeRef type = NULL;
-		LLVMValueRef zero = NULL;
-		bool emptyDecl = !decl->right;
-		if (emptyDecl) {
-			zero = getZeroForType(decl->left->type);
-			type = LLVMTypeOf(zero);
-		} else {
-			type = getLLVMType(decl->left->type);
-		}
+		LLVMTypeRef type = getLLVMType(decl->left->type);
 
 		LLVMValueRef var = NULL;
 		if (decl->left->kind == nkSmmIdent) {
@@ -186,9 +176,6 @@ void createLocalVars(PSmmLLVMModuleGenData data, PSmmAstScopeNode scope) {
 		}
 		PSmmToken varToken = decl->left->token;
 		smmAddDictValue(data->localVars, varToken->repr, var);
-		if (emptyDecl) {
-			LLVMBuildStore(data->builder, zero, var);
-		}
 		decl = decl->next;
 	}
 }
@@ -201,8 +188,6 @@ void convertBlock(PSmmLLVMModuleGenData data, PSmmAstBlockNode block) {
 		stmt = stmt->next;
 	}
 }
-
-#define MAX_FUNC_PARAMS 20
 
 void createFunc(PSmmLLVMModuleGenData data, PSmmAstFuncDefNode astFunc) {
 	LLVMTypeRef returnType = getLLVMType(astFunc->returnType);
@@ -228,7 +213,7 @@ void createFunc(PSmmLLVMModuleGenData data, PSmmAstFuncDefNode astFunc) {
 		LLVMPositionBuilderAtEnd(data->builder, entry);
 
 		if (paramsCount > 0) {
-			LLVMValueRef* paramVals = data->allocator->alloc(data->allocator, paramsCount * sizeof(LLVMValueRef));;
+			LLVMValueRef* paramVals = data->allocator->alloc(data->allocator, paramsCount * sizeof(LLVMValueRef));
 			LLVMGetParams(func, paramVals);
 			PSmmAstParamNode param = astFunc->params;
 			for (size_t i = 0; i < paramsCount; i++) {
@@ -262,14 +247,9 @@ void createGlobalVars(PSmmLLVMModuleGenData data, PSmmAstScopeNode scope) {
 			createFunc(data, (PSmmAstFuncDefNode)decl->left);
 			LLVMPositionBuilderAtEnd(data->builder, curBlock);
 		} else {
-			LLVMValueRef val = NULL;
-			if (decl->right && (decl->right->flags & nfSmmConst)) {
-				val = convertToInstructions(data, decl->right);
-				decl->right->kind = nkSmmError; // TODO(igors): improve this; So it will be skipped later
-			} else {
-				val = getZeroForType(decl->left->type);
-			}
-
+			assert(decl->right && "Global var must have initializer");
+			LLVMValueRef val = convertToInstructions(data, decl->right);
+			
 			LLVMValueRef globalVar = NULL;
 			if (decl->left->kind == nkSmmConst) {
 				globalVar = val;

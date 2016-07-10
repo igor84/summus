@@ -11,9 +11,9 @@ static PSmmAstNode getCastNode(PSmmAllocator a, PSmmAstNode node, PSmmAstNode pa
 	return cast;
 }
 
-static void fixExpressionTypes(PSmmModuleData data, PSmmAstNode node, PSmmAstNode parent) {
+static void fixExpressionTypes(PSmmModuleData data, PSmmAstNode* nodeField, PSmmAstNode parent) {
 	PSmmAstNode cast = NULL;
-	// TODO(igors): See if we can loose cast node from code if we manage to lower it or just ignore it and let LLVM do it
+	PSmmAstNode node = *nodeField;
 	if (parent->type != node->type) {
 		if ((parent->type->flags & tifSmmInt) && (node->type->flags & tifSmmFloat)) {
 			//if parent is int and node is float then warning and cast
@@ -35,7 +35,7 @@ static void fixExpressionTypes(PSmmModuleData data, PSmmAstNode node, PSmmAstNod
 			// if both are ints just fix the sizes
 			if (parent->type->flags == node->type->flags) {
 				if (parent->type->kind > node->type->kind) {
-					if (node->kind == nkSmmInt || (node->kind != nkSmmParam && node->right)) {
+					if (node->kind == nkSmmInt || (node->flags & nfSmmBinOp)) {
 						node->type = parent->type; // if literal or operator
 					} else {
 						cast = getCastNode(data->allocator, node, parent);
@@ -87,36 +87,37 @@ static void fixExpressionTypes(PSmmModuleData data, PSmmAstNode node, PSmmAstNod
 			} else { // if they are different size
 				cast = getCastNode(data->allocator, node, parent);
 			}
-		} else if ((parent->type->flags & node->type->flags & tifSmmBool) == 0) {
+		} else if (!(parent->type->flags & node->type->flags & tifSmmBool)) {
 			// TODO(igors): If only one is bool then Err
 		}
 
-		if (node->type->kind == tiSmmSoftFloat64)
+		if (node->type->kind == tiSmmSoftFloat64) {
 			node->type -= 2; // Change to float32
+		}
 	}
 
 	if (cast) {
-		if (node == parent->left) {
-			parent->left = cast;
-		} else if (node == parent->right) {
-			parent->right = cast;
-		} else {
-			assert(false && "Casting can't be done because parent and child are not related");
-		}
+		*nodeField = cast;
+		nodeField = &cast->left;
 	}
 
 	if (node->kind == nkSmmCall) {
 		PSmmAstCallNode callNode = (PSmmAstCallNode)node;
-		PSmmAstArgNode curArg = callNode->args;
+		PSmmAstNode* curArgField = &callNode->args;
 		PSmmAstParamNode curParam = callNode->params;
-		while (curParam && curArg) {
-			fixExpressionTypes(data, (PSmmAstNode)curArg, (PSmmAstNode)curParam);
+		while (curParam && *curArgField) {
+			fixExpressionTypes(data, curArgField, (PSmmAstNode)curParam);
 			curParam = curParam->next;
-			curArg = curArg->next;
+			curArgField = &(*curArgField)->next;
 		}
 	} else if (node->kind != nkSmmParam) {
-		if (node->left) fixExpressionTypes(data, node->left, node);
-		if (node->right) fixExpressionTypes(data, node->right, node);
+		if (node->left) fixExpressionTypes(data, &node->left, node);
+		if (node->right) fixExpressionTypes(data, &node->right, node);
+
+		if (node->kind == nkSmmCast && node->type == node->left->type) {
+			// Cast was succesfully lowered so it is not needed any more
+			*nodeField = node->left;
+		}
 	}
 }
 
@@ -125,7 +126,7 @@ void analyzeTypesInBlock(PSmmModuleData data, PSmmAstBlockNode block) {
 	while (curDecl) {
 		if (curDecl->left->kind == nkSmmConst) {
 			assert(curDecl->type == curDecl->left->type);
-			fixExpressionTypes(data, curDecl->right, curDecl);
+			fixExpressionTypes(data, &curDecl->right, curDecl);
 		} else if (curDecl->left->kind == nkSmmFunc) {
 			PSmmAstFuncDefNode func = (PSmmAstFuncDefNode)curDecl->left;
 			if (func->body)	analyzeTypesInBlock(data, func->body);
@@ -138,12 +139,12 @@ void analyzeTypesInBlock(PSmmModuleData data, PSmmAstBlockNode block) {
 			analyzeTypesInBlock(data, (PSmmAstBlockNode)parent);
 		} else if (parent->kind == nkSmmAssignment) {
 			assert(parent->type == parent->left->type);
-			fixExpressionTypes(data, parent->right, parent);
+			fixExpressionTypes(data, &parent->right, parent);
 		} else {
 			// We treat softFloat as float 32 in order to be consistent
 			if (parent->type->kind == tiSmmSoftFloat64) parent->type -= 2;
-			if (parent->left) fixExpressionTypes(data, parent->left, parent);
-			if (parent->right) fixExpressionTypes(data, parent->right, parent);
+			if (parent->left) fixExpressionTypes(data, &parent->left, parent);
+			if (parent->right) fixExpressionTypes(data, &parent->right, parent);
 		}
 		parent = parent->next;
 	}

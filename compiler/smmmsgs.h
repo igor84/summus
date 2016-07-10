@@ -21,8 +21,9 @@ typedef enum {
 	errSmmOperandMustBeLVal, errSmmUnknownType, errSmmIdentTaken, errSmmBadOperandsType,
 	errSmmGotSomeArgsButExpectedOneOf, errCantAssignToConst, errNonConstInConstExpression,
 	errSmmBadReturnStmtType, errSmmFuncMustReturnValue, errSmmUnreachableCode,
+	errSmmFuncUnderScope,
 
-	wrnSmmConversionDataLoss
+	wrnSmmConversionDataLoss, wrnSmmNoEffectStmt,
 } SmmMsgType;
 
 struct SmmFilePos {

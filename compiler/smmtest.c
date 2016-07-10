@@ -10,7 +10,7 @@
 void printNode(PSmmAstNode node, int align) {
 	if (align) printf("%*s", align, " ");
 
-	if (node->kind == nkSmmIdent || node->kind == nkSmmConst || node->kind == nkSmmParam || node->kind == nkSmmFunc) {
+	if (node->token && (node->flags & nfSmmIdent)) {
 		fputs(node->token->repr, stdout);
 	} else {
 		fputs(nodeKindToString[node->kind], stdout);
@@ -68,6 +68,7 @@ int main(int argc, char **argv) {
 		Do complete code review and add all the comments
 		Add logical operators
 		Add bitwise operators
+		Add LLVM debug info
 		GlobalSettings
 	*/
 

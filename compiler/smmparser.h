@@ -31,7 +31,6 @@ typedef struct SmmAstIdentNode* PSmmAstIdentNode;
 typedef struct SmmAstScopeNode* PSmmAstScopeNode;
 typedef struct SmmAstBlockNode* PSmmAstBlockNode;
 typedef struct SmmAstParamNode* PSmmAstParamNode;
-typedef struct SmmAstArgNode* PSmmAstArgNode;
 typedef struct SmmAstFuncDefNode* PSmmAstFuncDefNode;
 typedef struct SmmAstCallNode* PSmmAstCallNode;
 
@@ -49,10 +48,8 @@ struct SmmParser {
 	PSmmToken curToken;
 	PSmmDict idents;
 	PSmmAstScopeNode curScope;
-	PSmmAstNode nodePool;
 	PSmmAllocator allocator;
 	PSmmBinaryOperator* operatorPrecedences;
-	int lastErrorLine;
 };
 typedef struct SmmParser* PSmmParser;
 
@@ -94,12 +91,13 @@ enum SmmTypeInfoFlags {
 	tifSmmUnsigned = 0x2,
 	tifSmmUnsignedInt = 0x3,
 	tifSmmFloat = 0x4,
-	tifSmmBool = 0x8
+	tifSmmBool = 0x8,
 };
 
 enum SmmNodeFlags {
 	nfSmmIdent = 0x1,
-	nfSmmConst = 0x3
+	nfSmmConst = 0x2,
+	nfSmmBinOp = 0x4,
 };
 
 struct SmmTypeInfo {
@@ -171,16 +169,6 @@ struct SmmAstParamNode {
 	uintptr_t level; // We need this so we can easily check if same param is defined twice
 };
 
-struct SmmAstArgNode {
-	SmmAstNodeKind kind;
-	uint32_t flags;
-	PSmmToken token;
-	PSmmTypeInfo type;
-	PSmmAstArgNode next;
-	PSmmAstNode zzNotUsed1;
-	PSmmAstNode zzNotUsed2;
-};
-
 struct SmmAstFuncDefNode {
 	SmmAstNodeKind kind;
 	uint32_t flags;
@@ -198,7 +186,7 @@ struct SmmAstCallNode {
 	PSmmTypeInfo returnType;
 	PSmmAstNode zzNotUsed1;
 	PSmmAstParamNode params;
-	PSmmAstArgNode args;
+	PSmmAstNode args;
 };
 
 PSmmParser smmCreateParser(PSmmLexer lex, PSmmAllocator allocator);

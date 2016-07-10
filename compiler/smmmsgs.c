@@ -34,8 +34,10 @@ static const char* msgTypeToString[] = {
 	"type of return expression: %s doesn't match function return type: %s",
 	"function must return a value",
 	"unreachable code",
-
-	"possible loss of data in conversion from %s to %s"
+	"function '%s' must be defined in top scope",
+	
+	"possible loss of data in conversion from %s to %s",
+	"statement without effect",
 };
 
 static int errorCounter;

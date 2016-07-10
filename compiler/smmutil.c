@@ -81,8 +81,8 @@ PSmmDictEntry createNewEntry(PPrivDict privDict, const char* origKey, const char
 	} else {
 		newElem->keyPart = keyPart;
 	}
-	newElem->values = privDict->allocator->alloc(privDict->allocator, sizeof(struct SmmDictEntryValue));
-	newElem->values->value = privDict->dict.elemCreateFunc(origKey, privDict->allocator, privDict->dict.elemCreateFuncContext);
+	newElem->values = a->alloc(a, sizeof(struct SmmDictEntryValue));
+	newElem->values->value = privDict->dict.elemCreateFunc(origKey, a, privDict->dict.elemCreateFuncContext);
 	return newElem;
 }
 
@@ -207,7 +207,7 @@ void smmPushDictValue(PSmmDict dict, const char* key, void* value) {
 	if (entry->values->value != value) {
 		PSmmAllocator a = ((PPrivDict)dict)->allocator;
 		PSmmDictEntryValue newValue = a->alloc(a, sizeof(struct SmmDictEntryValue));
-		newValue->next = entry->values->value;
+		newValue->next = entry->values;
 		newValue->value = value;
 		entry->values = newValue;
 	}
@@ -218,9 +218,9 @@ void smmPushDictValue(PSmmDict dict, const char* key, void* value) {
 void* smmPopDictValue(PSmmDict dict, const char* key) {
 	PSmmDictEntry entry = smmGetDictEntry(dict, key, false);
 	if (!entry || !entry->values) return NULL;
-	void* value = entry->values;
-	entry->values = entry->values->next;
-	return value;
+	PSmmDictEntryValue value = entry->values;
+	entry->values = value->next;
+	return value->value;
 }
 
 PSmmAllocator smmCreatePermanentAllocator(const char* name, size_t size) {
