@@ -119,7 +119,7 @@ static void initSymTableWithKeywords(PPrivLexer lex) {
 	static struct Keywords keywords[] = {
 		{ "div", tkSmmIntDiv }, { "mod", tkSmmIntMod },
 		{ "and", tkSmmAndOp }, { "or", tkSmmOrOp }, { "xor", tkSmmXorOp },
-		{ "return", tkSmmReturn }
+		{ "return", tkSmmReturn },{ "false", tkSmmBool },{ "true", tkSmmBool },
 	};
 	
 	int count = sizeof(keywords) / sizeof(struct Keywords);
@@ -148,6 +148,9 @@ static bool parseIdent(PPrivLexer privLex, PSmmToken token) {
 	*cc = old;
 
 	token->kind = symbol->kind;
+	if (token->kind == tkSmmBool) {
+		token->boolVal = ident[0] == 't';
+	}
 	token->repr = symbol->name;
 	return true;
 }

@@ -10,7 +10,7 @@
 void printNode(PSmmAstNode node, int align) {
 	if (align) printf("%*s", align, " ");
 
-	if (node->token && (node->flags & nfSmmIdent)) {
+	if (node->token && node->token->repr && node->kind != nkSmmCast) {
 		fputs(node->token->repr, stdout);
 	} else {
 		fputs(nodeKindToString[node->kind], stdout);
@@ -26,8 +26,13 @@ void printNode(PSmmAstNode node, int align) {
 	if (node->kind == nkSmmFunc || node->kind == nkSmmCall) {
 		PSmmAstFuncDefNode func = (PSmmAstFuncDefNode)node;
 		bool isCall = node->kind == nkSmmCall;
-		if (isCall) node = node->right;
-		else node = node->left;
+		PSmmAstNode nextStmt = NULL;
+		if (isCall) {
+			nextStmt = node->next;
+			node = node->right;
+		} else {
+			node = node->left;
+		}
 		if (!node) {
 			fputs("()", stdout);
 			if (!isCall && func->body) printNode((PSmmAstNode)func->body, align + 4);
@@ -42,6 +47,10 @@ void printNode(PSmmAstNode node, int align) {
 		if (isCall) fputs(")", stdout);
 		else puts(")");
 		if (!isCall && func->body) printNode((PSmmAstNode)func->body, align + 4);
+		if (nextStmt) {
+			puts("");
+			printNode(nextStmt, align);
+		}
 		return;
 	}
 	
@@ -63,15 +72,6 @@ void printNode(PSmmAstNode node, int align) {
 }
 
 int main(int argc, char **argv) {
-	/*
-	TODO:
-		Do complete code review and add all the comments
-		Add logical operators
-		Add bitwise operators
-		Add LLVM debug info
-		GlobalSettings
-	*/
-
 	const char* filename = "console";
 	char* buf = NULL;
 	char filebuf[64 * 1024] = { 0 };
@@ -104,12 +104,12 @@ int main(int argc, char **argv) {
 	printNode(program, 0);
 	puts("\n");
 
-	if (smmHadErrors()) {
-		return 1;
+	bool hadErrors = smmHadErrors();
+	if (!hadErrors) {
+		smmGenLLVMModule(&data, allocator);
 	}
-	smmGenLLVMModule(&data, allocator);
 	
 	smmPrintAllocatorInfo(allocator);
 	
-	return 0;
+	return hadErrors;
 }

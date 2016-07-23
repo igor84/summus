@@ -67,6 +67,7 @@ typedef enum {
 	nkSmmNeg,
 	nkSmmType, nkSmmInt, nkSmmFloat, nkSmmBool,
 	nkSmmCast, nkSmmParam, nkSmmCall, nkSmmReturn,
+	nkSmmAndOp, nkSmmXorOp, nkSmmOrOp,
 
 	nkSmmTerminator
 } SmmAstNodeKind;
@@ -79,10 +80,10 @@ const char* nodeKindToString[nkSmmTerminator];
  * Float32 or Float64 and will be converted to those types eventually.
  */
 typedef enum {
-	tiSmmUnknown,
+	tiSmmUnknown, tiSmmBool,
 	tiSmmUInt8, tiSmmUInt16, tiSmmUInt32, tiSmmUInt64,
 	tiSmmInt8, tiSmmInt16, tiSmmInt32, tiSmmInt64,
-	tiSmmFloat32, tiSmmFloat64, tiSmmSoftFloat64, tiSmmBool
+	tiSmmFloat32, tiSmmFloat64, tiSmmSoftFloat64,
 } SmmTypInfoKind;
 
 enum SmmTypeInfoFlags {
@@ -102,7 +103,7 @@ enum SmmNodeFlags {
 
 struct SmmTypeInfo {
 	SmmTypInfoKind kind;
-	int sizeInBytes;
+	uint32_t sizeInBytes;
 	const char* name;
 	uint32_t flags;
 };

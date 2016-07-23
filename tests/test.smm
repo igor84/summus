@@ -14,12 +14,23 @@ putchar :: (char: int32) -> int32;
 	//g-y = 2 + 4 - x;
 	//x = - 342 + 54 - 87;
 	y = 567 - (2 + 5 * int16(345.564));
-	b:float64 = 123 + x / y;
-	a:float32 = b * 323.23 / 54.543;
-	b = a * 2143.23/543.23;
-	r:int32=float64(b+32.34);
+	f64:float64 = 123 + x / y;
+	f32:float32 = f64 * 323.23 / 54.543;
+	f64 = f32 * 2143.23/543.23;
+	r:int32=float64(f64+32.34);
 	r = r + bla(2,3);
 	putchar(65);
 	putchar(10);
-	return r;
+	
+	a := true;
+	b := false;
+	c := false;
+	d := true;
+	e := true;
+	f := false;
+	g := false;
+	h := true;
+	res := uint((a or b) and (c or d) xor (e or f or g and h));
+	
+	return int(res);
 }

@@ -12,8 +12,23 @@ struct SmmLLVMModuleGenData {
 	PSmmAllocator allocator;
 	PSmmDict localVars;
 	LLVMBuilderRef builder;
+	LLVMValueRef curFunc;
 };
 typedef struct SmmLLVMModuleGenData* PSmmLLVMModuleGenData;
+
+#define MAX_LOGICAL_EXPR_DEPTH 100
+
+struct LogicalExprData {
+	PSmmLLVMModuleGenData data;
+	LLVMBasicBlockRef endBlock;
+	LLVMBasicBlockRef lastCreatedBlock;
+	LLVMBasicBlockRef incomeBlocks[MAX_LOGICAL_EXPR_DEPTH];
+	LLVMValueRef incomeValues[MAX_LOGICAL_EXPR_DEPTH];
+	uint8_t blockCount;
+};
+typedef struct LogicalExprData* PLogicalExprData;
+
+LLVMValueRef convertToInstructions(PSmmLLVMModuleGenData data, PSmmAstNode node);
 
 LLVMTypeRef getLLVMFloatType(PSmmTypeInfo type) {
 	if (type->kind == tiSmmFloat32) return LLVMFloatType();
@@ -23,10 +38,11 @@ LLVMTypeRef getLLVMFloatType(PSmmTypeInfo type) {
 LLVMTypeRef getLLVMType(PSmmTypeInfo type) {
 	switch (type->kind) {
 	case tiSmmInt8: case tiSmmInt16: case tiSmmInt32: case tiSmmInt64:
-	case tiSmmBool: case tiSmmUInt8: case tiSmmUInt16: case tiSmmUInt32: case tiSmmUInt64:
+	case tiSmmUInt8: case tiSmmUInt16: case tiSmmUInt32: case tiSmmUInt64:
 		return LLVMIntType(type->sizeInBytes << 3);
 	case tiSmmFloat32: return LLVMFloatType();
 	case tiSmmFloat64: return LLVMDoubleType();
+	case tiSmmBool: return LLVMInt1Type();
 	default:
 		// custom types should be handled here
 		assert(false && "Custom types are not yet supported");
@@ -66,7 +82,13 @@ LLVMValueRef getCastInstruction(PSmmLLVMModuleGenData data, PSmmTypeInfo dtype, 
 		return LLVMBuildSIToFP(data->builder, val, getLLVMType(dtype), "");
 	}
 	
-	if ((dtype->flags & stype->flags & tifSmmInt) == tifSmmInt && dtype->sizeInBytes != stype->sizeInBytes) {
+	bool dstIsInt = dtype->flags & (tifSmmInt | tifSmmBool);
+	bool srcIsInt = stype->flags & (tifSmmInt | tifSmmBool);
+	bool differentSize = dtype->sizeInBytes != stype->sizeInBytes || dtype->kind == tiSmmBool;
+	if (dstIsInt && srcIsInt && differentSize) {
+		if ((dtype->flags & tifSmmUnsigned) && dtype->sizeInBytes > stype->sizeInBytes || stype->kind == tiSmmBool) {
+			return LLVMBuildZExt(data->builder, val, getLLVMType(dtype), "");
+		}
 		return LLVMBuildIntCast(data->builder, val, getLLVMType(dtype), "");
 	}
 
@@ -77,36 +99,70 @@ LLVMValueRef getCastInstruction(PSmmLLVMModuleGenData data, PSmmTypeInfo dtype, 
 	return val;
 }
 
+LLVMValueRef convertAndOrInstr(PLogicalExprData ledata, PSmmAstNode node, LLVMBasicBlockRef trueBlock, LLVMBasicBlockRef falseBlock) {
+	LLVMBasicBlockRef newRightBlock = LLVMInsertBasicBlock(ledata->lastCreatedBlock, "");
+	LLVMBasicBlockRef prevLastBlock = ledata->lastCreatedBlock;
+	ledata->lastCreatedBlock = newRightBlock;
+	LLVMBasicBlockRef nextTrue = trueBlock;
+	LLVMBasicBlockRef nextFalse = falseBlock;
+
+	if (node->kind == nkSmmAndOp) {
+		nextTrue = newRightBlock;
+	} else {
+		nextFalse = newRightBlock;
+	}
+
+	LLVMValueRef left = NULL;
+	switch (node->left->kind) {
+	case nkSmmAndOp: left = convertAndOrInstr(ledata, node->left, nextTrue, nextFalse); break;
+	case nkSmmOrOp: left = convertAndOrInstr(ledata, node->left, nextTrue, nextFalse); break;
+	default: left = convertToInstructions(ledata->data, node->left); break;
+	}
+
+	LLVMBuildCondBr(ledata->data->builder, left, nextTrue, nextFalse);
+	if (ledata->endBlock == nextTrue || ledata->endBlock == nextFalse) {
+		if (ledata->blockCount >= MAX_LOGICAL_EXPR_DEPTH) {
+			char msg[500] = { 0 };
+			snprintf(msg, 500, "Logical expression at %s:%d too complicated", node->token->filePos.filename, node->token->filePos.lineNumber);
+			smmAbortWithMessage(msg, __FILE__, __LINE__);
+		}
+		ledata->incomeBlocks[ledata->blockCount] = LLVMGetInsertBlock(ledata->data->builder);
+		ledata->incomeValues[ledata->blockCount] = LLVMConstInt(LLVMInt1Type(), ledata->endBlock == nextTrue, false);
+		ledata->blockCount++;
+	}
+
+	LLVMPositionBuilderAtEnd(ledata->data->builder, newRightBlock);
+	ledata->lastCreatedBlock = prevLastBlock;
+
+	switch (node->right->kind) {
+	case nkSmmAndOp: case nkSmmOrOp:
+		return convertAndOrInstr(ledata, node->right, trueBlock, falseBlock);
+	default: return convertToInstructions(ledata->data, node->right);
+	}
+}
+
 LLVMValueRef convertToInstructions(PSmmLLVMModuleGenData data, PSmmAstNode node) {
 	assert(LLVMFRem - LLVMAdd == nkSmmFRem - nkSmmAdd);
 	LLVMValueRef res = NULL;
-	LLVMValueRef left = NULL;
-	LLVMValueRef right = NULL;
 	LLVMBuilderRef builder = data->builder;
-	if (node->kind != nkSmmParam && node->kind != nkSmmCall) {
-		if (node->left) {
-			if (node->kind == nkSmmAssignment) {
-				PSmmToken varToken = node->left->token;
-				left = smmGetDictValue(data->localVars, varToken->repr, false);
-			} else {
-				left = convertToInstructions(data, node->left);
-			}
-		}
-		if (node->right) {
-			right = convertToInstructions(data, node->right);
-		}
-	}
+
+	// If it is arithmetic operator
 	if (node->kind >= nkSmmAdd && node->kind <= nkSmmFRem) {
+		LLVMValueRef left = convertToInstructions(data, node->left);
+		LLVMValueRef right = convertToInstructions(data, node->right);
 		return LLVMBuildBinOp(builder, node->kind - nkSmmAdd + LLVMAdd, left, right, "");
 	}
 
 	switch (node->kind) {
-	case nkSmmAssignment:
-		res = LLVMBuildStore(builder, right, left);
-		LLVMSetAlignment(res, node->left->type->sizeInBytes);
-		res = left;
-		break;
-	case nkSmmNeg: res = LLVMBuildNeg(builder, left, ""); break;
+	case nkSmmAssignment: 
+		{
+			LLVMValueRef left = smmGetDictValue(data->localVars, node->left->token->repr, false);
+			res = LLVMBuildStore(builder, convertToInstructions(data, node->right), left);
+			LLVMSetAlignment(res, node->left->type->sizeInBytes);
+			res = left;
+			break;
+		}
+	case nkSmmNeg: res = LLVMBuildNeg(builder, convertToInstructions(data, node->left), ""); break;
 	case nkSmmInt: {
 		bool signExtend = !(node->type->flags & tifSmmUnsigned);
 		LLVMTypeRef intType = LLVMIntType(node->type->sizeInBytes << 3);
@@ -120,6 +176,9 @@ LLVMValueRef convertToInstructions(PSmmLLVMModuleGenData data, PSmmAstNode node)
 			res = LLVMConstReal(LLVMDoubleType(), node->token->floatVal);
 		}
 		break;
+	case nkSmmBool:
+		res = LLVMConstInt(LLVMInt1Type(), node->token->boolVal, false);
+		break;
 	case nkSmmIdent: case nkSmmParam:
 		res = smmGetDictValue(data->localVars, node->token->repr, false);
 		res = LLVMBuildLoad(builder, res, "");
@@ -129,10 +188,10 @@ LLVMValueRef convertToInstructions(PSmmLLVMModuleGenData data, PSmmAstNode node)
 		res = smmGetDictValue(data->localVars, node->token->repr, false);
 		break;
 	case nkSmmCast:
-		res = getCastInstruction(data, node->type, node->left->type, left);
+		res = getCastInstruction(data, node->type, node->left->type, convertToInstructions(data, node->left));
 		break;
 	case nkSmmReturn:
-		if (left) res = LLVMBuildRet(data->builder, left);
+		if (node->left) res = LLVMBuildRet(data->builder, convertToInstructions(data, node->left));
 		else res = LLVMBuildRetVoid(data->builder);
 		break;
 	case nkSmmCall:
@@ -151,6 +210,31 @@ LLVMValueRef convertToInstructions(PSmmLLVMModuleGenData data, PSmmAstNode node)
 				}
 			}
 			res = LLVMBuildCall(data->builder, func, args, (unsigned)argCount, "");
+			break;
+		}
+	case nkSmmAndOp: case nkSmmOrOp:
+		{
+			// We initialize logicalExprData.endBlock with new block
+			struct LogicalExprData logicalExprData = { data, LLVMAppendBasicBlock(data->curFunc, "") };
+			logicalExprData.lastCreatedBlock = logicalExprData.endBlock;
+
+			res = convertAndOrInstr(&logicalExprData, node, logicalExprData.endBlock, logicalExprData.endBlock);
+			logicalExprData.incomeBlocks[logicalExprData.blockCount] = LLVMGetInsertBlock(data->builder);
+			logicalExprData.incomeValues[logicalExprData.blockCount] = res;
+			logicalExprData.blockCount++;
+			LLVMBuildBr(data->builder, logicalExprData.endBlock);
+			
+			LLVMPositionBuilderAtEnd(data->builder, logicalExprData.endBlock);
+			res = LLVMBuildPhi(data->builder, LLVMInt1Type(), "");
+			LLVMAddIncoming(res, logicalExprData.incomeValues, logicalExprData.incomeBlocks, logicalExprData.blockCount);
+
+			break;
+		}
+	case nkSmmXorOp:
+		{
+			LLVMValueRef left = convertToInstructions(data, node->left);
+			LLVMValueRef right = convertToInstructions(data, node->right);
+			res = LLVMBuildICmp(data->builder, LLVMIntNE, left, right, "");
 			break;
 		}
 	default:
@@ -204,10 +288,12 @@ void createFunc(PSmmLLVMModuleGenData data, PSmmAstFuncDefNode astFunc) {
 	}
 	LLVMTypeRef funcType = LLVMFunctionType(returnType, params, (unsigned)paramsCount, false);
 	LLVMValueRef func = LLVMAddFunction(data->llvmModule, astFunc->token->repr, funcType);
+	LLVMValueRef oldFunc = data->curFunc;
 
 	smmPushDictValue(data->localVars, astFunc->token->repr, func);
 	
 	if (astFunc->body) {
+		data->curFunc = func;
 		LLVMBasicBlockRef entry = LLVMAppendBasicBlock(func, "entry");
 
 		LLVMPositionBuilderAtEnd(data->builder, entry);
@@ -232,6 +318,8 @@ void createFunc(PSmmLLVMModuleGenData data, PSmmAstFuncDefNode astFunc) {
 			smmPopDictValue(data->localVars, param->token->repr);
 			param = param->next;
 		}
+
+		data->curFunc = oldFunc;
 
 		LLVMVerifyFunction(func, LLVMPrintMessageAction);
 	}
@@ -283,6 +371,7 @@ void smmGenLLVMModule(PSmmModuleData mdata, PSmmAllocator a) {
 	
 	LLVMTypeRef funcType = LLVMFunctionType(LLVMInt32Type(), NULL, 0, 0);
 	LLVMValueRef mainfunc = LLVMAddFunction(data->llvmModule, "main", funcType);
+	data->curFunc = mainfunc;
 
 	LLVMBasicBlockRef entry = LLVMAppendBasicBlock(mainfunc, "entry");
 

@@ -13,7 +13,7 @@
 #include <stdint.h>
 
 typedef enum {
-	errSmmUnknown, errSmmMemoryAllocationFailed,
+	errSmmUnknown,
 	errSmmInvalidHexDigit, errSmmIntTooBig, errSmmInvalidFloatExponent, errSmmInvalid0Number,
 	errSmmInvalidNumber, errSmmInvalidCharacter,
 
@@ -21,7 +21,7 @@ typedef enum {
 	errSmmOperandMustBeLVal, errSmmUnknownType, errSmmIdentTaken, errSmmBadOperandsType,
 	errSmmGotSomeArgsButExpectedOneOf, errCantAssignToConst, errNonConstInConstExpression,
 	errSmmBadReturnStmtType, errSmmFuncMustReturnValue, errSmmUnreachableCode,
-	errSmmFuncUnderScope,
+	errSmmFuncUnderScope, errSmmUnexpectedBool,
 
 	wrnSmmConversionDataLoss, wrnSmmNoEffectStmt,
 } SmmMsgType;
@@ -34,7 +34,7 @@ struct SmmFilePos {
 typedef struct SmmFilePos* PSmmFilePos;
 
 void smmPostMessage(SmmMsgType msgType, const struct SmmFilePos filePos, ...);
-void smmAbortWithMessage(SmmMsgType msgType, const char* additionalInfo, const char* filename, const int line);
+void smmAbortWithMessage(const char* msg, const char* filename, const int line);
 
 bool smmHadErrors();
 

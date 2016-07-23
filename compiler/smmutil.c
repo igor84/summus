@@ -8,8 +8,6 @@
 #include <string.h>
 #include <stdio.h>
 
-#define MSG_BUFFER_LENGTH 100
-
 /**
  * We create a private Allocator struct with additional data that has public struct
  * as the first member so &PrivAllocatorVar == &PrivAllocatorVar.allocator which
@@ -36,16 +34,17 @@ typedef struct PrivDict* PPrivDict;
 Private Functions
 *********************************************************/
 
-void abortWithAllocError(PSmmAllocator allocator, size_t size, int line) {
-	char ainfo[MSG_BUFFER_LENGTH] = {0};
-	snprintf(ainfo, MSG_BUFFER_LENGTH, "; Allocator: %s, Requested size: %zu", allocator->name, size);
-	smmAbortWithMessage(errSmmMemoryAllocationFailed, ainfo, __FILE__, line);
+void abortWithAllocError(const char* msg, const char* allocatorName, size_t size, const int line) {
+	char wholeMsg[500] = {0};
+	snprintf(wholeMsg, 500, "ERROR: %s %s; Requested size: %zu", msg, allocatorName, size);
+	smmAbortWithMessage(wholeMsg, __FILE__, line);
 }
 
 void* globalAlloc(PSmmAllocator allocator, size_t size) {
 	PPrivAllocator privAllocator = (PPrivAllocator) allocator;
 	if (size > privAllocator->free) {
-		abortWithAllocError(allocator, size, __LINE__ - 2);
+		smmPrintAllocatorInfo(allocator);
+		abortWithAllocError("Failed allocating memory in allocator", allocator->name, size, __LINE__);
 	}
 	size_t pos = privAllocator->size - privAllocator->free;
 	void* location = &privAllocator->memory[pos];
@@ -227,9 +226,7 @@ PSmmAllocator smmCreatePermanentAllocator(const char* name, size_t size) {
 	size = (size + 0xfff) & (~0xfff); // We take memory in chunks of 4KB
 	PPrivAllocator smmAllocator = (PPrivAllocator)calloc(1, size);
 	if (!smmAllocator) {
-		char ainfo[MSG_BUFFER_LENGTH] = { 0 };
-		snprintf(ainfo, MSG_BUFFER_LENGTH, "; Creating allocator %s with size %zu", name, size);
-		smmAbortWithMessage(errSmmMemoryAllocationFailed, ainfo, __FILE__, __LINE__ - 4);
+		abortWithAllocError("Failed creating allocator", name, size, __LINE__);
 	}
 	size_t skipBytes = sizeof(struct PrivAllocator);
 	skipBytes = (skipBytes + 0xf) & (~0xf);

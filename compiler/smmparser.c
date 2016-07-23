@@ -24,17 +24,18 @@ const char* nodeKindToString[] = {
 	"udiv", "sdiv", "/",
 	"umod", "smod", "%",
 	"-", "type", "int", "float", "bool",
-	"cast", "param", "call", "return"
+	"cast", "param", "call", "return",
+	"and", "xor" , "or",
 };
 
 static struct SmmTypeInfo builtInTypes[] = {
-	{ tiSmmUnknown, 0, "/unknown/"},
+	{ tiSmmUnknown, 0, "/unknown/"}, { tiSmmBool, 1, "bool", tifSmmBool },
 	{ tiSmmUInt8, 1, "uint8", tifSmmUnsignedInt }, { tiSmmUInt16, 2, "uint16", tifSmmUnsignedInt },
 	{ tiSmmUInt32, 4, "uint32", tifSmmUnsignedInt }, { tiSmmUInt64, 8, "uint64", tifSmmUnsignedInt },
 	{ tiSmmInt8, 1, "int8", tifSmmInt }, { tiSmmInt16, 2, "int16", tifSmmInt },
 	{ tiSmmInt32, 4, "int32", tifSmmInt }, { tiSmmInt64, 8, "int64", tifSmmInt },
 	{ tiSmmFloat32, 4, "float32", tifSmmFloat }, { tiSmmFloat64, 8, "float64", tifSmmFloat },
-	{ tiSmmSoftFloat64, 8, "/sfloat64/", tifSmmFloat }, { tiSmmBool, 1, "bool", tifSmmBool }
+	{ tiSmmSoftFloat64, 8, "/sfloat64/", tifSmmFloat },
 };
 
 static struct SmmAstNode errorNode = { nkSmmError, 0, NULL, &builtInTypes[0] };
@@ -68,7 +69,8 @@ void getNextToken(PSmmParser parser) {
 }
 
 bool isTerminatingToken(int tokenKind) {
-	return tokenKind == ';' || tokenKind == '{' || tokenKind == '}' || tokenKind == tkSmmEof;
+	return tokenKind == ';' || tokenKind == '{' || tokenKind == '}'
+		|| tokenKind == ')' || tokenKind == tkSmmEof;
 }
 
 bool findToken(PSmmParser parser, int tokenKind) {
@@ -281,14 +283,16 @@ PSmmAstNode parseIdentFactor(PSmmParser parser) {
 			if (parser->curToken->kind != ')') {
 				PSmmAstNode lastArg = parseExpression(parser);
 				resCall->args = lastArg;
+				if (lastArg == &errorNode) resCall->kind = nkSmmError;
 				while (parser->curToken->kind == ',') {
 					getNextToken(parser);
 					lastArg->next = parseExpression(parser);
 					lastArg = lastArg->next;
+					if (lastArg == &errorNode) resCall->kind = nkSmmError;
 				}
 			}
 			if (!expect(parser, ')')) return &errorNode;
-			res = resolveCall(parser, resCall);
+			if (resCall->kind != nkSmmError) res = resolveCall(parser, resCall);
 		} else {
 			if (identToken) {
 				smmPostMessage(errSmmUndefinedIdentifier, identToken->filePos, identToken->repr);
@@ -477,7 +481,7 @@ PSmmAstNode parseFactor(PSmmParser parser) {
 				return &errorNode;
 			}
 		}
-		if (res != &errorNode && !expect(parser, ')')) {
+		if (!expect(parser, ')')) {
 			int tk = parser->curToken->kind;
 			if (res->kind != nkSmmParam || (tk != tkSmmRArrow && tk != '{' && tk != ';')) {
 				findToken(parser, ';');
@@ -919,9 +923,8 @@ PSmmAstNode parseExpressionStmt(PSmmParser parser) {
 		return &errorNode;
 	}
 	if (lval) {
-		bool isJustIdent = (lval->flags & nfSmmIdent) && (lval->kind != nkSmmCall);
-		// TODO(igors): Exclude logical 'and' and 'or' because they can be used for shortcut expressions
-		bool isAnyBinOpExceptLogical = (lval->flags & nfSmmBinOp);
+		bool isJustIdent = (lval->flags & nfSmmIdent) && (lval->kind != nkSmmCall) && (lval->kind != nkSmmError);
+		bool isAnyBinOpExceptLogical = (lval->flags & nfSmmBinOp) && lval->kind != nkSmmAndOp && lval->kind != nkSmmOrOp;
 		if (isJustIdent || isAnyBinOpExceptLogical) {
 			smmPostMessage(wrnSmmNoEffectStmt, lval->token->filePos);
 			if (isJustIdent) lval = NULL;
@@ -1005,7 +1008,16 @@ PSmmAstNode setupAddSubNode(PSmmAstNode res) {
 
 // Called from parseBinOp for specific binary operators
 PSmmAstNode setupLogicOpNode(PSmmAstNode res) {
-	assert(false && "Not yet implemented!");
+	switch (res->token->kind)
+	{
+	case tkSmmAndOp: res->kind = nkSmmAndOp; break;
+	case tkSmmXorOp: res->kind = nkSmmXorOp; break;
+	case tkSmmOrOp: res->kind = nkSmmOrOp; break;
+	default:
+		assert(false && "Got unexpected token for LogicOp");
+		break;
+	}
+	res->type = &builtInTypes[tiSmmBool];
 	return res;
 }
 
@@ -1014,6 +1026,7 @@ API Functions
 *********************************************************/
 
 PSmmParser smmCreateParser(PSmmLexer lex, PSmmAllocator allocator) {
+	assert(nodeKindToString[nkSmmTerminator - 1]); //Check if names for all node kinds are defined
 	PSmmParser parser = allocator->alloc(allocator, sizeof(struct SmmParser));
 	parser->lex = lex;
 	parser->curToken = smmGetNextToken(lex);
@@ -1028,11 +1041,15 @@ PSmmParser smmCreateParser(PSmmLexer lex, PSmmAllocator allocator) {
 		smmAddDictValue(parser->idents, typeNode->type->name, typeNode);
 	}
 
+	smmAddDictValue(parser->idents, "int", smmGetDictValue(parser->idents, "int32", false));
+	smmAddDictValue(parser->idents, "uint", smmGetDictValue(parser->idents, "uint32", false));
+	smmAddDictValue(parser->idents, "float", smmGetDictValue(parser->idents, "float32", false));
+
+
 	static struct SmmBinaryOperator mulDivModOp = { setupMulDivModNode, 120 };
 	static struct SmmBinaryOperator addSubOp = { setupAddSubNode, 110 };
 	static struct SmmBinaryOperator andOp = { setupLogicOpNode, 100 };
-	static struct SmmBinaryOperator xorOp = { setupLogicOpNode, 90 };
-	static struct SmmBinaryOperator orOp = { setupLogicOpNode, 80 };
+	static struct SmmBinaryOperator orXorOp = { setupLogicOpNode, 90 };
 
 	static PSmmBinaryOperator binOpPrecs[128] = { 0 };
 	static bool binOpsInitialized = false;
@@ -1049,8 +1066,8 @@ PSmmParser smmCreateParser(PSmmLexer lex, PSmmAllocator allocator) {
 		binOpPrecs[tkSmmIntMod & 0x7f] = &mulDivModOp;
 
 		binOpPrecs[tkSmmAndOp & 0x7f] = &andOp;
-		binOpPrecs[tkSmmXorOp & 0x7f] = &xorOp;
-		binOpPrecs[tkSmmOrOp & 0x7f] = &orOp;
+		binOpPrecs[tkSmmXorOp & 0x7f] = &orXorOp;
+		binOpPrecs[tkSmmOrOp & 0x7f] = &orXorOp;
 	}
 	
 	parser->operatorPrecedences = binOpPrecs;

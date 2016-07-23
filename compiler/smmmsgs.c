@@ -12,7 +12,6 @@
 
 static const char* msgTypeToString[] = {
 	"unknown error",
-	"failed allocating memory",
 	"invalid hex digit",
 	"integer literal too big",
 	"invalid exponent in float literal",
@@ -35,6 +34,7 @@ static const char* msgTypeToString[] = {
 	"function must return a value",
 	"unreachable code",
 	"function '%s' must be defined in top scope",
+	"unexpected bool operand found",
 	
 	"possible loss of data in conversion from %s to %s",
 	"statement without effect",
@@ -64,8 +64,8 @@ void smmPostMessage(SmmMsgType msgType, const struct SmmFilePos filePos, ...) {
 	}
 }
 
-void smmAbortWithMessage(SmmMsgType msgType, const char* additionalInfo, const char* filename, const int line) {
-	printf("Compiler Error: %s %s (at %s:%d)\n", msgTypeToString[msgType], additionalInfo, filename, line);
+void smmAbortWithMessage(const char* msg, const char* filename, const int line) {
+	printf("Compiler Error: %s (at %s:%d)\n", msg, filename, line);
 	exit(EXIT_FAILURE);
 }
 
