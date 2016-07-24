@@ -28,6 +28,7 @@ typedef enum {
 	tkSmmErr,
 	tkSmmIdent = 256, // Because first 255 values are reserved for existing chars
 	tkSmmIntDiv, tkSmmIntMod, tkSmmAndOp, tkSmmXorOp, tkSmmOrOp,
+	tkSmmEq, tkSmmNotEq, tkSmmGtEq, tkSmmLtEq,
 	tkSmmInt, tkSmmUInt, tkSmmFloat, tkSmmBool,
 	tkSmmRArrow, tkSmmReturn,
 	tkSmmEof

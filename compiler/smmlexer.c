@@ -15,6 +15,7 @@
 static const char* tokenTypeToString[] = {
 	"identifier",
 	"div", "mod", "and", "or", "xor",
+	"==", "!=", ">=", "<=",
 	"uint32", "uint64", "float64", "bool",
 	"->", "return",
 	"eof"
@@ -322,15 +323,42 @@ PSmmToken smmGetNextToken(PSmmLexer lex) {
 		token->kind = tkSmmEof;
 		return token;
 	case '-':
-		token->kind = *firstChar;
 		nextChar(lex);
 		if (lex->curChar[0] == '>') {
 			token->kind = tkSmmRArrow;
 			nextChar(lex);
-		}
+		} else token->kind = *firstChar;
 		break;
-	case '+': case '*': case '/': case '%': case '=': case ':':
-	case ';': case '(': case ')': case '{': case '}': case ',':
+	case '=':
+		nextChar(lex);
+		if (lex->curChar[0] == '=') {
+			token->kind = tkSmmEq;
+			nextChar(lex);
+		} else token->kind = *firstChar;
+		break;
+	case '!':
+		nextChar(lex);
+		if (lex->curChar[0] == '=') {
+			token->kind = tkSmmNotEq;
+			nextChar(lex);
+		} else token->kind = *firstChar;
+		break;
+	case '>':
+		nextChar(lex);
+		if (lex->curChar[0] == '=') {
+			token->kind = tkSmmGtEq;
+			nextChar(lex);
+		} else token->kind = *firstChar;
+		break;
+	case '<':
+		nextChar(lex);
+		if (lex->curChar[0] == '=') {
+			token->kind = tkSmmLtEq;
+			nextChar(lex);
+		} else token->kind = *firstChar;
+		break;
+	case '+': case '*': case '/': case '%': case ':': case ';':
+	case '(': case ')': case '{': case '}': case ',':
 		token->kind = *firstChar;
 		nextChar(lex);
 		break;

@@ -26,6 +26,7 @@ const char* nodeKindToString[] = {
 	"-", "type", "int", "float", "bool",
 	"cast", "param", "call", "return",
 	"and", "xor" , "or",
+	"==", "!=", ">", ">=", "<", "<=", "!",
 };
 
 static struct SmmTypeInfo builtInTypes[] = {
@@ -443,22 +444,25 @@ PSmmAstNode getLiteralNode(PSmmParser parser) {
 	return res;
 }
 
-bool isNegFactor(PSmmParser parser) {
-	bool isNeg = false;
-	if (parser->curToken->kind == '-') {
-		isNeg = true;
+PSmmToken getUnaryOperator(PSmmParser parser) {
+	PSmmToken res;
+	switch (parser->curToken->kind) {
+	case '-': case '!': case '+':
+		res = parser->curToken;
 		getNextToken(parser);
-	} else if (parser->curToken->kind == '+') {
-		getNextToken(parser);
+		break;
+	default:
+		res = NULL;
+		break;
 	}
-	return isNeg;
+	return res;
 }
 
 PSmmAstNode parseFactor(PSmmParser parser) {
 	PSmmAstNode res = &errorNode;
 	bool canBeFuncDefn = parser->prevToken && parser->prevToken->kind == ':';
-	bool doNeg = isNegFactor(parser);
-	canBeFuncDefn = canBeFuncDefn && !doNeg;
+	PSmmToken unary = getUnaryOperator(parser);
+	canBeFuncDefn = canBeFuncDefn && !unary;
 	if (parser->curToken->kind == '(') {
 		getNextToken(parser);
 		if (parser->curToken->kind == ')') {
@@ -507,9 +511,10 @@ PSmmAstNode parseFactor(PSmmParser parser) {
 		if (res == &errorNode) findToken(parser, ';');
 	}
 
-	if (res == &errorNode) return res;
+	if (res == &errorNode || !unary) return res;
 
-	if (doNeg) {
+	switch (unary->kind) {
+	case '-':
 		if (res->kind == nkSmmInt) {
 			res->token->kind = tkSmmInt;
 			res->token->sintVal = -(int64_t)res->token->uintVal;
@@ -539,6 +544,16 @@ PSmmAstNode parseFactor(PSmmParser parser) {
 			}
 			neg->flags |= res->flags & nfSmmConst;
 			res = neg;
+		}
+		break;
+	case '!':
+		{
+			PSmmAstNode not = newAstNode(parser, nkSmmNot);
+			not->left = res;
+			not->type = &builtInTypes[tiSmmBool];
+			not->flags |= res->flags & nfSmmConst;
+			res = not;
+			break;
 		}
 	}
 	return res;
@@ -952,14 +967,30 @@ PSmmAstNode parseStatement(PSmmParser parser) {
 	}
 }
 
+PSmmTypeInfo getCommonTypeFromOperands(PSmmAstNode res) {
+	PSmmTypeInfo type;
+	if (res->left->type->flags & res->right->type->flags & tifSmmInt) {
+		// if both are ints we need to select bigger type but if only one is signed result should be signed
+		bool leftUnsigned = res->left->type->flags & tifSmmUnsigned;
+		bool rightUnsigned = res->right->type->flags & tifSmmUnsigned;
+		type = (res->left->type->sizeInBytes > res->right->type->sizeInBytes) ? res->left->type : res->right->type;
+		if (leftUnsigned != rightUnsigned && (type->flags & tifSmmUnsigned)) {
+			type = &builtInTypes[type->kind - tiSmmUInt8 + tiSmmInt8];
+		}
+	} else {
+		// Otherwise floats are always considered bigger then int
+		type = (res->left->type->kind > res->right->type->kind) ? res->left->type : res->right->type;
+	}
+	return type;
+}
+
 // Called from parseBinOp for specific binary operators
 PSmmAstNode setupMulDivModNode(PSmmAstNode res) {
-	PSmmTypeInfo type = (res->left->type->kind > res->right->type->kind) ? res->left->type : res->right->type;
+	PSmmTypeInfo type = getCommonTypeFromOperands(res);
 	PSmmTypeInfo ftype = type->kind < tiSmmFloat32 ? &builtInTypes[tiSmmSoftFloat64] : type;
 	switch (res->token->kind) {
 	case tkSmmIntDiv: case tkSmmIntMod: {
-		bool bothUnsigned = (res->left->type->flags & res->right->type->flags & tifSmmUnsigned);
-		res->kind = bothUnsigned ? nkSmmUDiv : nkSmmSDiv;
+		res->kind = (type->flags & tifSmmUnsigned) ? nkSmmUDiv : nkSmmSDiv;
 		if (res->token->kind == tkSmmIntMod) res->kind += nkSmmSRem - nkSmmSDiv;
 		res->type = type;
 		if (type->kind >= tiSmmFloat32) {
@@ -967,6 +998,8 @@ PSmmAstNode setupMulDivModNode(PSmmAstNode res) {
 			smmPostMessage(errSmmBadOperandsType, res->token->filePos, smmTokenToString(res->token, buf), type->name);
 			if (res->token->kind == tkSmmIntMod) res->kind = nkSmmFRem;
 			else res->kind = nkSmmFDiv;
+			// This way of handling it could possibly cause loss of precision warning as well.
+			// We can add casting to int instead if we want to avoid that, but which int?
 			res->type = ftype;
 		}
 		break;
@@ -995,11 +1028,7 @@ PSmmAstNode setupAddSubNode(PSmmAstNode res) {
 	if (res->token->kind == '+') res->kind = nkSmmAdd;
 	else res->kind = nkSmmSub;
 
-	if (res->left->type->kind >= res->right->type->kind) {
-		res->type = res->left->type;
-	} else {
-		res->type = res->right->type;
-	}
+	res->type = getCommonTypeFromOperands(res);
 
 	if (res->type->kind >= tiSmmFloat32) res->kind++; // Add to FAdd, Sub to FSub
 
@@ -1013,6 +1042,24 @@ PSmmAstNode setupLogicOpNode(PSmmAstNode res) {
 	case tkSmmAndOp: res->kind = nkSmmAndOp; break;
 	case tkSmmXorOp: res->kind = nkSmmXorOp; break;
 	case tkSmmOrOp: res->kind = nkSmmOrOp; break;
+	default:
+		assert(false && "Got unexpected token for LogicOp");
+		break;
+	}
+	res->type = &builtInTypes[tiSmmBool];
+	return res;
+}
+
+// Called from parseBinOp for specific binary operators
+PSmmAstNode setupRelOpNode(PSmmAstNode res) {
+	switch (res->token->kind)
+	{
+	case tkSmmEq: res->kind = nkSmmEq; break;
+	case tkSmmNotEq: res->kind = nkSmmNotEq; break;
+	case '>': res->kind = nkSmmGt; break;
+	case tkSmmGtEq: res->kind = nkSmmGtEq; break;
+	case '<': res->kind = nkSmmLt; break;
+	case tkSmmLtEq: res->kind = nkSmmLtEq; break;
 	default:
 		assert(false && "Got unexpected token for LogicOp");
 		break;
@@ -1047,14 +1094,16 @@ PSmmParser smmCreateParser(PSmmLexer lex, PSmmAllocator allocator) {
 
 
 	static struct SmmBinaryOperator mulDivModOp = { setupMulDivModNode, 120 };
-	static struct SmmBinaryOperator addSubOp = { setupAddSubNode, 110 };
-	static struct SmmBinaryOperator andOp = { setupLogicOpNode, 100 };
-	static struct SmmBinaryOperator orXorOp = { setupLogicOpNode, 90 };
+	static struct SmmBinaryOperator relOp = { setupRelOpNode, 110 };
+	static struct SmmBinaryOperator addSubOp = { setupAddSubNode, 100 };
+	static struct SmmBinaryOperator andOp = { setupLogicOpNode, 90 };
+	static struct SmmBinaryOperator orXorOp = { setupLogicOpNode, 80 };
 
 	static PSmmBinaryOperator binOpPrecs[128] = { 0 };
 	static bool binOpsInitialized = false;
 	if (!binOpsInitialized) {
-		// Init binary operator precedences. Index is tokenKind & 0x7f
+		// Init binary operator precedences. Index is tokenKind & 0x7f so its value must be less then 289
+		// which is after this operation equal to '!', first operator character in ascii map
 
 		binOpsInitialized = true;
 		binOpPrecs['+'] = &addSubOp;
@@ -1064,6 +1113,13 @@ PSmmParser smmCreateParser(PSmmLexer lex, PSmmAllocator allocator) {
 		binOpPrecs['/'] = &mulDivModOp;
 		binOpPrecs[tkSmmIntDiv & 0x7f] = &mulDivModOp;
 		binOpPrecs[tkSmmIntMod & 0x7f] = &mulDivModOp;
+
+		binOpPrecs[tkSmmEq & 0x7f] = &relOp;
+		binOpPrecs[tkSmmNotEq & 0x7f] = &relOp;
+		binOpPrecs['>'] = &relOp;
+		binOpPrecs[tkSmmGtEq & 0x7f] = &relOp;
+		binOpPrecs['<'] = &relOp;
+		binOpPrecs[tkSmmLtEq & 0x7f] = &relOp;
 
 		binOpPrecs[tkSmmAndOp & 0x7f] = &andOp;
 		binOpPrecs[tkSmmXorOp & 0x7f] = &orXorOp;

@@ -5,8 +5,12 @@ bla :: (a: int16, b: int16) -> int32 {
 putchar :: (char: int32) -> int32;
 
 {
-	z : int8 : 18446744073709551615;
-	x :: 2- 4 * 0x817972143abcdef div 12312 -3 * z;
+	ui32 : uint32 = 100;
+	i8 : int8 = -1;
+	result := 123 + ui32 div i8;
+
+	z : uint8 = 180;
+	x :: 2- 4 * 0x817972143abcdef div 12312 - 3;
 	//x := 123;
 	y:int64;
 	y = x - 123 + 0x23423fffdc - 123 * x;
@@ -22,15 +26,15 @@ putchar :: (char: int32) -> int32;
 	putchar(65);
 	putchar(10);
 	
-	a := true;
-	b := false;
+	a := y > z and z;
+	b := f64 < f32 or f32 > x;
 	c := false;
 	d := true;
 	e := true;
 	f := false;
 	g := false;
 	h := true;
-	res := uint((a or b) and (c or d) xor (e or f or g and h));
+	res := uint((a or b) and !(c or d) xor (e or f or g and h));
 	
 	return int(res);
 }

@@ -13,6 +13,7 @@ struct SmmLLVMModuleGenData {
 	PSmmDict localVars;
 	LLVMBuilderRef builder;
 	LLVMValueRef curFunc;
+	LLVMBasicBlockRef endBlock; // Used for logical expressions
 };
 typedef struct SmmLLVMModuleGenData* PSmmLLVMModuleGenData;
 
@@ -20,7 +21,6 @@ typedef struct SmmLLVMModuleGenData* PSmmLLVMModuleGenData;
 
 struct LogicalExprData {
 	PSmmLLVMModuleGenData data;
-	LLVMBasicBlockRef endBlock;
 	LLVMBasicBlockRef lastCreatedBlock;
 	LLVMBasicBlockRef incomeBlocks[MAX_LOGICAL_EXPR_DEPTH];
 	LLVMValueRef incomeValues[MAX_LOGICAL_EXPR_DEPTH];
@@ -86,7 +86,7 @@ LLVMValueRef getCastInstruction(PSmmLLVMModuleGenData data, PSmmTypeInfo dtype, 
 	bool srcIsInt = stype->flags & (tifSmmInt | tifSmmBool);
 	bool differentSize = dtype->sizeInBytes != stype->sizeInBytes || dtype->kind == tiSmmBool;
 	if (dstIsInt && srcIsInt && differentSize) {
-		if ((dtype->flags & tifSmmUnsigned) && dtype->sizeInBytes > stype->sizeInBytes || stype->kind == tiSmmBool) {
+		if ((stype->flags & tifSmmUnsigned) && dtype->sizeInBytes > stype->sizeInBytes || stype->kind == tiSmmBool) {
 			return LLVMBuildZExt(data->builder, val, getLLVMType(dtype), "");
 		}
 		return LLVMBuildIntCast(data->builder, val, getLLVMType(dtype), "");
@@ -114,20 +114,19 @@ LLVMValueRef convertAndOrInstr(PLogicalExprData ledata, PSmmAstNode node, LLVMBa
 
 	LLVMValueRef left = NULL;
 	switch (node->left->kind) {
-	case nkSmmAndOp: left = convertAndOrInstr(ledata, node->left, nextTrue, nextFalse); break;
-	case nkSmmOrOp: left = convertAndOrInstr(ledata, node->left, nextTrue, nextFalse); break;
+	case nkSmmAndOp: case nkSmmOrOp: left = convertAndOrInstr(ledata, node->left, nextTrue, nextFalse); break;
 	default: left = convertToInstructions(ledata->data, node->left); break;
 	}
 
 	LLVMBuildCondBr(ledata->data->builder, left, nextTrue, nextFalse);
-	if (ledata->endBlock == nextTrue || ledata->endBlock == nextFalse) {
+	if (ledata->data->endBlock == nextTrue || ledata->data->endBlock == nextFalse) {
 		if (ledata->blockCount >= MAX_LOGICAL_EXPR_DEPTH) {
 			char msg[500] = { 0 };
 			snprintf(msg, 500, "Logical expression at %s:%d too complicated", node->token->filePos.filename, node->token->filePos.lineNumber);
 			smmAbortWithMessage(msg, __FILE__, __LINE__);
 		}
 		ledata->incomeBlocks[ledata->blockCount] = LLVMGetInsertBlock(ledata->data->builder);
-		ledata->incomeValues[ledata->blockCount] = LLVMConstInt(LLVMInt1Type(), ledata->endBlock == nextTrue, false);
+		ledata->incomeValues[ledata->blockCount] = LLVMConstInt(LLVMInt1Type(), ledata->data->endBlock == nextTrue, false);
 		ledata->blockCount++;
 	}
 
@@ -214,29 +213,71 @@ LLVMValueRef convertToInstructions(PSmmLLVMModuleGenData data, PSmmAstNode node)
 		}
 	case nkSmmAndOp: case nkSmmOrOp:
 		{
-			// We initialize logicalExprData.endBlock with new block
-			struct LogicalExprData logicalExprData = { data, LLVMAppendBasicBlock(data->curFunc, "") };
-			logicalExprData.lastCreatedBlock = logicalExprData.endBlock;
+			// We initialize data.endBlock with new block
+			LLVMBasicBlockRef lastEndBlock = data->endBlock;
+			if (lastEndBlock) {
+				data->endBlock = LLVMInsertBasicBlock(lastEndBlock, "");
+			} else {
+				data->endBlock = LLVMAppendBasicBlock(data->curFunc, "");
+			}
+			struct LogicalExprData logicalExprData = { data, data->endBlock };
 
-			res = convertAndOrInstr(&logicalExprData, node, logicalExprData.endBlock, logicalExprData.endBlock);
+			res = convertAndOrInstr(&logicalExprData, node, data->endBlock, data->endBlock);
+			if (logicalExprData.blockCount >= MAX_LOGICAL_EXPR_DEPTH) {
+				char msg[500] = { 0 };
+				snprintf(msg, 500, "Logical expression at %s:%d too complicated", node->token->filePos.filename, node->token->filePos.lineNumber);
+				smmAbortWithMessage(msg, __FILE__, __LINE__);
+			}
 			logicalExprData.incomeBlocks[logicalExprData.blockCount] = LLVMGetInsertBlock(data->builder);
 			logicalExprData.incomeValues[logicalExprData.blockCount] = res;
 			logicalExprData.blockCount++;
-			LLVMBuildBr(data->builder, logicalExprData.endBlock);
+			LLVMBuildBr(data->builder, data->endBlock);
 			
-			LLVMPositionBuilderAtEnd(data->builder, logicalExprData.endBlock);
+			LLVMPositionBuilderAtEnd(data->builder, data->endBlock);
 			res = LLVMBuildPhi(data->builder, LLVMInt1Type(), "");
 			LLVMAddIncoming(res, logicalExprData.incomeValues, logicalExprData.incomeBlocks, logicalExprData.blockCount);
 
+			data->endBlock = lastEndBlock;
+
 			break;
 		}
-	case nkSmmXorOp:
+	case nkSmmXorOp: case nkSmmEq: case nkSmmNotEq:case nkSmmGt:case nkSmmGtEq:case nkSmmLt:case nkSmmLtEq:
 		{
+			// TODO(igors): test with unsigned numbers
 			LLVMValueRef left = convertToInstructions(data, node->left);
 			LLVMValueRef right = convertToInstructions(data, node->right);
-			res = LLVMBuildICmp(data->builder, LLVMIntNE, left, right, "");
+			if ((node->left->type->flags & tifSmmInt) || node->left->type->kind == tiSmmBool) {
+				LLVMIntPredicate op;
+				if (node->kind == nkSmmXorOp) op = LLVMIntNE;
+				else {
+					op = node->kind - nkSmmEq + LLVMIntEQ;
+					if (op >= LLVMIntUGT && !(node->left->type->flags & tifSmmUnsigned)) {
+						op = op - LLVMIntUGT + LLVMIntSGT;
+					}
+				}
+				res = LLVMBuildICmp(data->builder, op, left, right, "");
+			} else if (node->left->type->flags & tifSmmFloat) {
+				LLVMRealPredicate op = LLVMRealUNE; // For '!=', it can't be xor here because we add != 0 on float operands for xor
+				switch (node->kind) {
+				case nkSmmEq: op = LLVMRealOEQ; break;
+				case nkSmmGt: op = LLVMRealOGT; break;
+				case nkSmmGtEq: op = LLVMRealOGE; break;
+				case nkSmmLt: op = LLVMRealOLT; break;
+				case nkSmmLtEq: op = LLVMRealOLE; break;
+				default:
+					// TODO(igors): Add rest of float comparisons as DLang: https://dlang.org/spec/expression.html#floating-point-comparisons
+					assert(false && "Unexpected node type");
+					break;
+				}
+				res = LLVMBuildFCmp(data->builder, op, left, right, "");
+			} else {
+				assert(false && "Got unexpected type for relation operator");
+			}
 			break;
 		}
+	case nkSmmNot:
+		res = LLVMBuildNot(data->builder, convertToInstructions(data, node->left), "");
+		break;
 	default:
 		assert(false && "Encountered unknown node type!");
 		break;
