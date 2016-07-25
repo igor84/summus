@@ -9,12 +9,14 @@ Create and refine a most basic compiler using LLVM as backend that can easily be
 ## Windows
 - [Visual Studio 2015](https://www.visualstudio.com/products/free-developer-offers-vs) (Community Edition)
 - [Clang](https://sourceforge.net/projects/clangonwin/) compiler for Windows
+
 If you install Clang to C:\\Program Files\\LLVM\\ the VS project should just work. Otherwise you will have to change project library path under linker options.
 
 ## Linux
 - Clang compiler
 - LLVM (On Kubuntu: `# sudo apt-get install llvm`)
 - LibZ (On Kubuntu: `# sudo apt-get install libz-dev`)
+
 You can use clangCompile.sh or gccCompile.sh scripts to compile the compiler. You will get the binary output in the bin/ subdirectory.
 
 # Features
@@ -24,7 +26,8 @@ Language at the moment supports:
 - functions and blocks
 - block scope
 - and that is it :)
-The goal of this project is not to create a perfact new language but to try and create a perfect compiler for minimal possible language.
+
+The goal of this project is not to create a perfect new language but to try and create a perfect compiler for minimal possible language.
 
 # Commands
 Built compiler outputs readable LLVM assembly into a test.ll file at moment. Here are some useful commands you can run on that file:
