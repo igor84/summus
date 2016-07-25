@@ -4,7 +4,7 @@
 
 static PSmmAstNode getCastNode(PSmmAllocator a, PSmmAstNode node, PSmmAstNode parent) {
 	assert(parent->type->kind != tiSmmSoftFloat64);
-	if (parent->kind == nkSmmCast) return NULL;
+	if (parent->kind == nkSmmCast && (parent->left == node || parent->right == node)) return NULL;
 	PSmmAstNode cast = a->alloc(a, sizeof(struct SmmAstNode));
 	cast->kind = nkSmmCast;
 	cast->left = node;
@@ -165,8 +165,10 @@ static void checkExpressionTypes(PSmmModuleData data, PSmmAstNode* nodeField, PS
 		}
 	case nkSmmEq: case nkSmmNotEq:case nkSmmGt:case nkSmmGtEq:case nkSmmLt:case nkSmmLtEq:
 		if (node->left->type->kind > node->right->type->kind) {
+			checkExpressionTypes(data, &node->left, node->left);
 			checkExpressionTypes(data, &node->right, node->left);
 		} else {
+			checkExpressionTypes(data, &node->right, node->right);
 			checkExpressionTypes(data, &node->left, node->right);
 		}
 		break;

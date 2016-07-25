@@ -34,7 +34,7 @@ putchar :: (char: int32) -> int32;
 	f := false;
 	g := false;
 	h := true;
-	res := uint((a or b) and !(c or d) xor (e or f or g and h));
+	res := uint((a or b) and not (c or d) xor (e or f or g and h));
 	
 	return int(res);
 }

@@ -14,7 +14,7 @@
 
 static const char* tokenTypeToString[] = {
 	"identifier",
-	"div", "mod", "and", "or", "xor",
+	"div", "mod", "not", "and", "or", "xor",
 	"==", "!=", ">=", "<=",
 	"uint32", "uint64", "float64", "bool",
 	"->", "return",
@@ -118,7 +118,7 @@ static void initSymTableWithKeywords(PPrivLexer lex) {
 		int kind;
 	};
 	static struct Keywords keywords[] = {
-		{ "div", tkSmmIntDiv }, { "mod", tkSmmIntMod },
+		{ "div", tkSmmIntDiv }, { "mod", tkSmmIntMod }, { "not", tkSmmNot },
 		{ "and", tkSmmAndOp }, { "or", tkSmmOrOp }, { "xor", tkSmmXorOp },
 		{ "return", tkSmmReturn },{ "false", tkSmmBool },{ "true", tkSmmBool },
 	};

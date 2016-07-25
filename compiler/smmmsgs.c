@@ -35,9 +35,11 @@ static const char* msgTypeToString[] = {
 	"unreachable code",
 	"function '%s' must be defined in top scope",
 	"unexpected bool operand found",
+	"'!' used as not operator, use 'not' instead",
 	
 	"possible loss of data in conversion from %s to %s",
 	"statement without effect",
+	"comparing signed and unsigned values can have unpredictable results. Add explicit casts to avoid this warning",
 };
 
 static int errorCounter;

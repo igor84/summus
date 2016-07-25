@@ -25,6 +25,7 @@
 #include "smmcommon.h"
 #include "smmlexer.h"
 
+typedef struct SmmParser* PSmmParser;
 typedef struct SmmAstNode* PSmmAstNode;
 
 typedef struct SmmAstIdentNode* PSmmAstIdentNode;
@@ -34,7 +35,7 @@ typedef struct SmmAstParamNode* PSmmAstParamNode;
 typedef struct SmmAstFuncDefNode* PSmmAstFuncDefNode;
 typedef struct SmmAstCallNode* PSmmAstCallNode;
 
-typedef PSmmAstNode (*PSmmSetupBinOpNode)(PSmmAstNode binOp);
+typedef PSmmAstNode (*PSmmSetupBinOpNode)(PSmmParser parser, PSmmAstNode binOp);
 
 struct SmmBinaryOperator {
 	PSmmSetupBinOpNode setupNode;
@@ -51,7 +52,6 @@ struct SmmParser {
 	PSmmAllocator allocator;
 	PSmmBinaryOperator* operatorPrecedences;
 };
-typedef struct SmmParser* PSmmParser;
 
 // Each enum value should have coresponding string in smmparser.c
 typedef enum {

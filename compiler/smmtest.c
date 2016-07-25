@@ -19,10 +19,8 @@ void printNode(PSmmAstNode node, int align) {
 		fputs(":", stdout);
 		fputs(node->type->name, stdout);
 	}
-	if (node->kind != nkSmmNeg) {
-		fputs(" ", stdout);
-	}
-
+	fputs(" ", stdout);
+	
 	if (node->kind == nkSmmFunc || node->kind == nkSmmCall) {
 		PSmmAstFuncDefNode func = (PSmmAstFuncDefNode)node;
 		bool isCall = node->kind == nkSmmCall;

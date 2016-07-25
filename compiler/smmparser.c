@@ -26,7 +26,7 @@ const char* nodeKindToString[] = {
 	"-", "type", "int", "float", "bool",
 	"cast", "param", "call", "return",
 	"and", "xor" , "or",
-	"==", "!=", ">", ">=", "<", "<=", "!",
+	"==", "!=", ">", ">=", "<", "<=", "not",
 };
 
 static struct SmmTypeInfo builtInTypes[] = {
@@ -447,7 +447,11 @@ PSmmAstNode getLiteralNode(PSmmParser parser) {
 PSmmToken getUnaryOperator(PSmmParser parser) {
 	PSmmToken res;
 	switch (parser->curToken->kind) {
-	case '-': case '!': case '+':
+	case '!':
+		smmPostMessage(errSmmBangUsedAsNot, parser->curToken->filePos);
+		parser->curToken->kind = tkSmmNot;
+		// fallthrough
+	case '-': case tkSmmNot: case '+':
 		res = parser->curToken;
 		getNextToken(parser);
 		break;
@@ -546,7 +550,7 @@ PSmmAstNode parseFactor(PSmmParser parser) {
 			res = neg;
 		}
 		break;
-	case '!':
+	case tkSmmNot:
 		{
 			PSmmAstNode not = newAstNode(parser, nkSmmNot);
 			not->left = res;
@@ -588,7 +592,7 @@ PSmmAstNode parseBinOp(PSmmParser parser, PSmmAstNode left, int prec) {
 		res->token = resToken;
 		res->flags = left->flags & right->flags & nfSmmConst;
 		res->flags |= nfSmmBinOp;
-		left = binOp->setupNode(res);
+		left = binOp->setupNode(parser, res);
 	}
 }
 
@@ -738,10 +742,16 @@ PSmmAstNode parseAssignment(PSmmParser parser, PSmmAstNode lval) {
 	PSmmAstNode val = parseExpression(parser);
 	if (lval == &errorNode || val == &errorNode) return &errorNode;
 	if (!lval->type) {
-		if (val->type->kind == tiSmmSoftFloat64) {
-			lval->type = &builtInTypes[tiSmmFloat64];
-		} else {
-			lval->type = val->type;
+		// If right value is just another variable or func call just copy its type
+		// but if it is expression then try to be a bit smarter.
+		if (val->kind == nkSmmIdent) lval->type = val->type;
+		else {
+			switch (val->type->kind) {
+			case tiSmmSoftFloat64: lval->type = &builtInTypes[tiSmmFloat64]; break;
+			case tiSmmInt8: case tiSmmInt16: lval->type = &builtInTypes[tiSmmInt32]; break;
+			case tiSmmUInt8: case tiSmmUInt16: lval->type = &builtInTypes[tiSmmUInt32]; break;
+			default: lval->type = val->type; break;
+			}
 		}
 	}
 	// If lval is const or global var which just needs initializer we just return the val directly.
@@ -985,7 +995,7 @@ PSmmTypeInfo getCommonTypeFromOperands(PSmmAstNode res) {
 }
 
 // Called from parseBinOp for specific binary operators
-PSmmAstNode setupMulDivModNode(PSmmAstNode res) {
+PSmmAstNode setupMulDivModNode(PSmmParser parser, PSmmAstNode res) {
 	PSmmTypeInfo type = getCommonTypeFromOperands(res);
 	PSmmTypeInfo ftype = type->kind < tiSmmFloat32 ? &builtInTypes[tiSmmSoftFloat64] : type;
 	switch (res->token->kind) {
@@ -1024,7 +1034,7 @@ PSmmAstNode setupMulDivModNode(PSmmAstNode res) {
 }
 
 // Called from parseBinOp for specific binary operators
-PSmmAstNode setupAddSubNode(PSmmAstNode res) {
+PSmmAstNode setupAddSubNode(PSmmParser parser, PSmmAstNode res) {
 	if (res->token->kind == '+') res->kind = nkSmmAdd;
 	else res->kind = nkSmmSub;
 
@@ -1036,7 +1046,7 @@ PSmmAstNode setupAddSubNode(PSmmAstNode res) {
 }
 
 // Called from parseBinOp for specific binary operators
-PSmmAstNode setupLogicOpNode(PSmmAstNode res) {
+PSmmAstNode setupLogicOpNode(PSmmParser parser, PSmmAstNode res) {
 	switch (res->token->kind)
 	{
 	case tkSmmAndOp: res->kind = nkSmmAndOp; break;
@@ -1051,7 +1061,7 @@ PSmmAstNode setupLogicOpNode(PSmmAstNode res) {
 }
 
 // Called from parseBinOp for specific binary operators
-PSmmAstNode setupRelOpNode(PSmmAstNode res) {
+PSmmAstNode setupRelOpNode(PSmmParser parser, PSmmAstNode res) {
 	switch (res->token->kind)
 	{
 	case tkSmmEq: res->kind = nkSmmEq; break;
@@ -1065,6 +1075,28 @@ PSmmAstNode setupRelOpNode(PSmmAstNode res) {
 		break;
 	}
 	res->type = &builtInTypes[tiSmmBool];
+
+	bool bothOperandsInts = res->left->type->flags & res->right->type->flags & tifSmmInt;
+	if (!bothOperandsInts) return res;
+
+	bool onlyOneSigned = (res->left->type->flags & tifSmmUnsigned) != (res->right->type->flags & tifSmmUnsigned);
+	if (!onlyOneSigned) return res;
+
+	smmPostMessage(wrnSmmComparingSignedAndUnsigned, res->token->filePos);
+
+	PSmmAstNode castNode = newAstNode(parser, nkSmmCast);
+	castNode->flags = res->flags & nfSmmConst;
+	castNode->type = getCommonTypeFromOperands(res);
+	if (res->left->type->flags & tifSmmUnsigned) {
+		castNode->left = res->left;
+		castNode->token = res->left->token;
+		res->left = castNode;
+	} else {
+		castNode->left = res->right;
+		castNode->token = res->right->token;
+		res->right = castNode;
+	}
+
 	return res;
 }
 

@@ -27,7 +27,7 @@ typedef enum { smmLexTypeFile, smmLexTypeStdIn } SmmLexTypeEnum;
 typedef enum {
 	tkSmmErr,
 	tkSmmIdent = 256, // Because first 255 values are reserved for existing chars
-	tkSmmIntDiv, tkSmmIntMod, tkSmmAndOp, tkSmmXorOp, tkSmmOrOp,
+	tkSmmIntDiv, tkSmmIntMod, tkSmmNot, tkSmmAndOp, tkSmmXorOp, tkSmmOrOp,
 	tkSmmEq, tkSmmNotEq, tkSmmGtEq, tkSmmLtEq,
 	tkSmmInt, tkSmmUInt, tkSmmFloat, tkSmmBool,
 	tkSmmRArrow, tkSmmReturn,
