@@ -829,7 +829,10 @@ PSmmAstNode parseDeclaration(PSmmParser parser, PSmmAstNode lval) {
 		return &errorNode;
 	}
 
-	if (expr == &errorNode || lval == &errorNode) return &errorNode;
+	if (expr == &errorNode || lval == &errorNode) {
+		if (spareNode) parser->allocator->free(parser->allocator, spareNode);
+		return &errorNode;
+	}
 
 	PSmmAstNode decl = spareNode ? spareNode : newAstNode(parser, nkSmmDecl);
 	decl->token = declToken;
@@ -1180,5 +1183,8 @@ PSmmAstNode smmParse(PSmmParser parser) {
 			nextStmt = &curStmt->next;
 		}
 	}
+
+	program->token = parser->allocator->alloc(parser->allocator, sizeof(struct SmmToken));
+	program->token->repr = parser->lex->filePos.filename;
 	return program;
 }

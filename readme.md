@@ -30,7 +30,7 @@ Language at the moment supports:
 The goal of this project is not to create a perfect new language but to try and create a perfect compiler for minimal possible language.
 
 # Commands
-Built compiler outputs readable LLVM assembly into a test.ll file at moment. Here are some useful commands you can run on that file:
+Built compiler outputs readable LLVM assembly into a test.ll file at the moment. Here are some useful commands you can run on that file:
 - `clang -x ir -o test.exe test.ll` to make executable from ll file
 - `clang -c -x ir -o test.o test.ll` to make native object file from ll file
 - `llvm-objdump.exe -disassemble test.o` to get native disassembly of object file

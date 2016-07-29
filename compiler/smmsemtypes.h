@@ -2,8 +2,9 @@
 #define SMM_TYPE_FIXER_H
 
 #include "smmcommon.h"
-#include "smmpasses.h"
+#include "smmutil.h"
+#include "smmparser.h"
 
-void smmAnalyzeTypes(PSmmModuleData data);
+void smmAnalyzeTypes(PSmmAstNode module, PSmmAllocator a);
 
 #endif

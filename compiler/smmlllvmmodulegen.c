@@ -202,13 +202,14 @@ LLVMValueRef convertToInstructions(PSmmLLVMModuleGenData data, PSmmAstNode node)
 			if (callNode->params) {
 				argCount = callNode->params->count;
 				PSmmAstNode astArg = callNode->args;
-				args = data->allocator->alloc(data->allocator, argCount * sizeof(LLVMValueRef));
+				args = data->allocator->alloca(data->allocator, argCount * sizeof(LLVMValueRef));
 				for (size_t i = 0; i < argCount; i++) {
 					args[i] = convertToInstructions(data, astArg);
 					astArg = astArg->next;
 				}
 			}
 			res = LLVMBuildCall(data->builder, func, args, (unsigned)argCount, "");
+			if (args) data->allocator->freea(data->allocator, args);
 			break;
 		}
 	case nkSmmAndOp: case nkSmmOrOp:
@@ -321,13 +322,17 @@ void createFunc(PSmmLLVMModuleGenData data, PSmmAstFuncDefNode astFunc) {
 	if (astFunc->params) {
 		PSmmAstParamNode param = astFunc->params;
 		paramsCount = param->count;
-		params = data->allocator->alloc(data->allocator, paramsCount * sizeof(LLVMTypeRef));
+		params = data->allocator->alloca(data->allocator, paramsCount * sizeof(LLVMTypeRef));
 		for (size_t i = 0; i < paramsCount; i++) {
 			params[i] = getLLVMType(param->type);
 			param = param->next;
 		}
 	}
 	LLVMTypeRef funcType = LLVMFunctionType(returnType, params, (unsigned)paramsCount, false);
+	if (params) {
+		data->allocator->freea(data->allocator, params);
+		params = NULL;
+	}
 	LLVMValueRef func = LLVMAddFunction(data->llvmModule, astFunc->token->repr, funcType);
 	LLVMValueRef oldFunc = data->curFunc;
 
@@ -340,17 +345,18 @@ void createFunc(PSmmLLVMModuleGenData data, PSmmAstFuncDefNode astFunc) {
 		LLVMPositionBuilderAtEnd(data->builder, entry);
 
 		if (paramsCount > 0) {
-			LLVMValueRef* paramVals = data->allocator->alloc(data->allocator, paramsCount * sizeof(LLVMValueRef));
+			LLVMValueRef* paramVals = data->allocator->alloca(data->allocator, paramsCount * sizeof(LLVMValueRef));
 			LLVMGetParams(func, paramVals);
 			PSmmAstParamNode param = astFunc->params;
 			for (size_t i = 0; i < paramsCount; i++) {
+				LLVMSetValueName(paramVals[i], param->token->repr);
 				LLVMValueRef paramStore = LLVMBuildAlloca(data->builder, LLVMTypeOf(paramVals[i]), param->token->repr);
 				LLVMBuildStore(data->builder, paramVals[i], paramStore);
 				smmPushDictValue(data->localVars, param->token->repr, paramStore);
 				param = param->next;
 			}
+			data->allocator->freea(data->allocator, paramVals);
 		}
-
 
 		convertBlock(data, astFunc->body);
 
@@ -395,18 +401,18 @@ void createGlobalVars(PSmmLLVMModuleGenData data, PSmmAstScopeNode scope) {
 	}
 }
 
-void smmGenLLVMModule(PSmmModuleData mdata, PSmmAllocator a) {
-	if (!mdata || !mdata->module) return;
+void smmGenLLVMModule(PSmmAstNode module, PSmmAllocator a) {
+	if (!module) return;
 
 	PSmmLLVMModuleGenData data = a->alloc(a, sizeof(struct SmmLLVMModuleGenData));
 	data->allocator = a;
-	data->module = mdata->module;
+	data->module = module;
 	data->localVars = smmCreateDict(a, NULL, NULL);
 	data->localVars->storeKeyCopy = false;
 
 	if (data->module->kind == nkSmmProgram) data->module = data->module->next;
 
-	data->llvmModule = LLVMModuleCreateWithName(mdata->filename);
+	data->llvmModule = LLVMModuleCreateWithName(module->token->repr);
 	LLVMSetDataLayout(data->llvmModule, "");
 	LLVMSetTarget(data->llvmModule, LLVMGetDefaultTargetTriple());
 	

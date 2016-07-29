@@ -59,6 +59,8 @@ struct SmmAllocator {
 	void* (*malloc)(PSmmAllocator allocator, size_t size); // Just get the memory
 	void* (*calloc)(PSmmAllocator allocator, size_t count, size_t size); // Get and zero memory
 	void  (*free)(PSmmAllocator allocator, void* ptr);
+	void* (*alloca)(PSmmAllocator allocator, size_t size); // Get zeroed memory if available from simulated stack
+	void  (*freea)(PSmmAllocator allocator, void* ptr); // Free ptr if it is last entry from the simulated stack, otherwise assert(false) 
 };
 
 typedef struct SmmDictEntryValue* PSmmDictEntryValue;

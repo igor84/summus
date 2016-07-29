@@ -2,8 +2,9 @@
 #define SMM_LLVM_MODULE_GEN_H
 
 #include "smmcommon.h"
-#include "smmpasses.h"
+#include "smmutil.h"
+#include "smmparser.h"
 
-void smmGenLLVMModule(PSmmModuleData mdata, PSmmAllocator a);
+void smmGenLLVMModule(PSmmAstNode module, PSmmAllocator a);
 
 #endif

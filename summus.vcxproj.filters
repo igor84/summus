@@ -77,9 +77,6 @@
     <ClInclude Include="compiler\smmsemtypes.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="compiler\smmpasses.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="compiler\smmlllvmmodulegen.h">
       <Filter>Header Files</Filter>
     </ClInclude>

@@ -84,7 +84,7 @@ int main(int argc, char **argv) {
 		fclose(f);
 		buf = filebuf;
 	}
-	PSmmAllocator allocator = smmCreatePermanentAllocator(filename, 64 * 1024 * 1024);
+	PSmmAllocator allocator = smmCreatePermanentAllocator(filename, 64 * 1024);
 	PSmmLexer lex = smmCreateLexer(buf, filename, allocator);
 	
 	PSmmParser parser = smmCreateParser(lex, allocator);
@@ -95,8 +95,7 @@ int main(int argc, char **argv) {
 	printNode(program, 0);
 	puts("\n");
 
-	struct SmmModuleData data = {program, filename, allocator};
-	smmAnalyzeTypes(&data);
+	smmAnalyzeTypes(program, allocator);
 
 	puts("\n");
 	printNode(program, 0);
@@ -104,7 +103,7 @@ int main(int argc, char **argv) {
 
 	bool hadErrors = smmHadErrors();
 	if (!hadErrors) {
-		smmGenLLVMModule(&data, allocator);
+		smmGenLLVMModule(program, allocator);
 	}
 	
 	smmPrintAllocatorInfo(allocator);
