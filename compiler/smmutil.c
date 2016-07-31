@@ -35,13 +35,13 @@ typedef struct PrivDict* PPrivDict;
 Private Functions
 *********************************************************/
 
-void abortWithAllocError(const char* msg, const char* allocatorName, size_t size, const int line) {
+static void abortWithAllocError(const char* msg, const char* allocatorName, size_t size, const int line) {
 	char wholeMsg[500] = {0};
 	snprintf(wholeMsg, 500, "ERROR: %s %s; Requested size: %zu", msg, allocatorName, size);
 	smmAbortWithMessage(wholeMsg, __FILE__, line);
 }
 
-void* globalAlloc(PSmmAllocator allocator, size_t size) {
+static void* globalAlloc(PSmmAllocator allocator, size_t size) {
 	PPrivAllocator privAllocator = (PPrivAllocator) allocator;
 	privAllocator->used += size;
 	size = (size + 0xf) & ~0xf; //We align memory on 16 bytes
@@ -55,11 +55,11 @@ void* globalAlloc(PSmmAllocator allocator, size_t size) {
 	return location;
 }
 
-void* globalCAlloc(PSmmAllocator allocator, size_t count, size_t size) {
+static void* globalCAlloc(PSmmAllocator allocator, size_t count, size_t size) {
 	return globalAlloc(allocator, count * size);
 }
 
-void* globalAllocA(PSmmAllocator allocator, size_t size) {
+static void* globalAllocA(PSmmAllocator allocator, size_t size) {
 	PPrivAllocator privAllocator = (PPrivAllocator)allocator;
 	void* loc = privAllocator->stack;
 	size = (size + 0x1f) & ~0xf;
@@ -68,11 +68,11 @@ void* globalAllocA(PSmmAllocator allocator, size_t size) {
 	return loc;
 }
 
-void globalFree(PSmmAllocator allocator, void* ptr) {
+static void globalFree(PSmmAllocator allocator, void* ptr) {
 	// Does nothing
 }
 
-void globalFreeA(PSmmAllocator allocator, void* ptr) {
+static void globalFreeA(PSmmAllocator allocator, void* ptr) {
 	if (!ptr) return;
 	PPrivAllocator privAllocator = (PPrivAllocator)allocator;
 	size_t lastSize = *((size_t *)(privAllocator->stack - 0x10));
@@ -83,11 +83,11 @@ void globalFreeA(PSmmAllocator allocator, void* ptr) {
 }
 
 // This is used as a temp dict create elem func in smmAddDictValue
-void* getValueToAdd(const char* key, PSmmAllocator a, void* context) {
+static void* getValueToAdd(const char* key, PSmmAllocator a, void* context) {
 	return context;
 }
 
-PSmmDictEntry createNewEntry(PPrivDict privDict, const char* origKey, const char* keyPart) {
+static PSmmDictEntry createNewEntry(PPrivDict privDict, const char* origKey, const char* keyPart) {
 	PSmmAllocator a = privDict->allocator;
 	PSmmDictEntry newElem = a->alloc(a, sizeof(struct SmmDictEntry));
 	newElem->keyPartLength = strlen(keyPart);

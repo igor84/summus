@@ -139,16 +139,16 @@ entry:
 
 define i32 @bla(i16 %a, i16 %b) {
 entry:
-  %a1 = alloca i16
-  store i16 %a, i16* %a1
-  %b2 = alloca i16
-  store i16 %b, i16* %b2
-  %0 = load i16, i16* %a1, align 2
-  %1 = sext i16 %0 to i32
-  %2 = load i16, i16* %b2, align 2
+  %0 = alloca i16
+  %1 = alloca i16
+  store i16 %a, i16* %0
+  store i16 %b, i16* %1
+  %2 = load i16, i16* %0, align 2
   %3 = sext i16 %2 to i32
-  %4 = add i32 %1, %3
-  ret i32 %4
+  %4 = load i16, i16* %1, align 2
+  %5 = sext i16 %4 to i32
+  %6 = add i32 %3, %5
+  ret i32 %6
 }
 
 declare i32 @putchar(i32)

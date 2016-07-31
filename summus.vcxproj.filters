@@ -48,10 +48,16 @@
     <ClCompile Include="tests\smmparsertests.c">
       <Filter>Tests</Filter>
     </ClCompile>
-    <ClCompile Include="compiler\smmsemtypes.c">
+    <ClCompile Include="compiler\smmpasses.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="compiler\smmlllvmmodulegen.c">
+    <ClCompile Include="compiler\smmsempass.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="compiler\smmllvmcodegen.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="compiler\smmdebugprinter.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -74,15 +80,21 @@
     <ClInclude Include="compiler\smmcommon.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="compiler\smmsemtypes.h">
+    <ClInclude Include="compiler\smmsempass.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="compiler\smmlllvmmodulegen.h">
+    <ClInclude Include="compiler\smmllvmcodegen.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="compiler\smmdebugprinter.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="tests\test.smm">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="readme.md">
       <Filter>Resource Files</Filter>
     </None>
   </ItemGroup>

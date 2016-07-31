@@ -45,16 +45,16 @@ static struct SmmAstNode errorNode = { nkSmmError, 0, NULL, &builtInTypes[0] };
 Private Functions
 *********************************************************/
 
-PSmmAstNode parseExpression(PSmmParser parser);
-PSmmAstNode parseStatement(PSmmParser parser);
+static PSmmAstNode parseExpression(PSmmParser parser);
+static PSmmAstNode parseStatement(PSmmParser parser);
 
-void* newAstNode(PSmmParser parser, SmmAstNodeKind kind) {
+static void* newAstNode(PSmmParser parser, SmmAstNodeKind kind) {
 	PSmmAstNode res = parser->allocator->alloc(parser->allocator, sizeof(struct SmmAstNode));
 	res->kind = kind;
 	return res;
 }
 
-PSmmAstScopeNode newScopeNode(PSmmParser parser) {
+static PSmmAstScopeNode newScopeNode(PSmmParser parser) {
 	PSmmAstScopeNode scope = newAstNode(parser, nkSmmScope);
 	scope->level = parser->curScope->level + 1;
 	scope->prevScope = parser->curScope;
@@ -64,17 +64,17 @@ PSmmAstScopeNode newScopeNode(PSmmParser parser) {
 	return scope;
 }
 
-void getNextToken(PSmmParser parser) {
+static void getNextToken(PSmmParser parser) {
 	parser->prevToken = parser->curToken;
 	parser->curToken = smmGetNextToken(parser->lex);
 }
 
-bool isTerminatingToken(int tokenKind) {
+static bool isTerminatingToken(int tokenKind) {
 	return tokenKind == ';' || tokenKind == '{' || tokenKind == '}'
 		|| tokenKind == ')' || tokenKind == tkSmmEof;
 }
 
-bool findToken(PSmmParser parser, int tokenKind) {
+static bool findToken(PSmmParser parser, int tokenKind) {
 	int curKind = parser->curToken->kind;
 	while (curKind != tokenKind && !isTerminatingToken(curKind)) {
 		getNextToken(parser);
@@ -83,7 +83,7 @@ bool findToken(PSmmParser parser, int tokenKind) {
 	return curKind == tokenKind;
 }
 
-int findEitherToken(PSmmParser parser, int tokenKind1, int tokenKind2) {
+static int findEitherToken(PSmmParser parser, int tokenKind1, int tokenKind2) {
 	int curKind = parser->curToken->kind;
 	while (curKind != tokenKind1 && curKind != tokenKind2 && !isTerminatingToken(curKind)) {
 		getNextToken(parser);
@@ -94,7 +94,7 @@ int findEitherToken(PSmmParser parser, int tokenKind1, int tokenKind2) {
 	return 0;
 }
 
-PSmmToken expect(PSmmParser parser, int type) {
+static PSmmToken expect(PSmmParser parser, int type) {
 	PSmmToken token = parser->curToken;
 	if (token->kind != type) {
 		if (token->kind != tkSmmErr) {
@@ -120,7 +120,7 @@ PSmmToken expect(PSmmParser parser, int type) {
 
 #define FUNC_SIGNATURE_LENGTH 4 * 1024
 
-char* getFuncsSignatureAsString(PSmmAstFuncDefNode funcs, char* buf) {
+static char* getFuncsSignatureAsString(PSmmAstFuncDefNode funcs, char* buf) {
 	PSmmAstFuncDefNode curFunc = funcs;
 	size_t len = 0;
 	while (curFunc) {
@@ -145,7 +145,7 @@ char* getFuncsSignatureAsString(PSmmAstFuncDefNode funcs, char* buf) {
 	return buf;
 }
 
-char* getFuncCallAsString(const char* name, PSmmAstNode args, char* buf) {
+static char* getFuncCallAsString(const char* name, PSmmAstNode args, char* buf) {
 	size_t len = strlen(name);
 	strncpy(buf, name, len);
 	buf[len++] = '(';
@@ -162,7 +162,7 @@ char* getFuncCallAsString(const char* name, PSmmAstNode args, char* buf) {
 	return buf;
 }
 
-bool isUpcastPossible(PSmmTypeInfo srcType, PSmmTypeInfo dstType) {
+static bool isUpcastPossible(PSmmTypeInfo srcType, PSmmTypeInfo dstType) {
 	bool bothInts = (dstType->flags == srcType->flags) && (srcType->flags | tifSmmInt);
 	bool bothFloats = dstType->flags & srcType->flags & tifSmmFloat;
 	bool floatAndSoftFloat = srcType->kind == tiSmmSoftFloat64 && (dstType->flags & tifSmmFloat);
@@ -198,7 +198,7 @@ bool isUpcastPossible(PSmmTypeInfo srcType, PSmmTypeInfo dstType) {
  *                   ___float64                          softFloat64___
  *               bool                                                  bool
  */
-PSmmAstNode resolveCall(PSmmParser parser, PSmmAstCallNode node) {
+static PSmmAstNode resolveCall(PSmmParser parser, PSmmAstCallNode node) {
 	PSmmAstFuncDefNode curFunc = (PSmmAstFuncDefNode)node->params;
 	PSmmAstFuncDefNode softFunc = NULL;
 	while (curFunc) {
@@ -240,7 +240,7 @@ PSmmAstNode resolveCall(PSmmParser parser, PSmmAstCallNode node) {
 	return &errorNode;
 }
 
-PSmmAstNode parseIdentFactor(PSmmParser parser) {
+static PSmmAstNode parseIdentFactor(PSmmParser parser) {
 	PSmmToken identToken = NULL;
 	PSmmTypeInfo castType = NULL;
 	PSmmAstNode res = &errorNode;
@@ -318,7 +318,7 @@ PSmmAstNode parseIdentFactor(PSmmParser parser) {
 	return res;
 }
 
-PSmmTypeInfo getLiteralTokenType(PSmmToken token) {
+static PSmmTypeInfo getLiteralTokenType(PSmmToken token) {
 	switch (token->kind) {
 	case tkSmmBool: return &builtInTypes[tiSmmBool];
 	case tkSmmFloat: return &builtInTypes[tiSmmSoftFloat64];
@@ -334,7 +334,7 @@ PSmmTypeInfo getLiteralTokenType(PSmmToken token) {
 	}
 }
 
-PSmmAstNode parseFuncParams(PSmmParser parser, PSmmAstParamNode firstParam) {
+static PSmmAstNode parseFuncParams(PSmmParser parser, PSmmAstParamNode firstParam) {
 	assert(firstParam != NULL);
 	assert(parser->curToken->kind == ':');
 
@@ -431,7 +431,7 @@ PSmmAstNode parseFuncParams(PSmmParser parser, PSmmAstParamNode firstParam) {
 	return (PSmmAstNode)firstParam;
 }
 
-PSmmAstNode getLiteralNode(PSmmParser parser) {
+static PSmmAstNode getLiteralNode(PSmmParser parser) {
 	PSmmAstNode res = newAstNode(parser, nkSmmError);
 	res->type = getLiteralTokenType(parser->curToken);
 	if (res->type->flags & tifSmmInt) res->kind = nkSmmInt;
@@ -444,7 +444,7 @@ PSmmAstNode getLiteralNode(PSmmParser parser) {
 	return res;
 }
 
-PSmmToken getUnaryOperator(PSmmParser parser) {
+static PSmmToken getUnaryOperator(PSmmParser parser) {
 	PSmmToken res;
 	switch (parser->curToken->kind) {
 	case '!':
@@ -462,7 +462,7 @@ PSmmToken getUnaryOperator(PSmmParser parser) {
 	return res;
 }
 
-PSmmAstNode parseFactor(PSmmParser parser) {
+static PSmmAstNode parseFactor(PSmmParser parser) {
 	PSmmAstNode res = &errorNode;
 	bool canBeFuncDefn = parser->prevToken && parser->prevToken->kind == ':';
 	PSmmToken unary = getUnaryOperator(parser);
@@ -563,7 +563,7 @@ PSmmAstNode parseFactor(PSmmParser parser) {
 	return res;
 }
 
-PSmmAstNode parseBinOp(PSmmParser parser, PSmmAstNode left, int prec) {
+static PSmmAstNode parseBinOp(PSmmParser parser, PSmmAstNode left, int prec) {
 	while (true) {
 		PSmmBinaryOperator binOp = parser->operatorPrecedences[parser->curToken->kind & 0x7f];
 		if (!binOp || binOp->precedence < prec) {
@@ -596,7 +596,7 @@ PSmmAstNode parseBinOp(PSmmParser parser, PSmmAstNode left, int prec) {
 	}
 }
 
-PSmmAstNode parseExpression(PSmmParser parser) {
+static PSmmAstNode parseExpression(PSmmParser parser) {
 	PSmmAstNode left = parseFactor(parser);
 	if (left != &errorNode) {
 		left = parseBinOp(parser, left, 0);
@@ -604,7 +604,7 @@ PSmmAstNode parseExpression(PSmmParser parser) {
 	return left;
 }
 
-void removeScopeVars(PSmmParser parser) {
+static void removeScopeVars(PSmmParser parser) {
 	PSmmAstNode curDecl = parser->curScope->decls;
 	while (curDecl) {
 		smmPopDictValue(parser->idents, curDecl->left->token->repr);
@@ -618,7 +618,7 @@ void removeScopeVars(PSmmParser parser) {
 	parser->curScope = prevScope;
 }
 
-PSmmAstBlockNode parseBlock(PSmmParser parser, PSmmTypeInfo curFuncReturnType, bool isFuncBlock) {
+static PSmmAstBlockNode parseBlock(PSmmParser parser, PSmmTypeInfo curFuncReturnType, bool isFuncBlock) {
 	assert(parser->curToken->kind == '{');
 	getNextToken(parser); // Skip '{'
 	PSmmAstBlockNode block = newAstNode(parser, nkSmmBlock);
@@ -652,7 +652,7 @@ PSmmAstBlockNode parseBlock(PSmmParser parser, PSmmTypeInfo curFuncReturnType, b
  * arrow and type and then also optional function body. Func node should
  * have kind, token and params set.
  */
-PSmmAstNode parseFunction(PSmmParser parser, PSmmAstFuncDefNode func) {
+static PSmmAstNode parseFunction(PSmmParser parser, PSmmAstFuncDefNode func) {
 	int curKind = parser->curToken->kind;
 	if (curKind != tkSmmRArrow && curKind != '{' && curKind != ';') {
 		char gotBuf[4];
@@ -706,7 +706,7 @@ PSmmAstNode parseFunction(PSmmParser parser, PSmmAstFuncDefNode func) {
 	return (PSmmAstNode)func;
 }
 
-PSmmAstNode getZeroValNode(PSmmParser parser, PSmmTypeInfo varType) {
+static PSmmAstNode getZeroValNode(PSmmParser parser, PSmmTypeInfo varType) {
 	PSmmAstNode zero = newAstNode(parser, nkSmmInt);
 	zero->flags = nfSmmConst;
 	zero->type = varType;
@@ -729,7 +729,7 @@ PSmmAstNode getZeroValNode(PSmmParser parser, PSmmTypeInfo varType) {
 	return zero;
 }
 
-PSmmAstNode parseAssignment(PSmmParser parser, PSmmAstNode lval) {
+static PSmmAstNode parseAssignment(PSmmParser parser, PSmmAstNode lval) {
 	bool isTopLevelDecl = (parser->prevToken->kind == ':' && parser->curScope->level == 0);
 
 	PSmmToken eqToken = parser->curToken;
@@ -766,7 +766,7 @@ PSmmAstNode parseAssignment(PSmmParser parser, PSmmAstNode lval) {
 	return assignment;
 }
 
-PSmmAstNode parseDeclaration(PSmmParser parser, PSmmAstNode lval) {
+static PSmmAstNode parseDeclaration(PSmmParser parser, PSmmAstNode lval) {
 	PSmmToken declToken = parser->curToken;
 	assert(parser->curToken->kind == ':');
 	getNextToken(parser);
@@ -885,7 +885,7 @@ PSmmAstNode parseDeclaration(PSmmParser parser, PSmmAstNode lval) {
 	return expr;
 }
 
-PSmmAstNode parseReturnStmt(PSmmParser parser) {
+static PSmmAstNode parseReturnStmt(PSmmParser parser) {
 	assert(parser->curToken->kind == tkSmmReturn);
 
 	PSmmAstNode lval;
@@ -925,7 +925,7 @@ PSmmAstNode parseReturnStmt(PSmmParser parser) {
 	return res;
 }
 
-PSmmAstNode parseExpressionStmt(PSmmParser parser) {
+static PSmmAstNode parseExpressionStmt(PSmmParser parser) {
 	PSmmAstNode lval;
 
 	struct SmmFilePos fpos = parser->curToken->filePos;
@@ -962,7 +962,7 @@ PSmmAstNode parseExpressionStmt(PSmmParser parser) {
 	return lval;
 }
 
-PSmmAstNode parseStatement(PSmmParser parser) {
+static PSmmAstNode parseStatement(PSmmParser parser) {
 	switch (parser->curToken->kind) {
 	case tkSmmReturn: return parseReturnStmt(parser);
 	case '{': return (PSmmAstNode)parseBlock(parser, parser->curScope->returnType, false);
@@ -980,7 +980,7 @@ PSmmAstNode parseStatement(PSmmParser parser) {
 	}
 }
 
-PSmmTypeInfo getCommonTypeFromOperands(PSmmAstNode res) {
+static PSmmTypeInfo getCommonTypeFromOperands(PSmmAstNode res) {
 	PSmmTypeInfo type;
 	if (res->left->type->flags & res->right->type->flags & tifSmmInt) {
 		// if both are ints we need to select bigger type but if only one is signed result should be signed
@@ -998,7 +998,7 @@ PSmmTypeInfo getCommonTypeFromOperands(PSmmAstNode res) {
 }
 
 // Called from parseBinOp for specific binary operators
-PSmmAstNode setupMulDivModNode(PSmmParser parser, PSmmAstNode res) {
+static PSmmAstNode setupMulDivModNode(PSmmParser parser, PSmmAstNode res) {
 	PSmmTypeInfo type = getCommonTypeFromOperands(res);
 	PSmmTypeInfo ftype = type->kind < tiSmmFloat32 ? &builtInTypes[tiSmmSoftFloat64] : type;
 	switch (res->token->kind) {
@@ -1037,7 +1037,7 @@ PSmmAstNode setupMulDivModNode(PSmmParser parser, PSmmAstNode res) {
 }
 
 // Called from parseBinOp for specific binary operators
-PSmmAstNode setupAddSubNode(PSmmParser parser, PSmmAstNode res) {
+static PSmmAstNode setupAddSubNode(PSmmParser parser, PSmmAstNode res) {
 	if (res->token->kind == '+') res->kind = nkSmmAdd;
 	else res->kind = nkSmmSub;
 
@@ -1049,7 +1049,7 @@ PSmmAstNode setupAddSubNode(PSmmParser parser, PSmmAstNode res) {
 }
 
 // Called from parseBinOp for specific binary operators
-PSmmAstNode setupLogicOpNode(PSmmParser parser, PSmmAstNode res) {
+static PSmmAstNode setupLogicOpNode(PSmmParser parser, PSmmAstNode res) {
 	switch (res->token->kind)
 	{
 	case tkSmmAndOp: res->kind = nkSmmAndOp; break;
@@ -1064,7 +1064,7 @@ PSmmAstNode setupLogicOpNode(PSmmParser parser, PSmmAstNode res) {
 }
 
 // Called from parseBinOp for specific binary operators
-PSmmAstNode setupRelOpNode(PSmmParser parser, PSmmAstNode res) {
+static PSmmAstNode setupRelOpNode(PSmmParser parser, PSmmAstNode res) {
 	switch (res->token->kind)
 	{
 	case tkSmmEq: res->kind = nkSmmEq; break;

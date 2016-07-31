@@ -179,20 +179,20 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="compiler\smmdebugprinter.c" />
     <ClCompile Include="compiler\smmlexer.c">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Test|x64'">true</ExcludedFromBuild>
     </ClCompile>
-    <ClCompile Include="compiler\smmlllvmmodulegen.c" />
+    <ClCompile Include="compiler\smmllvmcodegen.c" />
     <ClCompile Include="compiler\smmmsgs.c">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Test|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="compiler\smmparser.c">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Test|x64'">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="compiler\smmpasses.c" />
+    <ClCompile Include="compiler\smmsempass.c" />
     <ClCompile Include="compiler\smmtest.c">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Test|x64'">true</ExcludedFromBuild>
-    </ClCompile>
-    <ClCompile Include="compiler\smmsemtypes.c">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Test|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="compiler\smmutil.c" />
@@ -214,17 +214,19 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="compiler\smmcommon.h" />
+    <ClInclude Include="compiler\smmdebugprinter.h" />
     <ClInclude Include="compiler\smmlexer.h" />
-    <ClInclude Include="compiler\smmlllvmmodulegen.h" />
+    <ClInclude Include="compiler\smmllvmcodegen.h" />
     <ClInclude Include="compiler\smmmsgs.h" />
     <ClInclude Include="compiler\smmparser.h" />
-    <ClInclude Include="compiler\smmsemtypes.h" />
+    <ClInclude Include="compiler\smmsempass.h" />
     <ClInclude Include="compiler\smmutil.h" />
     <ClInclude Include="tests\CuTest.h">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
+    <None Include="readme.md" />
     <None Include="tests\test.smm" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
