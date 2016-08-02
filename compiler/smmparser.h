@@ -136,8 +136,8 @@ struct SmmAstIdentNode {
 	uint32_t flags;
 	PSmmToken token;
 	PSmmTypeInfo type;
-	PSmmAstNode next;
-	PSmmAstNode left;
+	PSmmAstNode zzNotUsed1;
+	PSmmAstNode zzNotUsed2;
 	uintptr_t level; // Scope level ident is created in (must be int which is the same size as pointer)
 };
 

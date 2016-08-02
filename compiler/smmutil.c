@@ -276,6 +276,6 @@ void smmFreePermanentAllocator(PSmmAllocator allocator) {
 
 void smmPrintAllocatorInfo(const PSmmAllocator allocator) {
 	PPrivAllocator a = (PPrivAllocator)allocator;
-	printf("\nAllocator %s Size=%zuMB Used=%zuKB Allocated=%zuKB Free=%zuKB\n",
-		allocator->name, a->size >> 20, a->used >> 10, (a->size - a->free) >> 10, a->free >> 10);
+	printf("\nAllocator %s Size=%zuKB Used=%zuKB Allocated=%zuKB Free=%zuKB\n",
+		allocator->name, a->size >> 10, a->used >> 10, (a->size - a->free) >> 10, a->free >> 10);
 }

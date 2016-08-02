@@ -1,10 +1,12 @@
 ; ModuleID = 'test.smm'
 target triple = "x86_64-pc-windows-msvc"
 
+@ui32 = global i32 100
+
 define i32 @main() {
 entry:
-  %ui32 = alloca i32, align 4
   %i8 = alloca i8, align 1
+  %ui32 = alloca i32, align 4
   %result = alloca i32, align 4
   %z = alloca i8, align 1
   %y = alloca i64, align 8
@@ -20,8 +22,8 @@ entry:
   %g = alloca i1, align 1
   %h = alloca i1, align 1
   %res = alloca i32, align 4
-  store i32 100, i32* %ui32, align 4
   store i8 -1, i8* %i8, align 1
+  store i32 20, i32* %ui32, align 4
   %0 = load i32, i32* %ui32, align 4
   %1 = load i8, i8* %i8, align 1
   %2 = sext i8 %1 to i32

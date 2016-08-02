@@ -4,9 +4,10 @@ bla :: (a: int16, b: int16) -> int32 {
 
 putchar :: (char: int32) -> int32;
 
+ui32 : uint32 = 100;
 {
-	ui32 : uint32 = 100;
 	i8 : int8 = -1;
+	ui32 : uint32 = 20;
 	result := 123 + ui32 div i8;
 
 	z : uint8 = 180;

@@ -198,8 +198,7 @@ static bool isUpcastPossible(PSmmTypeInfo srcType, PSmmTypeInfo dstType) {
  *                   ___float64                          softFloat64___
  *               bool                                                  bool
  */
-static PSmmAstNode resolveCall(PSmmParser parser, PSmmAstCallNode node) {
-	PSmmAstFuncDefNode curFunc = (PSmmAstFuncDefNode)node->params;
+static PSmmAstNode resolveCall(PSmmParser parser, PSmmAstCallNode node, PSmmAstFuncDefNode curFunc) {
 	PSmmAstFuncDefNode softFunc = NULL;
 	while (curFunc) {
 		PSmmAstNode curArg = node->args;
@@ -240,81 +239,106 @@ static PSmmAstNode resolveCall(PSmmParser parser, PSmmAstCallNode node) {
 	return &errorNode;
 }
 
+static PSmmAstNode createNewIdent(PSmmParser parser, PSmmToken identToken) {
+	PSmmAstIdentNode var = newAstNode(parser, nkSmmIdent);
+	var->flags = nfSmmIdent;
+	var->token = identToken;
+	var->level = parser->curScope->level;
+	smmPushDictValue(parser->idents, var->token->repr, var);
+	return (PSmmAstNode)var;
+}
+
 static PSmmAstNode parseIdentFactor(PSmmParser parser) {
-	PSmmToken identToken = NULL;
-	PSmmTypeInfo castType = NULL;
 	PSmmAstNode res = &errorNode;
-	PSmmAstNode var = smmGetDictValue(parser->idents, parser->curToken->repr, false);
-	if (!var) {
-		identToken = parser->curToken;
-	} else if (var->kind == nkSmmType) {
-		identToken = parser->curToken;
-		castType = var->type;
-	} else if (!(var->flags & nfSmmIdent)) {
-		const char* tokenStr = nodeKindToString[var->kind];
-		smmPostMessage(errSmmIdentTaken, parser->curToken->filePos, parser->curToken->repr, tokenStr);
-	} else if (!var->type) {
-		smmPostMessage(errSmmUndefinedIdentifier, parser->curToken->filePos, parser->curToken->repr);
-	} else {
-		res = newAstNode(parser, nkSmmIdent);
-		*res = *var;
-		res->token = parser->curToken;
-	}
+	PSmmToken identToken = parser->curToken;
 	getNextToken(parser);
-	if (parser->curToken->kind == '(') {
-		// Function call or cast
-		if (castType) {
-			// Since we pass '(' to parse expression it will also handle ')'
-			PSmmAstNode expr = parseExpression(parser);
-			if (expr == &errorNode) return expr;
-			res = newAstNode(parser, nkSmmCast);
-			res->left = expr;
-			res->token = identToken;
-			res->type = castType;
-			res->flags = expr->flags & nfSmmConst;
-		} else if (res != &errorNode) {
-			// Res is an identifier
-			getNextToken(parser); // Skip '('
-			PSmmAstCallNode resCall = (PSmmAstCallNode)res;
-			resCall->kind = nkSmmCall;
-			resCall->params = (PSmmAstParamNode)var;
-			// When read from identDict this contains func def body and since this
-			// is a call node we don't need definition body so we set it to NULL
-			resCall->zzNotUsed1 = NULL;
-			if (parser->curToken->kind != ')') {
-				PSmmAstNode lastArg = parseExpression(parser);
-				resCall->args = lastArg;
-				if (lastArg == &errorNode) resCall->kind = nkSmmError;
-				while (parser->curToken->kind == ',') {
-					getNextToken(parser);
-					lastArg->next = parseExpression(parser);
-					lastArg = lastArg->next;
-					if (lastArg == &errorNode) resCall->kind = nkSmmError;
-				}
+	PSmmAstIdentNode var = smmGetDictValue(parser->idents, identToken->repr, false);
+
+	if (parser->curToken->kind == ':') {
+		// This is declaration
+		if (var) {
+			if (var->kind == nkSmmType) {
+				// If type identifier was used as variable identifier
+				const char* tokenStr = nodeKindToString[var->kind];
+				smmPostMessage(errSmmIdentTaken, parser->curToken->filePos, parser->curToken->repr, tokenStr);
+			} else if (!(var->flags & nfSmmIdent)) {
+				// If variable name equals some keyword
+				const char* tokenStr = nodeKindToString[var->kind];
+				smmPostMessage(errSmmIdentTaken, parser->curToken->filePos, parser->curToken->repr, tokenStr);
+			} else if (!var->type) {
+				smmPostMessage(errSmmUndefinedIdentifier, parser->curToken->filePos, parser->curToken->repr);
+			} else if (var->level < parser->curScope->level) {
+				res = createNewIdent(parser, identToken);
+			} else {
+				smmPostMessage(errSmmRedefinition, identToken->filePos, identToken->repr);
+				findToken(parser, ';');
 			}
-			if (!expect(parser, ')')) return &errorNode;
-			if (resCall->kind != nkSmmError) res = resolveCall(parser, resCall);
 		} else {
-			if (identToken) {
-				smmPostMessage(errSmmUndefinedIdentifier, identToken->filePos, identToken->repr);
-			}
-			findToken(parser, ')'); // Skip all until closing parantheses
+			res = createNewIdent(parser, identToken);
 		}
-	} else if (identToken && !castType) {
-		if (parser->curToken->kind == ':') {
-			// This is declaration
-			res = newAstNode(parser, nkSmmIdent);
-			res->flags = nfSmmIdent;
-			res->token = identToken;
-			smmAddDictValue(parser->idents, res->token->repr, res);
+	} else if (parser->curToken->kind == '(') {
+		if (var) {
+			if (var->kind == nkSmmType) {
+				// This is a cast
+				getNextToken(parser);
+				PSmmAstNode expr = parseExpression(parser);
+				if (expr == &errorNode) return expr;
+				expect(parser, ')');
+				res = newAstNode(parser, nkSmmCast);
+				res->left = expr;
+				res->token = identToken;
+				res->type = var->type;
+				res->flags = expr->flags & nfSmmConst;
+			} else if (var->kind == nkSmmFunc) {
+				getNextToken(parser);
+				PSmmAstCallNode resCall = newAstNode(parser, nkSmmCall);
+				*resCall = *(PSmmAstCallNode)var;
+				resCall->kind = nkSmmCall;
+				resCall->token = identToken;
+				// When read from identDict this contains func def body and since this
+				// is a call node we don't need definition body so we set it to NULL
+				resCall->zzNotUsed1 = NULL;
+				if (parser->curToken->kind != ')') {
+					PSmmAstNode lastArg = parseExpression(parser);
+					resCall->args = lastArg;
+					if (lastArg == &errorNode) resCall->kind = nkSmmError;
+					while (parser->curToken->kind == ',') {
+						getNextToken(parser);
+						lastArg->next = parseExpression(parser);
+						lastArg = lastArg->next;
+						if (lastArg == &errorNode) resCall->kind = nkSmmError;
+					}
+				}
+				if (expect(parser, ')') && resCall->kind != nkSmmError) {
+					res = resolveCall(parser, resCall, (PSmmAstFuncDefNode)var);
+				}
+				// Otherwise res remains equal to &errorNode
+			} else {
+				smmPostMessage(errSmmNotAFunction, identToken->filePos, identToken->repr);
+				findToken(parser, ';');
+			}
 		} else {
 			smmPostMessage(errSmmUndefinedIdentifier, identToken->filePos, identToken->repr);
+			findToken(parser, ';');
 		}
-	} else if (castType) {
-		// If type identifier was used as identifier but not as a cast
-		const char* tokenStr = nodeKindToString[var->kind];
-		smmPostMessage(errSmmIdentTaken, parser->curToken->filePos, parser->curToken->repr, tokenStr);
+	} else {
+		if (var) {
+			if (var->kind == nkSmmType || !(var->flags & nfSmmIdent)) {
+				// if type or keyword is used in place of variable
+				const char* tokenStr = nodeKindToString[var->kind];
+				smmPostMessage(errSmmIdentTaken, parser->curToken->filePos, parser->curToken->repr, tokenStr);
+				findToken(parser, ';');
+			} else {
+				res = newAstNode(parser, nkSmmIdent);
+				*res = *(PSmmAstNode)var;
+				res->token = identToken;
+			}
+		} else {
+			smmPostMessage(errSmmUndefinedIdentifier, identToken->filePos, identToken->repr);
+			findToken(parser, ';');
+		}
 	}
+
 	return res;
 }
 
@@ -423,7 +447,6 @@ static PSmmAstNode parseFuncParams(PSmmParser parser, PSmmAstParamNode firstPara
 		newParam->type = paramTypeInfo;
 		param->next = newParam;
 		param = newParam;
-		smmPushDictValue(parser->idents, newParam->token->repr, newParam);
 	}
 
 	firstParam->count = paramCount;
@@ -480,6 +503,7 @@ static PSmmAstNode parseFactor(PSmmParser parser) {
 			return &errorNode;
 		}
 		res = parseExpression(parser);
+		// In case expression is followed by ':' it might be it is just ident and thus first param of func declaration
 		if (parser->curToken->kind == ':') {
 			if (canBeFuncDefn) {
 				res = parseFuncParams(parser, (PSmmAstParamNode)res);
@@ -730,7 +754,9 @@ static PSmmAstNode getZeroValNode(PSmmParser parser, PSmmTypeInfo varType) {
 }
 
 static PSmmAstNode parseAssignment(PSmmParser parser, PSmmAstNode lval) {
-	bool isTopLevelDecl = (parser->prevToken->kind == ':' && parser->curScope->level == 0);
+	bool isTopLevelDecl = ((parser->prevToken->kind == ':')
+		|| (parser->prevToken->kind == tkSmmIdent && parser->prevToken != lval->token))
+		&& parser->curScope->level == 0;
 
 	PSmmToken eqToken = parser->curToken;
 	if (lval->kind == nkSmmConst && eqToken->kind == '=') {
@@ -770,11 +796,6 @@ static PSmmAstNode parseDeclaration(PSmmParser parser, PSmmAstNode lval) {
 	PSmmToken declToken = parser->curToken;
 	assert(parser->curToken->kind == ':');
 	getNextToken(parser);
-	if (lval->type) {
-		smmPostMessage(errSmmRedefinition, declToken->filePos, lval->token->repr);
-		findToken(parser, ';');
-		return &errorNode;
-	}
 
 	bool typeErrorReported = false;
 	PSmmAstNode typeInfo = NULL;
@@ -930,6 +951,11 @@ static PSmmAstNode parseExpressionStmt(PSmmParser parser) {
 
 	struct SmmFilePos fpos = parser->curToken->filePos;
 	lval = parseExpression(parser);
+
+	if (lval == &errorNode) {
+		if (parser->curToken->kind == ';') getNextToken(parser);
+		return lval;
+	}
 
 	bool justCreatedLValIdent = (lval->kind == nkSmmIdent) && (lval->type == NULL);
 

@@ -36,6 +36,7 @@ static const char* msgTypeToString[] = {
 	"function '%s' must be defined in top scope",
 	"unexpected bool operand found",
 	"'!' used as not operator, use 'not' instead",
+	"'%s' is not a function",
 	
 	"possible loss of data in conversion from %s to %s",
 	"statement without effect",
