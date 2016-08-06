@@ -24,6 +24,8 @@ typedef enum {
 	errSmmFuncUnderScope, errSmmUnexpectedBool, errSmmBangUsedAsNot, errSmmNotAFunction,
 
 	wrnSmmConversionDataLoss, wrnSmmNoEffectStmt, wrnSmmComparingSignedAndUnsigned,
+
+	hintSmmTerminator
 } SmmMsgType;
 
 struct SmmFilePos {

@@ -358,7 +358,7 @@ PSmmToken smmGetNextToken(PSmmLexer lex) {
 		} else token->kind = *firstChar;
 		break;
 	case '+': case '*': case '/': case '%': case ':': case ';':
-	case '(': case ')': case '{': case '}': case ',':
+	case '(': case ')': case '{': case '}': case ',': case '.':
 		token->kind = *firstChar;
 		nextChar(lex);
 		break;

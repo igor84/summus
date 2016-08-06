@@ -5,30 +5,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "../compiler/smmmsgs.h"
+#include "smmmsgsMockup.h"
 #include "CuTest.h"
 
-static int errorCounter;
-
-static SmmMsgType expected;
-static CuTest* currentTC;
-
 void smmPostMessage(SmmMsgType msgType, const struct SmmFilePos filePos, ...) {
-	if (currentTC) {
-		errorCounter++;
-		CuAssertIntEquals(currentTC, expected, msgType);
-		currentTC = NULL;
-	} else {
-		expected = msgType;
-		currentTC = (CuTest*)filePos.filename;
-	}
+	if (onPostMessageCalled) onPostMessageCalled(msgType);
 }
 
-void smmAbortWithMessage(SmmMsgType msgType, const char* additionalInfo, const char* filename, const int line) {
-	printf("Compiler Error: %d %s (at %s:%d)\n", msgType, additionalInfo, filename, line);
+void smmAbortWithMessage(const char* msg, const char* filename, const int line) {
+	printf("Compiler Error: %s (at %s:%d)\n", msg, filename, line);
 	exit(EXIT_FAILURE);
 }
 
 bool smmHadErrors() {
-	return errorCounter > 0;
+	return true;
 }

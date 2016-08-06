@@ -60,6 +60,15 @@
     <ClCompile Include="compiler\smmdebugprinter.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="tests\smmastwritter.c">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="tests\smmastreader.c">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="tests\smmastmatcher.c">
+      <Filter>Tests</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="compiler\smmlexer.h">
@@ -88,6 +97,18 @@
     </ClInclude>
     <ClInclude Include="compiler\smmdebugprinter.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="tests\smmmsgsMockup.h">
+      <Filter>Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="tests\smmastwritter.h">
+      <Filter>Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="tests\smmastreader.h">
+      <Filter>Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="tests\smmastmatcher.h">
+      <Filter>Tests</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

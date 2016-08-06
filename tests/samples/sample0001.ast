@@ -1,0 +1,4 @@
+errSmmInvalidCharacter
+
+MODULE sample0001
+:0 x:1:int32 = int:2:34:int8 

@@ -1,10 +1,16 @@
 #include "../compiler/smmcommon.h"
 #include "CuTest.h"
 #include "../compiler/smmlexer.c"
+#include "smmmsgsMockup.h"
 
 static PSmmAllocator allocator;
+static SmmMsgType lastGotMsg;
 
-void TestSkipWhiteSpace(CuTest *tc) {
+static void lexOnPostMessageCalled(SmmMsgType msgType) {
+	lastGotMsg = msgType;
+}
+
+static void TestSkipWhiteSpace(CuTest *tc) {
 #define spaces "   "
 #define newLines "\n\n"
 	char buf[] = spaces newLines spaces "whatever";
@@ -16,7 +22,7 @@ void TestSkipWhiteSpace(CuTest *tc) {
 	CuAssertUIntEquals(tc, strlen(newLines) + 2, lex->filePos.lineOffset);
 }
 
-void TestParseIdent(CuTest *tc) {
+static void TestParseIdent(CuTest *tc) {
 	char buf[] = "whatever and something or whatever again";
 	PSmmLexer lex = smmCreateLexer(buf, "TestParseIdent", allocator);
 	PSmmToken token = smmGetNextToken(lex);
@@ -45,7 +51,7 @@ void TestParseIdent(CuTest *tc) {
 	CuAssertStrEquals(tc, "again", token->repr);
 }
 
-void TestParseHexNumber(CuTest *tc) {
+static void TestParseHexNumber(CuTest *tc) {
 	char buf[] = "0x0 0x1234abcd 0x567890ef 0xffffffff 0x100000000 0xFFFFFFFFFFFFFFFF "
 		"0x10000000000000000 0xxrg 0x123asd 0x123.324 ";
 	PSmmLexer lex = smmCreateLexer(buf, "TestParseHexNumber", allocator);
@@ -73,33 +79,36 @@ void TestParseHexNumber(CuTest *tc) {
 	CuAssertIntEquals(tc, tkSmmUInt, token->kind);
 	CuAssertTrue(tc, 0xFFFFFFFFFFFFFFFF == token->uintVal);
 
+	onPostMessageCalled = lexOnPostMessageCalled;
 	// 0x10000000000000000
-	struct SmmFilePos filepos = { (char*)tc };
-	smmPostMessage(errSmmIntTooBig, filepos);
+	lastGotMsg = 0;
 	token = smmGetNextToken(lex);
 	CuAssertIntEquals(tc, tkSmmErr, token->kind);
+	CuAssertIntEquals_Msg(tc, "Expected message not received", errSmmIntTooBig, lastGotMsg);
 
 	// 0xxrg
-	smmPostMessage(errSmmInvalidHexDigit, filepos);
+	lastGotMsg = 0;
 	token = smmGetNextToken(lex);
 	CuAssertIntEquals(tc, tkSmmErr, token->kind);
+	CuAssertIntEquals_Msg(tc, "Expected message not received", errSmmInvalidHexDigit, lastGotMsg);
 
 	// 0x123asd
-	smmPostMessage(errSmmInvalidHexDigit, filepos);
+	lastGotMsg = 0;
 	token = smmGetNextToken(lex);
 	CuAssertIntEquals(tc, tkSmmErr, token->kind);
+	CuAssertIntEquals_Msg(tc, "Expected message not received", errSmmInvalidHexDigit, lastGotMsg);
 
 	// 0x123.324
 	token = smmGetNextToken(lex);
 	CuAssertIntEquals(tc, tkSmmUInt, token->kind);
 	CuAssertUIntEquals(tc, 0x123, token->uintVal);
-	smmPostMessage(errSmmInvalidCharacter, filepos);
 	token = smmGetNextToken(lex);
-	CuAssertIntEquals(tc, tkSmmErr, token->kind);
-	CuAssertStrEquals(tc, ".", token->repr);
+	CuAssertIntEquals(tc, '.', token->kind);
+
+	onPostMessageCalled = NULL;
 }
 
-void TestParseNumber(CuTest *tc) {
+static void TestParseNumber(CuTest *tc) {
 	char buf[] = "0 1 1234567890 4294967295 4294967296 18446744073709551615 18446744073709551616 02342 43abc "
 		"123.321 4.2 456E2 789E-2  901.234E+123 56789.01235E-456 234.3434E-234.34 37.b "
 		"1111111111111111111111111111111.456 1.12345678901234567890";
@@ -128,16 +137,18 @@ void TestParseNumber(CuTest *tc) {
 	CuAssertIntEquals(tc, tkSmmUInt, token->kind);
 	CuAssertTrue(tc, 18446744073709551615U == token->uintVal);
 
+	onPostMessageCalled = lexOnPostMessageCalled;
 	// 18446744073709551616 MAX_UINT64 + 1
-	struct SmmFilePos filepos = { (char*)tc };
-	smmPostMessage(errSmmIntTooBig, filepos);
+	lastGotMsg = 0;
 	token = smmGetNextToken(lex);
 	CuAssertIntEquals(tc, tkSmmErr, token->kind);
+	CuAssertIntEquals_Msg(tc, "Expected message not received", errSmmIntTooBig, lastGotMsg);
 
 	// 02342
-	smmPostMessage(errSmmInvalid0Number, filepos);
+	lastGotMsg = 0;
 	token = smmGetNextToken(lex);
 	CuAssertIntEquals(tc, tkSmmErr, token->kind);
+	CuAssertIntEquals_Msg(tc, "Expected message not received", errSmmInvalid0Number, lastGotMsg);
 
 	// 43abc
 	token = smmGetNextToken(lex);
@@ -179,18 +190,18 @@ void TestParseNumber(CuTest *tc) {
 	CuAssertDblEquals(tc, 234.3434E-234, token->floatVal, 0);
 
 	// . (dot)
-	smmPostMessage(errSmmInvalidCharacter, filepos);
 	token = smmGetNextToken(lex);
-	CuAssertIntEquals(tc, tkSmmErr, token->kind);
+	CuAssertIntEquals(tc, '.', token->kind);
 
 	// 34
 	token = smmGetNextToken(lex);
 	CuAssertIntEquals(tc, tkSmmUInt, token->kind);
 
 	// 37.b
-	smmPostMessage(errSmmInvalidNumber, filepos);
+	lastGotMsg = 0;
 	token = smmGetNextToken(lex);
 	CuAssertIntEquals(tc, tkSmmUInt, token->kind);
+	CuAssertIntEquals_Msg(tc, "Expected message not received", errSmmInvalidNumber, lastGotMsg);
 
 	token = smmGetNextToken(lex);
 	CuAssertIntEquals(tc, tkSmmFloat, token->kind);
@@ -199,9 +210,11 @@ void TestParseNumber(CuTest *tc) {
 	token = smmGetNextToken(lex);
 	CuAssertIntEquals(tc, tkSmmFloat, token->kind);
 	CuAssertDblEquals(tc, 1.12345678901234567890, token->floatVal, 0);
+
+	onPostMessageCalled = NULL;
 }
 
-void TestTokenToString(CuTest *tc) {
+static void TestTokenToString(CuTest *tc) {
 	struct SmmToken token = { 0, "repr" };
 	char buf[4] = { 0 };
 	const char* res = smmTokenToString(&token, buf);
@@ -222,10 +235,12 @@ void TestTokenToString(CuTest *tc) {
 CuSuite* SmmLexerGetSuite() {
 	allocator = smmCreatePermanentAllocator("lexerTest", 64 * 1024 * 1024);
 	CuSuite* suite = CuSuiteNew();
+
 	SUITE_ADD_TEST(suite, TestSkipWhiteSpace);
 	SUITE_ADD_TEST(suite, TestParseIdent);
 	SUITE_ADD_TEST(suite, TestParseHexNumber);
 	SUITE_ADD_TEST(suite, TestParseNumber);
 	SUITE_ADD_TEST(suite, TestTokenToString);
+
 	return suite;
 }

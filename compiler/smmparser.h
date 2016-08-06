@@ -50,7 +50,6 @@ struct SmmParser {
 	PSmmDict idents;
 	PSmmAstScopeNode curScope;
 	PSmmAllocator allocator;
-	PSmmBinaryOperator* operatorPrecedences;
 };
 
 // Each enum value should have coresponding string in smmparser.c
@@ -117,7 +116,6 @@ typedef struct SmmTypeInfo* PSmmTypeInfo;
  * 2. 32bit value
  * 3. pointer value that should point to token
  * 4. 4 more pointer values where first one should point to type
- * 5. Arbitraty additional fields may be added
  * That way we can freely cast between these types although in a few situations
  * we need to be aware what field in "derived" type matches what field in AstNode.
  */
@@ -193,5 +191,6 @@ struct SmmAstCallNode {
 
 PSmmParser smmCreateParser(PSmmLexer lex, PSmmAllocator allocator);
 PSmmAstNode smmParse(PSmmParser parser);
+PSmmTypeInfo smmGetBuiltInTypes();
 
 #endif

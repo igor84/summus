@@ -98,7 +98,7 @@ void CuAssertPtrEquals_LineMsg(CuTest* tc,
 
 /* CuSuite */
 
-#define MAX_TEST_CASES	1024
+#define MAX_TEST_CASES	10024
 
 #define SUITE_ADD_TEST(SUITE,TEST)	CuSuiteAdd(SUITE, CuTestNew(#TEST, TEST))
 

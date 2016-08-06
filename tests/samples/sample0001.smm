@@ -1,0 +1,3 @@
+// Test how well parser handles invalid tokens in different situations
+
+x := 34 \ 23;
