@@ -58,7 +58,7 @@ static void processExpression(PSmmAstNode expr, FILE* f, PSmmAllocator a) {
 		}
 		break;
 	case nkSmmFloat:
-		if (expr->token->floatVal > 0) {
+		if (expr->token->floatVal >= 0) {
 			fprintf(f, "%s:%u:%s:%s ", nodeKindToString[expr->kind], expr->flags, expr->token->repr, expr->type->name);
 		} else {
 			fprintf(f, "%s:%u:-%s:%s ", nodeKindToString[expr->kind], expr->flags, expr->token->repr, expr->type->name);
@@ -169,6 +169,7 @@ static void processGlobalSymbols(PSmmAstNode decl, FILE* f, PSmmAllocator a) {
 void smmOutputAst(PSmmAstNode module, FILE* f, PSmmAllocator a) {
 	PSmmTypeInfo builtInTypes = smmGetBuiltInTypes();
 	builtInTypes[tiSmmSoftFloat64].name = "sfloat64"; // This is how we want it written instead of "/sfloat64/"
+	builtInTypes[tiSmmUnknown].name = "unknown"; // This is how we want it written instead of "/sfloat64/"
 	const char* moduleName = module->token->repr;
 	fprintf(f, "MODULE %s\n", moduleName);
 

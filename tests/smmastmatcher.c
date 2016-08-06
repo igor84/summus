@@ -8,7 +8,11 @@ static const char* NODES_REPRS_DONT_MATCH = "Nodes representations don't match";
 
 static void assertNodesEqual(CuTest* tc, PSmmAstNode ex, PSmmAstNode got) {
 	CuAssertIntEquals_Msg(tc, NODES_DONT_MATCH, ex->kind, got->kind);
-	CuAssertPtrEquals_Msg(tc, NODES_TYPES_DONT_MATCH, ex->type, got->type);
+	if (ex->type && got->type) {
+		CuAssertIntEquals_Msg(tc, NODES_TYPES_DONT_MATCH, ex->type->kind, got->type->kind);
+	} else {
+		CuAssertPtrEquals_Msg(tc, NODES_TYPES_DONT_MATCH, ex->type, got->type);
+	}
 	CuAssertIntEquals_Msg(tc, NODES_FLAGS_DONT_MATCH, ex->flags, got->flags);
 	if (got->kind == nkSmmCast) return;
 	if (got->token && ex->token) {

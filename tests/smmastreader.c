@@ -315,12 +315,13 @@ void initTypeDict() {
 	PSmmAllocator a = smmCreatePermanentAllocator("TYPEDICT", 4 * 1024);
 	typeDict = smmCreateDict(a, NULL, NULL);
 	typeDict->storeKeyCopy = false;
-	PSmmTypeInfo typeInfos = smmGetBuiltInTypes();
+	PSmmTypeInfo typeInfo = smmGetBuiltInTypes();
+	typeInfo->name = "unknown"; // Instead of "/unknown/"
 	do {
-		smmAddDictValue(typeDict, typeInfos->name, typeInfos);
-		typeInfos++;
-	} while (typeInfos->kind != tiSmmSoftFloat64);
-	smmAddDictValue(typeDict, "sfloat64", typeInfos);
+		smmAddDictValue(typeDict, typeInfo->name, typeInfo);
+		typeInfo++;
+	} while (typeInfo->kind != tiSmmSoftFloat64);
+	smmAddDictValue(typeDict, "sfloat64", typeInfo);
 }
 
 PSmmAstNode smmLoadAst(PSmmLexer lex, PSmmAllocator a) {

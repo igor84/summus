@@ -663,7 +663,7 @@ static PSmmAstBlockNode parseBlock(PSmmParser parser, PSmmTypeInfo curFuncReturn
 		}
 	}
 
-	if (isFuncBlock && curFuncReturnType && curStmt && curStmt->kind != nkSmmReturn) {
+	if (isFuncBlock && curFuncReturnType && curStmt && curStmt->kind != nkSmmReturn && curStmt != &errorNode) {
 		smmPostMessage(errSmmFuncMustReturnValue, parser->curToken->filePos);
 	}
 
@@ -768,7 +768,6 @@ static PSmmAstNode parseAssignment(PSmmParser parser, PSmmAstNode lval) {
 	}
 	getNextToken(parser);
 	PSmmAstNode val = parseExpression(parser);
-	if (lval == &errorNode || val == &errorNode) return &errorNode;
 	if (!lval->type) {
 		// If right value is just another variable or func call just copy its type
 		// but if it is expression then try to be a bit smarter.
@@ -782,6 +781,7 @@ static PSmmAstNode parseAssignment(PSmmParser parser, PSmmAstNode lval) {
 			}
 		}
 	}
+	if (lval == &errorNode || val == &errorNode) return &errorNode;
 	// If lval is const or global var which just needs initializer we just return the val directly.
 	if (lval->kind == nkSmmConst || ((val->flags & nfSmmConst) && isTopLevelDecl)) return val;
 	
@@ -932,7 +932,7 @@ static PSmmAstNode parseReturnStmt(PSmmParser parser) {
 			// We had problems trying to parse func return type so now we will assume type
 			// of this return stmt is return type of the function
 			parser->curScope->returnType = lval->type;
-		} else if (lval->type != retType && !isUpcastPossible(lval->type, retType)) {
+		} else if (lval->type != retType && !isUpcastPossible(lval->type, retType) && lval->type->kind != tiSmmUnknown) {
 			smmPostMessage(errSmmBadReturnStmtType, retToken->filePos, lval->type->name, retType->name);
 		}
 	} else {
@@ -1033,6 +1033,7 @@ static PSmmTypeInfo getCommonTypeFromOperands(PSmmAstNode res) {
 
 // Called from parseBinOp for specific binary operators
 static PSmmAstNode setupMulDivModNode(PSmmParser parser, PSmmAstNode res) {
+	if (res == &errorNode) return res;
 	PSmmTypeInfo type = getCommonTypeFromOperands(res);
 	PSmmTypeInfo ftype = type->kind < tiSmmFloat32 ? &builtInTypes[tiSmmSoftFloat64] : type;
 	switch (res->token->kind) {
@@ -1072,6 +1073,7 @@ static PSmmAstNode setupMulDivModNode(PSmmParser parser, PSmmAstNode res) {
 
 // Called from parseBinOp for specific binary operators
 static PSmmAstNode setupAddSubNode(PSmmParser parser, PSmmAstNode res) {
+	if (res == &errorNode) return res;
 	if (res->token->kind == '+') res->kind = nkSmmAdd;
 	else res->kind = nkSmmSub;
 
@@ -1084,6 +1086,7 @@ static PSmmAstNode setupAddSubNode(PSmmParser parser, PSmmAstNode res) {
 
 // Called from parseBinOp for specific binary operators
 static PSmmAstNode setupLogicOpNode(PSmmParser parser, PSmmAstNode res) {
+	if (res == &errorNode) return res;
 	switch (res->token->kind)
 	{
 	case tkSmmAndOp: res->kind = nkSmmAndOp; break;
@@ -1099,6 +1102,7 @@ static PSmmAstNode setupLogicOpNode(PSmmParser parser, PSmmAstNode res) {
 
 // Called from parseBinOp for specific binary operators
 static PSmmAstNode setupRelOpNode(PSmmParser parser, PSmmAstNode res) {
+	if (res == &errorNode) return res;
 	switch (res->token->kind)
 	{
 	case tkSmmEq: res->kind = nkSmmEq; break;

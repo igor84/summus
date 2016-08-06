@@ -1,3 +1,12 @@
 // Test how well parser handles invalid tokens in different situations
 
+test1 :: (a : int) -> int {
+	return a * 0xaaaaaaaaabbbbbbbbbbbb1231231;
+}
+
 x := 34 \ 23;
+y := test1(0x55abcgf);
+z := 12. + 3.12 * y;
+a := 12ez;
+b := a + y - 12361753871387152387165238716523;
+return x;
