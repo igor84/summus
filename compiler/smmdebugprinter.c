@@ -61,8 +61,21 @@ static void processExpression(PSmmAstNode expr, PSmmAllocator a) {
 			}
 			break;
 		}
-	case nkSmmParam: case nkSmmIdent: case nkSmmConst:
-	case nkSmmInt: case nkSmmFloat: case nkSmmBool:
+	case nkSmmInt:
+		if (expr->type->flags & tifSmmUnsigned || expr->token->sintVal >= 0) {
+			printf("%s:%s", expr->token->repr, expr->type->name);
+		} else {
+			printf("-%s:%s", expr->token->repr, expr->type->name);
+		}
+		break;
+	case nkSmmFloat:
+		if (expr->token->floatVal >= 0) {
+			printf("%s:%s", expr->token->repr, expr->type->name);
+		} else {
+			printf("-%s:%s", expr->token->repr, expr->type->name);
+		}
+		break;
+	case nkSmmParam: case nkSmmIdent: case nkSmmConst: case nkSmmBool:
 		printf("%s:%s", expr->token->repr, expr->type->name);
 		break;
 	default:
@@ -128,7 +141,11 @@ static void processGlobalSymbols(PSmmAstNode decl, PSmmAllocator a) {
 	while (decl) {
 		if (decl->left->kind == nkSmmFunc) {
 			PSmmAstFuncDefNode funcNode = (PSmmAstFuncDefNode)decl->left;
-			printf("%s:%s(", funcNode->token->repr, funcNode->returnType->name);
+			if (funcNode->returnType) {
+				printf("%s:%s(", funcNode->token->repr, funcNode->returnType->name);
+			} else {
+				printf("%s(", funcNode->token->repr);
+			}
 
 			PSmmAstParamNode param = funcNode->params;
 			if (param) {

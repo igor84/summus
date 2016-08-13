@@ -142,7 +142,7 @@ CuSuite* SmmParserGetSuite() {
 		snprintf(filename, 30, "samples/" SAMPLE_FORMAT ".smm", i);
 		FILE* f = fopen(filename, "rb");
 		if (f) {
-			SUITE_ADD_TEST(suite, TestSample);
+			CuSuiteAdd(suite, CuTestNew(filename, TestSample));
 			fclose(f);
 		} else {
 			break;

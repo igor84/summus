@@ -141,7 +141,7 @@ static void processGlobalSymbols(CuTest* tc, PSmmAstNode exDecl, PSmmAstNode got
 		assertNodesEqual(tc, exDecl->left, gotDecl->left);
 		if (gotDecl->left->kind == nkSmmFunc) {
 			PSmmAstFuncDefNode exFuncNode = (PSmmAstFuncDefNode)exDecl->left;
-			PSmmAstFuncDefNode gotFuncNode = (PSmmAstFuncDefNode)exDecl->left;
+			PSmmAstFuncDefNode gotFuncNode = (PSmmAstFuncDefNode)gotDecl->left;
 			PSmmAstParamNode exParam = exFuncNode->params;
 			PSmmAstParamNode gotParam = gotFuncNode->params;
 			while (gotParam) {
@@ -150,9 +150,9 @@ static void processGlobalSymbols(CuTest* tc, PSmmAstNode exDecl, PSmmAstNode got
 				exParam = exParam->next;
 				gotParam = gotParam->next;
 			}
-			CuAssertPtrEquals_Msg(tc, "Unexpected number of paramteres", exParam, gotParam);
+			CuAssertPtrEquals_Msg(tc, "Unexpected number of parameters", exParam, gotParam);
 			if (exFuncNode->params) {
-				CuAssertUIntEquals_Msg(tc, "Unexpected paramteres count", exFuncNode->params->count, gotFuncNode->params->count);
+				CuAssertUIntEquals_Msg(tc, "Unexpected parameters count", exFuncNode->params->count, gotFuncNode->params->count);
 			}
 			if (gotFuncNode->body) {
 				CuAssertPtrNotNullMsg(tc, "Unexpected function body", exFuncNode->body);

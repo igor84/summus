@@ -84,6 +84,8 @@ static void processExpression(PSmmAstNode* exprField, PSmmLexer lex, PSmmAllocat
 
 	PSmmAstNode expr = newAstNode(kind, a);
 	expr->token = exprToken;
+	if (expr->kind == nkSmmUDiv || expr->kind == nkSmmSDiv) expr->token->repr = "div";
+	else if (expr->kind == nkSmmURem || expr->kind == nkSmmSRem) expr->token->repr = "mod";
 	
 	switch (expr->kind) {
 	case nkSmmAdd: case nkSmmFAdd: case nkSmmSub: case nkSmmFSub:
@@ -259,10 +261,12 @@ static void processGlobalSymbols(PSmmAstScopeNode scope, PSmmLexer lex, PSmmAllo
 		decl->left->token = smmGetNextToken(lex);
 		smmGetNextToken(lex); // skip ':'
 		decl->left->flags = (uint32_t)smmGetNextToken(lex)->uintVal;
-		smmGetNextToken(lex); // skip ':'
-		decl->left->type = smmGetDictValue(typeDict, smmGetNextToken(lex)->repr, false);
-		decl->type = decl->left->type;
-		lastToken = smmGetNextToken(lex);
+		lastToken = smmGetNextToken(lex); // skip ':'
+		if (lastToken->kind == ':') {
+			decl->left->type = smmGetDictValue(typeDict, smmGetNextToken(lex)->repr, false);
+			decl->type = decl->left->type;
+			lastToken = smmGetNextToken(lex);
+		}
 		if (lastToken->kind == '(') {
 			decl->left->kind = nkSmmFunc;
 			PSmmAstFuncDefNode funcNode = (PSmmAstFuncDefNode)decl->left;
@@ -277,6 +281,8 @@ static void processGlobalSymbols(PSmmAstScopeNode scope, PSmmLexer lex, PSmmAllo
 			while (param) {
 				paramCount++;
 				param->token = lastToken;
+				smmGetNextToken(lex); // skip ':'
+				param->flags = (uint32_t)smmGetNextToken(lex)->uintVal;
 				smmGetNextToken(lex); // skip ':'
 				param->type = smmGetDictValue(typeDict, smmGetNextToken(lex)->repr, false);
 				lastToken = smmGetNextToken(lex);

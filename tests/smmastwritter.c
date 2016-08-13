@@ -136,11 +136,15 @@ static void processGlobalSymbols(PSmmAstNode decl, FILE* f, PSmmAllocator a) {
 		fprintf(f, ":%u ", decl->flags);
 		if (decl->left->kind == nkSmmFunc) {
 			PSmmAstFuncDefNode funcNode = (PSmmAstFuncDefNode)decl->left;
-			fprintf(f, "%s:%u:%s(", funcNode->token->repr, funcNode->flags, funcNode->returnType->name);
+			if (funcNode->returnType) {
+				fprintf(f, "%s:%u:%s(", funcNode->token->repr, funcNode->flags, funcNode->returnType->name);
+			} else {
+				fprintf(f, "%s:%u(", funcNode->token->repr, funcNode->flags);
+			}
 
 			PSmmAstParamNode param = funcNode->params;
 			if (param) {
-				fprintf(f, "%s:%s", param->token->repr, param->type->name);
+				fprintf(f, "%s:%u:%s", param->token->repr, param->flags, param->type->name);
 				param = param->next;
 				while (param) {
 					fprintf(f, ", %s:%s", param->token->repr, param->type->name);

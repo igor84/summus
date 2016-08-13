@@ -37,6 +37,7 @@ static const char* msgTypeToString[] = {
 	"unexpected bool operand found",
 	"'!' used as not operator, use 'not' instead",
 	"'%s' is not a function",
+	"expected expression that produces a value",
 	
 	"possible loss of data in conversion from %s to %s",
 	"statement without effect",

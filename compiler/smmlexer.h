@@ -51,8 +51,9 @@ typedef struct SmmSymbol* PSmmSymbol;
 
 struct SmmToken {
 	int kind;
+	int isFirstOnLine : 1;
+	int canBeNewSymbol : 1;
 	const char* repr;
-	bool isFirstOnLine;
 	struct SmmFilePos filePos;
 	union {
 		uint64_t uintVal;

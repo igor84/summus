@@ -10,7 +10,7 @@ Create and refine a most basic compiler using LLVM as backend that can easily be
 - [Visual Studio 2015](https://www.visualstudio.com/products/free-developer-offers-vs) (Community Edition)
 - [Clang](https://sourceforge.net/projects/clangonwin/) compiler for Windows
 
-If you install Clang to C:\\Program Files\\LLVM\\ the VS project should just work. Otherwise you will have to change project library path under linker options.
+If you install Clang to C:\\Program Files\\LLVM\\ the VS project should just work. Otherwise you will have to change project library path under linker options. Also in case you get a lot of linker errors try changing Runtime Library in project options, under C/C++ -> Code Generation, to /MD or /MT.
 
 ## Linux
 - Clang compiler

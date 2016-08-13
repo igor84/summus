@@ -215,7 +215,7 @@ static void TestParseNumber(CuTest *tc) {
 }
 
 static void TestTokenToString(CuTest *tc) {
-	struct SmmToken token = { 0, "repr" };
+	struct SmmToken token = { 0, 0, 0, "repr" };
 	char buf[4] = { 0 };
 	const char* res = smmTokenToString(&token, buf);
 	CuAssertStrEquals(tc, "repr", res);

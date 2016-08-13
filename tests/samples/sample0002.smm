@@ -1,0 +1,18 @@
+// Tests invalid operands and declarations
+
+isPositive :: (a : int) -> bool {
+	var1 := a div 34;
+	(var2 := 23);
+	var2 := true;
+	var3 := 12 * var2;
+	(a > 0) and 3 > 4;
+	return a > 0;
+}
+
+x : int = -123;
+y : uint = 123;
+z := x > y;
+f := 123.21;
+a := x div f;
+b := a + y
+return x;

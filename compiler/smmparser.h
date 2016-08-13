@@ -19,7 +19,7 @@
  * the node type is set to SoftFloat meaning that second pass should set this to
  * either float32 or float64 depending on parent nodes and the precision they
  * require. If inferred type of variable being assigned turns out to be SoftFloat
- * it is assumed to be float64.
+ * it is assumed to be float32.
  */
 
 #include "smmcommon.h"
@@ -50,6 +50,7 @@ struct SmmParser {
 	PSmmDict idents;
 	PSmmAstScopeNode curScope;
 	PSmmAllocator allocator;
+	int32_t lastErrorLine;
 };
 
 // Each enum value should have coresponding string in smmparser.c
