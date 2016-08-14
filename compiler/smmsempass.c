@@ -14,7 +14,7 @@ static PSmmAstNode getCastNode(PSmmAllocator a, PSmmAstNode node, PSmmTypeInfo p
 static PSmmAstNode* fixExpressionTypes(PSmmAstNode* nodeField, PSmmTypeInfo parentType, bool isParentCast, PSmmAllocator a) {
 	PSmmAstNode cast = NULL;
 	PSmmAstNode node = *nodeField;
-	if ((parentType->flags & tifSmmInt) && (node->type->flags & tifSmmFloat)) {
+	if (parentType->isInt && node->type->isFloat) {
 		//if parent is int and node is float then warning and cast
 		PSmmTypeInfo type = node->type;
 		// If we need to cast arbitrary float expression to int we will treat expression as float32
@@ -23,7 +23,7 @@ static PSmmAstNode* fixExpressionTypes(PSmmAstNode* nodeField, PSmmTypeInfo pare
 			cast = getCastNode(a, node, parentType);
 			smmPostMessage(wrnSmmConversionDataLoss, node->token->filePos, type->name, parentType->name);
 		}
-	} else if ((parentType->flags & tifSmmFloat) && (node->type->flags & tifSmmInt)) {
+	} else if (parentType->isFloat && node->type->isInt) {
 		// if parent is float and node is int change it if it is literal or cast it otherwise
 		if (node->kind == nkSmmInt) {
 			node->kind = nkSmmFloat;
@@ -32,11 +32,11 @@ static PSmmAstNode* fixExpressionTypes(PSmmAstNode* nodeField, PSmmTypeInfo pare
 		} else {
 			if (!isParentCast) cast = getCastNode(a, node, parentType);
 		}
-	} else if ((parentType->flags & node->type->flags & tifSmmInt)) {
+	} else if (parentType->isInt && node->type->isInt) {
 		// if both are ints just fix the sizes
-		if (parentType->flags == node->type->flags) {
+		if (parentType->isUnsigned == node->type->isUnsigned) {
 			if (parentType->kind > node->type->kind) {
-				if (node->kind == nkSmmInt || (node->flags & nfSmmBinOp)) {
+				if (node->kind == nkSmmInt || node->isBinOp) {
 					node->type = parentType; // if literal or operator
 				} else {
 					if (!isParentCast) cast = getCastNode(a, node, parentType);
@@ -81,7 +81,7 @@ static PSmmAstNode* fixExpressionTypes(PSmmAstNode* nodeField, PSmmTypeInfo pare
 				node->type = parentType;
 			}
 		}
-	} else if ((parentType->flags & node->type->flags & tifSmmFloat)) {
+	} else if ((parentType->isFloat && node->type->isFloat)) {
 		// if both are floats just fix the sizes
 		if (node->type->kind == tiSmmSoftFloat64) {
 			node->type = parentType;
@@ -108,16 +108,17 @@ static PSmmAstNode* fixExpressionTypes(PSmmAstNode* nodeField, PSmmTypeInfo pare
 				zeroToken->repr = "!=";
 
 				PSmmAstNode zeroNode = a->alloc(a, sizeof(struct SmmAstNode));
-				zeroNode->flags = nfSmmConst;
+				zeroNode->isConst = true;
 				zeroNode->kind = nkSmmInt;
 				zeroNode->token = zeroToken;
 				zeroNode->type = node->type;
-				if (zeroNode->type->flags & tifSmmFloat) {
+				if (zeroNode->type->isFloat) {
 					zeroToken->kind = tkSmmFloat;
 				}
 
 				PSmmAstNode notEqNode = a->alloc(a, sizeof(struct SmmAstNode));
-				notEqNode->flags = nfSmmBinOp | (node->flags & nfSmmConst);
+				notEqNode->isBinOp = true;
+				notEqNode->isConst = node->isConst;
 				notEqNode->kind = nkSmmNotEq;
 				notEqNode->left = node;
 				notEqNode->right = zeroNode;

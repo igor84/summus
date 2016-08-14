@@ -87,32 +87,20 @@ typedef enum {
 	tiSmmFloat32, tiSmmFloat64, tiSmmSoftFloat64,
 } SmmTypInfoKind;
 
-enum SmmTypeInfoFlags {
-	tifSmmUnknown = 0x0,
-	tifSmmInt = 0x1,
-	tifSmmUnsigned = 0x2,
-	tifSmmUnsignedInt = 0x3,
-	tifSmmFloat = 0x4,
-	tifSmmBool = 0x8,
-};
-
-enum SmmNodeFlags {
-	nfSmmIdent = 0x1,
-	nfSmmConst = 0x2,
-	nfSmmBinOp = 0x4,
-};
-
 struct SmmTypeInfo {
 	SmmTypInfoKind kind;
 	uint32_t sizeInBytes;
 	const char* name;
-	uint32_t flags;
+	uint32_t isInt : 1;
+	uint32_t isUnsigned : 1;
+	uint32_t isFloat : 1;
+	uint32_t isBool : 1;
 };
 typedef struct SmmTypeInfo* PSmmTypeInfo;
 
 /**
  * SmmAstNode is base "class" of AstNodes so all following types of AstNodes
- * must begin with identical structure which is:
+ * must have identical structure which is:
  * 1. SmmAstNodeKind kind;
  * 2. 32bit value
  * 3. pointer value that should point to token
@@ -122,7 +110,9 @@ typedef struct SmmTypeInfo* PSmmTypeInfo;
  */
 struct SmmAstNode {
 	SmmAstNodeKind kind;
-	uint32_t flags; // Node flags, like does it represent a const expression
+	uint32_t isIdent : 1;
+	uint32_t isConst : 1;
+	uint32_t isBinOp : 1;
 	PSmmToken token;
 	PSmmTypeInfo type;
 	PSmmAstNode next;
@@ -132,7 +122,8 @@ struct SmmAstNode {
 
 struct SmmAstIdentNode {
 	SmmAstNodeKind kind;
-	uint32_t flags;
+	uint32_t isIdent : 1;
+	uint32_t isConst : 1;
 	PSmmToken token;
 	PSmmTypeInfo type;
 	PSmmAstNode zzNotUsed1;
@@ -162,7 +153,7 @@ struct SmmAstBlockNode {
 
 struct SmmAstParamNode {
 	SmmAstNodeKind kind;
-	uint32_t flags;
+	uint32_t isIdent : 1;
 	PSmmToken token;
 	PSmmTypeInfo type;
 	PSmmAstParamNode next;
@@ -172,7 +163,7 @@ struct SmmAstParamNode {
 
 struct SmmAstFuncDefNode {
 	SmmAstNodeKind kind;
-	uint32_t flags;
+	uint32_t isIdent : 1;
 	PSmmToken token;
 	PSmmTypeInfo returnType;
 	PSmmAstBlockNode body;
@@ -182,7 +173,7 @@ struct SmmAstFuncDefNode {
 
 struct SmmAstCallNode {
 	SmmAstNodeKind kind;
-	uint32_t flags;
+	uint32_t isIdent : 1;
 	PSmmToken token;
 	PSmmTypeInfo returnType;
 	PSmmAstNode zzNotUsed1;

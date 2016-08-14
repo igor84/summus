@@ -3,8 +3,13 @@
 
 static const char* NODES_DONT_MATCH = "Node kinds don't match";
 static const char* NODES_TYPES_DONT_MATCH = "Node's types don't match";
-static const char* NODES_FLAGS_DONT_MATCH = "Node's flags don't match";
 static const char* NODES_REPRS_DONT_MATCH = "Nodes representations don't match";
+
+static void assertNodeFlagsEqual(CuTest* tc, PSmmAstNode ex, PSmmAstNode got) {
+	CuAssertUIntEquals_Msg(tc, "Ident flag doesn't match", ex->isIdent, got->isIdent);
+	CuAssertUIntEquals_Msg(tc, "Const flag doesn't match", ex->isConst, got->isConst);
+	CuAssertUIntEquals_Msg(tc, "BinOp flag doesn't match", ex->isBinOp, got->isBinOp);
+}
 
 static void assertNodesEqual(CuTest* tc, PSmmAstNode ex, PSmmAstNode got) {
 	CuAssertIntEquals_Msg(tc, NODES_DONT_MATCH, ex->kind, got->kind);
@@ -13,7 +18,7 @@ static void assertNodesEqual(CuTest* tc, PSmmAstNode ex, PSmmAstNode got) {
 	} else {
 		CuAssertPtrEquals_Msg(tc, NODES_TYPES_DONT_MATCH, ex->type, got->type);
 	}
-	CuAssertIntEquals_Msg(tc, NODES_FLAGS_DONT_MATCH, ex->flags, got->flags);
+	assertNodeFlagsEqual(tc, ex, got);
 	if (got->kind == nkSmmCast) return;
 	if (got->token && ex->token) {
 		CuAssertStrEquals_Msg(tc, NODES_REPRS_DONT_MATCH, ex->token->repr, got->token->repr);
@@ -80,7 +85,7 @@ static void processLocalSymbols(CuTest* tc, PSmmAstNode exDecl, PSmmAstNode gotD
 		CuAssertPtrNotNullMsg(tc, "Got more global declarations than expected", exDecl);
 		CuAssertIntEquals_Msg(tc, NODES_DONT_MATCH, exDecl->kind, gotDecl->kind);
 		CuAssertPtrEquals_Msg(tc, NODES_TYPES_DONT_MATCH, exDecl->type, gotDecl->type);
-		CuAssertIntEquals_Msg(tc, NODES_FLAGS_DONT_MATCH, exDecl->flags, gotDecl->flags);
+		assertNodeFlagsEqual(tc, exDecl, gotDecl);
 
 		assertNodesEqual(tc, exDecl->left, gotDecl->left);
 		if (gotDecl->left->kind == nkSmmConst) {
@@ -136,7 +141,7 @@ static void processGlobalSymbols(CuTest* tc, PSmmAstNode exDecl, PSmmAstNode got
 		CuAssertPtrNotNullMsg(tc, "Got more global declarations than expected", exDecl);
 		CuAssertIntEquals_Msg(tc, NODES_DONT_MATCH, exDecl->kind, gotDecl->kind);
 		CuAssertPtrEquals_Msg(tc, NODES_TYPES_DONT_MATCH, exDecl->type, gotDecl->type);
-		CuAssertIntEquals_Msg(tc, NODES_FLAGS_DONT_MATCH, exDecl->flags, gotDecl->flags);
+		assertNodeFlagsEqual(tc, exDecl, gotDecl);
 
 		assertNodesEqual(tc, exDecl->left, gotDecl->left);
 		if (gotDecl->left->kind == nkSmmFunc) {

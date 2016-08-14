@@ -5,6 +5,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+static uint32_t getFlags(PSmmAstNode node) {
+	// We must do it this way instead of having a union with uint32 field
+	// because bit positions are compiler dependent
+	return (node->isBinOp << 2) | (node->isConst << 1) | node->isIdent;
+}
+
 static void processExpression(PSmmAstNode expr, FILE* f, PSmmAllocator a) {
 	switch (expr->kind) {
 	case nkSmmAdd: case nkSmmFAdd: case nkSmmSub: case nkSmmFSub:
@@ -14,7 +20,7 @@ static void processExpression(PSmmAstNode expr, FILE* f, PSmmAllocator a) {
 	case nkSmmXorOp:
 	case nkSmmEq: case nkSmmNotEq: case nkSmmGt: case nkSmmGtEq: case nkSmmLt: case nkSmmLtEq:
 		{
-			fprintf(f, "%s:%u:%s ", nodeKindToString[expr->kind], expr->flags, expr->type->name);
+			fprintf(f, "%s:%u:%s ", nodeKindToString[expr->kind], getFlags(expr->left), expr->type->name);
 
 			processExpression(expr->left, f, a);
 			processExpression(expr->right, f, a);
@@ -22,20 +28,20 @@ static void processExpression(PSmmAstNode expr, FILE* f, PSmmAllocator a) {
 		}
 	case nkSmmNeg:
 		{
-			fprintf(f, "neg:%u:%s ", expr->flags, expr->type->name);
+			fprintf(f, "neg:%u:%s ", getFlags(expr), expr->type->name);
 			processExpression(expr->left, f, a);
 			break;
 		}
 	case nkSmmNot: case nkSmmCast:
 		{
-			fprintf(f, "%s:%u:%s ", nodeKindToString[expr->kind], expr->flags, expr->type->name);
+			fprintf(f, "%s:%u:%s ", nodeKindToString[expr->kind], getFlags(expr), expr->type->name);
 			processExpression(expr->left, f, a);
 			break;
 		}
 	case nkSmmCall:
 		{
 			PSmmAstCallNode callNode = (PSmmAstCallNode)expr;
-			fprintf(f, "(%s:%u:%s(", callNode->token->repr, callNode->flags, callNode->returnType->name);
+			fprintf(f, "(%s:%u:%s(", callNode->token->repr, getFlags(expr), callNode->returnType->name);
 			if (callNode->params) {
 				size_t paramCount = callNode->params->count;
 				PSmmAstNode astArg = callNode->args;
@@ -51,21 +57,21 @@ static void processExpression(PSmmAstNode expr, FILE* f, PSmmAllocator a) {
 			break;
 		}
 	case nkSmmInt:
-		if (expr->type->flags & tifSmmUnsigned || expr->token->sintVal >= 0) {
-			fprintf(f, "%s:%u:%s:%s ", nodeKindToString[expr->kind], expr->flags, expr->token->repr, expr->type->name);
+		if (expr->type->isUnsigned || expr->token->sintVal >= 0) {
+			fprintf(f, "%s:%u:%s:%s ", nodeKindToString[expr->kind], getFlags(expr), expr->token->repr, expr->type->name);
 		} else {
-			fprintf(f, "%s:%u:-%s:%s ", nodeKindToString[expr->kind], expr->flags, expr->token->repr, expr->type->name);
+			fprintf(f, "%s:%u:-%s:%s ", nodeKindToString[expr->kind], getFlags(expr), expr->token->repr, expr->type->name);
 		}
 		break;
 	case nkSmmFloat:
 		if (expr->token->floatVal >= 0) {
-			fprintf(f, "%s:%u:%s:%s ", nodeKindToString[expr->kind], expr->flags, expr->token->repr, expr->type->name);
+			fprintf(f, "%s:%u:%s:%s ", nodeKindToString[expr->kind], getFlags(expr), expr->token->repr, expr->type->name);
 		} else {
-			fprintf(f, "%s:%u:-%s:%s ", nodeKindToString[expr->kind], expr->flags, expr->token->repr, expr->type->name);
+			fprintf(f, "%s:%u:-%s:%s ", nodeKindToString[expr->kind], getFlags(expr), expr->token->repr, expr->type->name);
 		}
 		break;
 	case nkSmmParam: case nkSmmIdent: case nkSmmConst: case nkSmmBool:
-		fprintf(f, "%s:%u:%s:%s ", nodeKindToString[expr->kind], expr->flags, expr->token->repr, expr->type->name);
+		fprintf(f, "%s:%u:%s:%s ", nodeKindToString[expr->kind], getFlags(expr), expr->token->repr, expr->type->name);
 		break;
 	default:
 		assert(false && "Got unexpected node type in processExpression");
@@ -76,11 +82,11 @@ static void processExpression(PSmmAstNode expr, FILE* f, PSmmAllocator a) {
 static void processLocalSymbols(PSmmAstNode decl, int level, FILE* f, PSmmAllocator a) {
 	while (decl) {
 		if (level) fprintf(f, "%*s", level, " ");
-		fprintf(f, ":%u ", decl->flags);
+		fprintf(f, ":%u ", getFlags(decl));
 		if (decl->left->kind == nkSmmIdent) {
-			fprintf(f, "%s:%u:%s", decl->left->token->repr, decl->left->flags, decl->type->name);
+			fprintf(f, "%s:%u:%s", decl->left->token->repr, getFlags(decl->left), decl->type->name);
 		} else if (decl->left->kind == nkSmmConst) {
-			fprintf(f, "%s:%u:%s = ", decl->left->token->repr, decl->left->flags, decl->type->name);
+			fprintf(f, "%s:%u:%s = ", decl->left->token->repr, getFlags(decl->left), decl->type->name);
 			processExpression(decl->right, f, a);
 		} else {
 			assert(false && "Declaration of unknown node kind");
@@ -91,7 +97,7 @@ static void processLocalSymbols(PSmmAstNode decl, int level, FILE* f, PSmmAlloca
 }
 
 static void processAssignment(PSmmAstNode stmt, FILE* f, PSmmAllocator a) {
-	fprintf(f, "= %s:%u:%s  ", stmt->left->token->repr, stmt->left->flags, stmt->left->type->name);
+	fprintf(f, "= %s:%u:%s  ", stmt->left->token->repr, getFlags(stmt->left), stmt->left->type->name);
 	processExpression(stmt->right, f, a);
 	fputs("\n", f);
 }
@@ -133,18 +139,18 @@ static void processBlock(PSmmAstBlockNode block, int level, FILE* f, PSmmAllocat
 
 static void processGlobalSymbols(PSmmAstNode decl, FILE* f, PSmmAllocator a) {
 	while (decl) {
-		fprintf(f, ":%u ", decl->flags);
+		fprintf(f, ":%u ", getFlags(decl));
 		if (decl->left->kind == nkSmmFunc) {
 			PSmmAstFuncDefNode funcNode = (PSmmAstFuncDefNode)decl->left;
 			if (funcNode->returnType) {
-				fprintf(f, "%s:%u:%s(", funcNode->token->repr, funcNode->flags, funcNode->returnType->name);
+				fprintf(f, "%s:%u:%s(", funcNode->token->repr, getFlags(decl->left), funcNode->returnType->name);
 			} else {
-				fprintf(f, "%s:%u(", funcNode->token->repr, funcNode->flags);
+				fprintf(f, "%s:%u(", funcNode->token->repr, getFlags(decl->left));
 			}
 
 			PSmmAstParamNode param = funcNode->params;
 			if (param) {
-				fprintf(f, "%s:%u:%s", param->token->repr, param->flags, param->type->name);
+				fprintf(f, "%s:%u:%s", param->token->repr, getFlags((PSmmAstNode)param), param->type->name);
 				param = param->next;
 				while (param) {
 					fprintf(f, ", %s:%s", param->token->repr, param->type->name);
@@ -160,7 +166,7 @@ static void processGlobalSymbols(PSmmAstNode decl, FILE* f, PSmmAllocator a) {
 			}
 		} else {
 			assert(decl->right && "Global var must have initializer");
-			fprintf(f, "%s:%u:%s ", decl->left->token->repr, decl->left->flags, decl->left->type->name);
+			fprintf(f, "%s:%u:%s ", decl->left->token->repr, getFlags(decl->left), decl->left->type->name);
 			if (decl->left->kind == nkSmmConst) fputs(": ", f);
 			else fputs("= ", f);
 			processExpression(decl->right, f, a);

@@ -44,32 +44,32 @@ static LLVMTypeRef getLLVMType(PSmmTypeInfo type) {
 }
 
 static LLVMValueRef getCastInstruction(PSmmLLVMCodeGenData data, PSmmTypeInfo dtype, PSmmTypeInfo stype, LLVMValueRef val) {
-	if ((dtype->flags & tifSmmInt) && (stype->flags & tifSmmFloat)) {
+	if (dtype->isInt && stype->isFloat) {
 		//if dest is int and node is float
-		if (dtype->flags & tifSmmUnsigned) {
+		if (dtype->isUnsigned) {
 			return LLVMBuildFPToUI(data->builder, val, getLLVMType(dtype), "");
 		}
 		return LLVMBuildFPToSI(data->builder, val, getLLVMType(dtype), "");
 	}
-	if ((dtype->flags & tifSmmFloat) && (stype->flags & tifSmmInt)) {
+	if ((dtype->isFloat) && (stype->isInt)) {
 		//if dest is float and node is int
-		if (stype->flags & tifSmmUnsigned) {
+		if (stype->isUnsigned) {
 			return LLVMBuildUIToFP(data->builder, val, getLLVMType(dtype), "");
 		}
 		return LLVMBuildSIToFP(data->builder, val, getLLVMType(dtype), "");
 	}
 
-	bool dstIsInt = dtype->flags & (tifSmmInt | tifSmmBool);
-	bool srcIsInt = stype->flags & (tifSmmInt | tifSmmBool);
+	bool dstIsInt = dtype->isInt || dtype->isBool;
+	bool srcIsInt = stype->isInt || stype->isBool;
 	bool differentSize = dtype->sizeInBytes != stype->sizeInBytes || dtype->kind == tiSmmBool;
 	if (dstIsInt && srcIsInt && differentSize) {
-		if (((stype->flags & tifSmmUnsigned) && dtype->sizeInBytes > stype->sizeInBytes) || stype->kind == tiSmmBool) {
+		if ((stype->isUnsigned && dtype->sizeInBytes > stype->sizeInBytes) || stype->kind == tiSmmBool) {
 			return LLVMBuildZExt(data->builder, val, getLLVMType(dtype), "");
 		}
 		return LLVMBuildIntCast(data->builder, val, getLLVMType(dtype), "");
 	}
 
-	if ((dtype->flags & stype->flags & tifSmmFloat) == tifSmmFloat && dtype->sizeInBytes != stype->sizeInBytes) {
+	if (dtype->isFloat && stype->isFloat && dtype->sizeInBytes != stype->sizeInBytes) {
 		return LLVMBuildFPCast(data->builder, val, getLLVMType(dtype), "");
 	}
 
@@ -162,17 +162,17 @@ static LLVMValueRef processExpression(PSmmLLVMCodeGenData data, PSmmAstNode expr
 		{
 			LLVMValueRef left = processExpression(data, expr->left, a);
 			LLVMValueRef right = processExpression(data, expr->right, a);
-			if ((expr->left->type->flags & tifSmmInt) || expr->left->type->kind == tiSmmBool) {
+			if (expr->left->type->isInt || expr->left->type->kind == tiSmmBool) {
 				LLVMIntPredicate op;
 				if (expr->kind == nkSmmXorOp) op = LLVMIntNE;
 				else {
 					op = expr->kind - nkSmmEq + LLVMIntEQ;
-					if (op >= LLVMIntUGT && !(expr->left->type->flags & tifSmmUnsigned)) {
+					if (op >= LLVMIntUGT && !expr->left->type->isUnsigned) {
 						op = op - LLVMIntUGT + LLVMIntSGT;
 					}
 				}
 				res = LLVMBuildICmp(data->builder, op, left, right, "");
-			} else if (expr->left->type->flags & tifSmmFloat) {
+			} else if (expr->left->type->isFloat) {
 				LLVMRealPredicate op = LLVMRealUNE; // For '!=', it can't be xor here because we add != 0 on float operands for xor
 				switch (expr->kind) {
 				case nkSmmEq: op = LLVMRealOEQ; break;
@@ -238,7 +238,7 @@ static LLVMValueRef processExpression(PSmmLLVMCodeGenData data, PSmmAstNode expr
 		break;
 	case nkSmmInt:
 		{
-			bool signExtend = !(expr->type->flags & tifSmmUnsigned);
+			bool signExtend = !expr->type->isUnsigned;
 			LLVMTypeRef intType = LLVMIntType(expr->type->sizeInBytes << 3);
 			res = LLVMConstInt(intType, expr->token->uintVal, signExtend);
 			break;

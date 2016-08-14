@@ -8,6 +8,15 @@
 static PSmmToken lastToken;
 static PSmmDict typeDict;
 
+static void readFlags(PSmmAstNode node, PSmmToken token) {
+	// We must do it this way instead of having a union with uint32 field
+	// because bit positions are compiler dependent
+	uint32_t flags = (uint32_t)token->uintVal;
+	node->isIdent = flags & 1;
+	node->isConst = (flags & 2) > 0;
+	node->isBinOp = (flags & 4) > 0;
+}
+
 static void* newAstNode(SmmAstNodeKind kind, PSmmAllocator a) {
 	PSmmAstNode res = a->alloc(a, sizeof(struct SmmAstNode));
 	res->kind = kind;
@@ -95,7 +104,7 @@ static void processExpression(PSmmAstNode* exprField, PSmmLexer lex, PSmmAllocat
 	case nkSmmXorOp:
 	case nkSmmEq: case nkSmmNotEq: case nkSmmGt: case nkSmmGtEq: case nkSmmLt: case nkSmmLtEq:
 		{
-			expr->flags = (uint32_t)smmGetNextToken(lex)->uintVal;
+			readFlags(expr, smmGetNextToken(lex));
 			smmGetNextToken(lex); // skip ':'
 			expr->type = smmGetDictValue(typeDict, smmGetNextToken(lex)->repr, false);
 			lastToken = smmGetNextToken(lex);
@@ -106,7 +115,7 @@ static void processExpression(PSmmAstNode* exprField, PSmmLexer lex, PSmmAllocat
 		}
 	case nkSmmNeg: case nkSmmNot: case nkSmmCast:
 		{
-			expr->flags = (uint32_t)smmGetNextToken(lex)->uintVal;
+			readFlags(expr, smmGetNextToken(lex));
 			smmGetNextToken(lex); // skip ':'
 			PSmmToken typeToken = smmGetNextToken(lex);
 			expr->type = smmGetDictValue(typeDict, typeToken->repr, false);
@@ -121,7 +130,7 @@ static void processExpression(PSmmAstNode* exprField, PSmmLexer lex, PSmmAllocat
 			PSmmAstCallNode callNode = (PSmmAstCallNode)expr;
 			callNode->token = lastToken;
 			smmGetNextToken(lex); // skip ':'
-			callNode->flags = (uint32_t)smmGetNextToken(lex)->uintVal;
+			readFlags(expr, smmGetNextToken(lex));
 			smmGetNextToken(lex); // skip ':'
 			callNode->returnType = smmGetDictValue(typeDict, smmGetNextToken(lex)->repr, false);
 			smmGetNextToken(lex); // skip '('
@@ -143,7 +152,7 @@ static void processExpression(PSmmAstNode* exprField, PSmmLexer lex, PSmmAllocat
 		}
 	case nkSmmParam: case nkSmmIdent: case nkSmmConst:
 	case nkSmmInt: case nkSmmFloat: case nkSmmBool:
-		expr->flags = (uint32_t)smmGetNextToken(lex)->uintVal;
+		readFlags(expr, smmGetNextToken(lex));
 		smmGetNextToken(lex); // skip ':'
 		expr->token = smmGetNextToken(lex);
 		if (expr->token->kind == '-') {
@@ -168,15 +177,15 @@ static void processLocalSymbols(PSmmAstScopeNode scope, PSmmLexer lex, PSmmAlloc
 		scope->decls = decl;
 	}
 	while (decl) {
-		decl->flags = (uint32_t)smmGetNextToken(lex)->uintVal;
+		readFlags(decl, smmGetNextToken(lex));
 		decl->left = newAstNode(nkSmmIdent, a);
 		decl->left->token = smmGetNextToken(lex);
 		smmGetNextToken(lex); // skip ':'
-		decl->left->flags = (uint32_t)smmGetNextToken(lex)->uintVal;
+		readFlags(decl->left, smmGetNextToken(lex));
 		smmGetNextToken(lex); // skip ':'
 		decl->left->type = smmGetDictValue(typeDict, smmGetNextToken(lex)->repr, false);
 		decl->type = decl->left->type;
-		if (decl->left->flags & nfSmmConst) {
+		if (decl->left->isConst) {
 			decl->left->kind = nkSmmConst;
 			smmGetNextToken(lex); // We skip '='
 			lastToken = smmGetNextToken(lex);
@@ -196,7 +205,7 @@ static void processAssignment(PSmmAstNode stmt, PSmmLexer lex, PSmmAllocator a) 
 	stmt->left = newAstNode(nkSmmIdent, a);
 	stmt->left->token = smmGetNextToken(lex);
 	smmGetNextToken(lex); // skip ':'
-	stmt->left->flags = (uint32_t)smmGetNextToken(lex)->uintVal;
+	readFlags(stmt->left, smmGetNextToken(lex));
 	smmGetNextToken(lex); // skip ':'
 	stmt->left->type = smmGetDictValue(typeDict, smmGetNextToken(lex)->repr, false);
 	stmt->type = stmt->left->type;
@@ -256,11 +265,11 @@ static void processGlobalSymbols(PSmmAstScopeNode scope, PSmmLexer lex, PSmmAllo
 		scope->decls = decl;
 	}
 	while (decl) {
-		decl->flags = (uint32_t)smmGetNextToken(lex)->uintVal;
+		readFlags(decl, smmGetNextToken(lex));
 		decl->left = newAstNode(nkSmmIdent, a);
 		decl->left->token = smmGetNextToken(lex);
 		smmGetNextToken(lex); // skip ':'
-		decl->left->flags = (uint32_t)smmGetNextToken(lex)->uintVal;
+		readFlags(decl->left, smmGetNextToken(lex));
 		lastToken = smmGetNextToken(lex); // skip ':'
 		if (lastToken->kind == ':') {
 			decl->left->type = smmGetDictValue(typeDict, smmGetNextToken(lex)->repr, false);
@@ -282,7 +291,7 @@ static void processGlobalSymbols(PSmmAstScopeNode scope, PSmmLexer lex, PSmmAllo
 				paramCount++;
 				param->token = lastToken;
 				smmGetNextToken(lex); // skip ':'
-				param->flags = (uint32_t)smmGetNextToken(lex)->uintVal;
+				readFlags((PSmmAstNode)param, smmGetNextToken(lex));
 				smmGetNextToken(lex); // skip ':'
 				param->type = smmGetDictValue(typeDict, smmGetNextToken(lex)->repr, false);
 				lastToken = smmGetNextToken(lex);

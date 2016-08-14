@@ -62,7 +62,7 @@ static void processExpression(PSmmAstNode expr, PSmmAllocator a) {
 			break;
 		}
 	case nkSmmInt:
-		if (expr->type->flags & tifSmmUnsigned || expr->token->sintVal >= 0) {
+		if (expr->type->isUnsigned || expr->token->sintVal >= 0) {
 			printf("%s:%s", expr->token->repr, expr->type->name);
 		} else {
 			printf("-%s:%s", expr->token->repr, expr->type->name);
