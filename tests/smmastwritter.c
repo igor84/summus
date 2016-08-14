@@ -20,7 +20,7 @@ static void processExpression(PSmmAstNode expr, FILE* f, PSmmAllocator a) {
 	case nkSmmXorOp:
 	case nkSmmEq: case nkSmmNotEq: case nkSmmGt: case nkSmmGtEq: case nkSmmLt: case nkSmmLtEq:
 		{
-			fprintf(f, "%s:%u:%s ", nodeKindToString[expr->kind], getFlags(expr->left), expr->type->name);
+			fprintf(f, "%s:%u:%s ", nodeKindToString[expr->kind], getFlags(expr), expr->type->name);
 
 			processExpression(expr->left, f, a);
 			processExpression(expr->right, f, a);
@@ -103,11 +103,13 @@ static void processAssignment(PSmmAstNode stmt, FILE* f, PSmmAllocator a) {
 }
 
 static void processReturn(PSmmAstNode stmt, FILE* f, PSmmAllocator a) {
-	if (stmt->left) {
+	if (stmt->type) {
 		fprintf(f, "%s:%s ", nodeKindToString[stmt->kind], stmt->type->name);
-		processExpression(stmt->left, f, a);
 	} else {
-		fprintf(f, "%s", nodeKindToString[stmt->kind]);
+		fputs(nodeKindToString[stmt->kind], f);
+	}
+	if (stmt->left) {
+		processExpression(stmt->left, f, a);
 	}
 	fputs("\n", f);
 }

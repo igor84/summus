@@ -71,6 +71,7 @@ static void TestSample(CuTest *tc) {
 	snprintf(outFileName, 30, "samples/%s.ast", baseName);
 	PSmmAllocator a = smmCreatePermanentAllocator(baseName, 1024 * 1024);
 	PSmmAstNode module = loadModule(inFileName, baseName, a);
+	if (!module) return;
 	FILE* f = fopen(outFileName, "rb");
 	if (!f) {
 		snprintf(outFileName, 30, "samples/%sTST.ast", baseName);

@@ -22,7 +22,7 @@ typedef enum {
 	errSmmGotSomeArgsButExpectedOneOf, errCantAssignToConst, errNonConstInConstExpression,
 	errSmmBadReturnStmtType, errSmmFuncMustReturnValue, errSmmUnreachableCode,
 	errSmmFuncUnderScope, errSmmUnexpectedBool, errSmmBangUsedAsNot, errSmmNotAFunction,
-	errSmmInvalidExprUsed,
+	errSmmInvalidExprUsed, errSmmNoReturnValueNeeded,
 
 	wrnSmmConversionDataLoss, wrnSmmNoEffectStmt, wrnSmmComparingSignedAndUnsigned,
 

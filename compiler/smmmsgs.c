@@ -38,6 +38,7 @@ static const char* msgTypeToString[] = {
 	"'!' used as not operator, use 'not' instead",
 	"'%s' is not a function",
 	"expected expression that produces a value",
+	"function should not return any value",
 	
 	"possible loss of data in conversion from %s to %s",
 	"statement without effect",
@@ -62,9 +63,9 @@ void smmPostMessage(SmmMsgType msgType, const struct SmmFilePos filePos, ...) {
 	va_end(argList);
 
 	if (filePos.filename) {
-		printf("%s: %s (at %s:%d:%d)\n", lvl, msg, filePos.filename, filePos.lineNumber, filePos.lineOffset);
+		printf("%s (at %s:%d:%d): %s\n", lvl, filePos.filename, filePos.lineNumber, filePos.lineOffset, msg);
 	} else {
-		printf("%s: %s (at %d:%d)\n", lvl, msg, filePos.lineNumber, filePos.lineOffset);
+		printf("%s (at %d:%d): %s\n", lvl, filePos.lineNumber, filePos.lineOffset, msg);
 	}
 }
 

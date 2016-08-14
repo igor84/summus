@@ -123,6 +123,7 @@ static void processBlock(PSmmAstBlockNode block, int level, PSmmAllocator a) {
 				puts("{");
 				processLocalSymbols(newBlock->scope->decls, level + 4, a);
 				processBlock(newBlock, level + 4, a);
+				if (level) printf("%*s", level, " ");
 				puts("}");
 				break;
 			}

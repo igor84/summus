@@ -1,0 +1,25 @@
+
+func :: (param: int) -> int {
+	return; //Func must return a value
+}
+
+proc :: (param: int) {
+	var1 := 123;
+	return var1; //Func should not return a value
+}
+
+intFunc :: (param: int) -> int {
+	return 123.321; // Bad return type
+}
+
+proc2 :: () {
+	return proc(123); //Invalid Expr
+}
+
+*x := 123; //Invalid statement - unexpected token
+x := 123;
+x + 122; // No effect
+y = 432; // Undefined identifier
+y := 432;
+
+x * y = 123; // Operand must be lval

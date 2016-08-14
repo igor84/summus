@@ -16,7 +16,7 @@ static const char* tokenTypeToString[] = {
 	"identifier",
 	"div", "mod", "not", "and", "or", "xor",
 	"==", "!=", ">=", "<=",
-	"uint32", "uint64", "float64", "bool",
+	"int", "uint", "float", "bool",
 	"->", "return",
 	"eof"
 };
@@ -402,8 +402,12 @@ PSmmToken smmGetNextToken(PSmmLexer lex) {
  * put "<quote>char<quote><null>" into the buffer and return it.
  */
 const char* smmTokenToString(PSmmToken token, char* buf) {
-	if (token->kind > 255) return tokenTypeToString[token->kind - 256];
-	if (token->kind == tkSmmErr) return token->repr;
+	if ((token->kind >= tkSmmInt && token->kind <= tkSmmBool) || token->kind == tkSmmErr) {
+		return token->repr;
+	}
+	if (token->kind > 255) {
+		return tokenTypeToString[token->kind - 256];
+	}
 
 	buf[2] = buf[0] = '\'';
 	buf[1] = (char)token->kind;

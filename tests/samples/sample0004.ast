@@ -1,0 +1,19 @@
+errSmmUnknownType
+errSmmFuncUnderScope
+errSmmUnreachableCode
+errSmmFuncMustReturnValue
+errSmmFuncUnderScope
+errSmmFuncUnderScope
+errNonConstInConstExpression
+errSmmGotUnexpectedToken
+errSmmGotUnexpectedToken
+errCantAssignToConst
+
+MODULE sample0004
+:0 x:1:int32 = int:2:123:int8 
+:0 tst1:1:int32 = int:2:100:int8 
+:0 y:3:int32 : int:2:0:int32 
+{
+}
+int:2:23:int8 
+return:int32 Ident:1:tst1:int32

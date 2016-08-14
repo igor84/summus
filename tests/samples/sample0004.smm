@@ -1,0 +1,23 @@
+
+x : int33 = 123; // Unknown type
+tst1 := 100;
+
+{
+	tst :: (a: int) -> int { // Func not allowed outside global scope
+		y := a; // Undefined 'a'
+		return y;
+		y = y + 3; //Unreachable code
+	}
+	tst1 :: () -> int { // Func not allowed outside global scope
+		tst2 :: () -> int { // Func not allowed outside global scope
+			return 211;
+		}
+		return 21;
+	}
+}
+
+y :: 12 * x; // Non const in const expr
+z : 12; // Got unexpected token
+a :; // Got unexpected token, expected type
+y = 23; // Can't assign to const
+return tst1;

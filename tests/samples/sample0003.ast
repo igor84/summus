@@ -1,0 +1,31 @@
+errSmmFuncMustReturnValue
+errSmmNoReturnValueNeeded
+errSmmBadReturnStmtType
+errSmmInvalidExprUsed
+errSmmGotUnexpectedToken
+wrnSmmNoEffectStmt
+errSmmUndefinedIdentifier
+errSmmOperandMustBeLVal
+
+MODULE sample0003
+:0 func:3:int32(param:1:int32)
+{
+    return:int32 
+}
+:0 proc:3(param:1:int32)
+{
+    :0 var1:1:int32
+    = var1:1:int32  int:2:123:int8 
+    return
+}
+:0 intFunc:3:int32(param:1:int32)
+{
+    return:int32 float:2:123.321:sfloat64 
+}
+:0 proc2:3()
+{
+}
+:0 x:1:int32 = int:2:123:int8 
+:0 y:1:int32 = int:2:432:int16 
++:4:int32 Ident:1:x:int32 int:2:122:int8 
+return:int32 int:2:0:int32

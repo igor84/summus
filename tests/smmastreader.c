@@ -221,8 +221,10 @@ static void processReturn(PSmmAstNode stmt, PSmmLexer lex, PSmmAllocator a) {
 	if (lastToken->kind == ':') {
 		stmt->type = smmGetDictValue(typeDict, smmGetNextToken(lex)->repr, false);
 		lastToken = smmGetNextToken(lex);
-		processExpression(&stmt->left, lex, a);
-		lastToken = smmGetNextToken(lex);
+		if (!lastToken->isFirstOnLine) {
+			processExpression(&stmt->left, lex, a);
+			lastToken = smmGetNextToken(lex);
+		}
 	}
 }
 
@@ -301,7 +303,7 @@ static void processGlobalSymbols(PSmmAstScopeNode scope, PSmmLexer lex, PSmmAllo
 				}
 				param = param->next;
 			}
-			funcNode->params->count = paramCount;
+			if (paramCount > 0) funcNode->params->count = paramCount;
 			lastToken = smmGetNextToken(lex);
 			if (lastToken->kind == '{') {
 				funcNode->body = newAstNode(nkSmmBlock, a);
