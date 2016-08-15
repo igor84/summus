@@ -24,8 +24,9 @@ MODULE sample0003
 }
 :0 proc2:3()
 {
+    return
 }
 :0 x:1:int32 = int:2:123:int8 
 :0 y:1:int32 = int:2:432:int16 
 +:4:int32 Ident:1:x:int32 int:2:122:int8 
-return:int32 int:2:0:int32
+return:int32 int:2:0:int32 

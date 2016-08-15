@@ -16,4 +16,4 @@ MODULE sample0004
 {
 }
 int:2:23:int8 
-return:int32 Ident:1:tst1:int32
+return:int32 Ident:1:tst1:int32 

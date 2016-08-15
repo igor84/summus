@@ -29,6 +29,7 @@ typedef struct LogicalExprData* PLogicalExprData;
 static LLVMValueRef processExpression(PSmmLLVMCodeGenData data, PSmmAstNode expr, PSmmAllocator a);
 
 static LLVMTypeRef getLLVMType(PSmmTypeInfo type) {
+	if (!type) return LLVMVoidType();
 	switch (type->kind) {
 	case tiSmmInt8: case tiSmmInt16: case tiSmmInt32: case tiSmmInt64:
 	case tiSmmUInt8: case tiSmmUInt16: case tiSmmUInt32: case tiSmmUInt64:
@@ -341,7 +342,6 @@ static LLVMValueRef createFunc(PSmmLLVMCodeGenData data, PSmmAstFuncDefNode astF
 
 static void processGlobalSymbols(PSmmLLVMCodeGenData data, PSmmAstNode decl, PSmmAllocator a) {
 	while (decl) {
-		LLVMTypeRef type = getLLVMType(decl->left->type);
 
 		if (decl->left->kind == nkSmmFunc) {
 			PSmmAstFuncDefNode funcNode = (PSmmAstFuncDefNode)decl->left;
@@ -402,6 +402,7 @@ static void processGlobalSymbols(PSmmLLVMCodeGenData data, PSmmAstNode decl, PSm
 			if (decl->left->kind == nkSmmConst) {
 				globalVar = val;
 			} else {
+				LLVMTypeRef type = getLLVMType(decl->left->type);
 				globalVar = LLVMAddGlobal(data->llvmModule, type, decl->left->token->repr);
 				LLVMSetGlobalConstant(globalVar, false);
 				LLVMSetInitializer(globalVar, val);

@@ -57,7 +57,7 @@ static void processExpression(PSmmAstNode expr, FILE* f, PSmmAllocator a) {
 			break;
 		}
 	case nkSmmInt:
-		if (expr->type->isUnsigned || expr->token->sintVal >= 0) {
+		if (expr->token->kind == tkSmmUInt) {
 			fprintf(f, "%s:%u:%s:%s ", nodeKindToString[expr->kind], getFlags(expr), expr->token->repr, expr->type->name);
 		} else {
 			fprintf(f, "%s:%u:-%s:%s ", nodeKindToString[expr->kind], getFlags(expr), expr->token->repr, expr->type->name);

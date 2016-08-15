@@ -1,0 +1,21 @@
+NoRetTypeAndNoRetStmt :: () {
+	//Ok
+}
+
+UndefinedType :: () -> {
+
+}
+
+UnexpectedToken :: () - {
+
+}
+
+UndefinedTypeButLegalReturn :: () -> int33 {
+	return 123;
+}
+
+x := -0xf000000000000000; // Warning loss of data
+
+y := x---; //Expected literal or identifier but got -
+
+z := x - (); // Expected expression but got )

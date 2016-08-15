@@ -39,6 +39,11 @@ static struct SmmTypeInfo builtInTypes[] = {
 	{ tiSmmSoftFloat64, 8, "/sfloat64/", 0, 0, 1 },
 };
 
+// We define temporary needed node kinds with huge start value so they don't overlap with real node kinds
+enum {
+	nkSmmParamDefinition = 100000
+};
+
 static PSmmBinaryOperator binOpPrecs[128] = { 0 };
 
 static struct SmmAstNode errorNode = { nkSmmError, 0, 0, 0, NULL, &builtInTypes[0] };
@@ -72,6 +77,21 @@ static PSmmAstScopeNode newScopeNode(PSmmParser parser) {
 	scope->returnType = parser->curScope->returnType;
 	parser->curScope = scope;
 	return scope;
+}
+
+static PSmmTypeInfo deduceTypeFrom(PSmmAstNode val) {
+	// If right value is just another variable or func call just copy its type
+	// but if it is expression then try to be a bit smarter.
+	if (val->kind == nkSmmIdent || val->kind == nkSmmParam || val->kind == nkSmmCall || !val->type) {
+		return val->type;
+	} else {
+		switch (val->type->kind) {
+		case tiSmmSoftFloat64: return &builtInTypes[tiSmmFloat32];
+		case tiSmmInt8: case tiSmmInt16: return &builtInTypes[tiSmmInt32];
+		case tiSmmUInt8: case tiSmmUInt16: return &builtInTypes[tiSmmUInt32];
+		default: return val->type;
+		}
+	}
 }
 
 static void getNextToken(PSmmParser parser) {
@@ -391,7 +411,7 @@ static PSmmAstNode parseFuncParams(PSmmParser parser, PSmmAstParamNode firstPara
 	}
 
 	int paramCount = 1;
-	firstParam->kind = nkSmmParam;
+	firstParam->kind = nkSmmParamDefinition;
 	firstParam->type = typeInfo;
 	firstParam->isIdent = true;
 	firstParam->level = parser->curScope->level + 1;
@@ -505,7 +525,7 @@ static PSmmAstNode parseFactor(PSmmParser parser) {
 		if (parser->curToken->kind == ')') {
 			getNextToken(parser);
 			if (canBeFuncDefn) {
-				PSmmAstParamNode param = newAstNode(nkSmmParam, parser->allocator);
+				PSmmAstParamNode param = newAstNode(nkSmmParamDefinition, parser->allocator);
 				param->count = 0;
 				return (PSmmAstNode)param;
 			}
@@ -526,7 +546,7 @@ static PSmmAstNode parseFactor(PSmmParser parser) {
 		}
 		if (!expect(parser, ')')) {
 			int tk = parser->curToken->kind;
-			if (res->kind != nkSmmParam || (tk != tkSmmRArrow && tk != '{' && tk != ';')) {
+			if (res->kind != nkSmmParamDefinition || (tk != tkSmmRArrow && tk != '{' && tk != ';')) {
 				if (findToken(parser, ')')) getNextToken(parser);
 				return &errorNode;
 			}
@@ -630,7 +650,7 @@ static PSmmAstNode parseBinOp(PSmmParser parser, PSmmAstNode left, int prec) {
 
 static PSmmAstNode parseExpression(PSmmParser parser) {
 	PSmmAstNode left = parseFactor(parser);
-	if (left != &errorNode) {
+	if (left != &errorNode && left->kind != nkSmmParamDefinition) {
 		left = parseBinOp(parser, left, 0);
 	}
 	return left;
@@ -671,8 +691,14 @@ static PSmmAstBlockNode parseBlock(PSmmParser parser, PSmmTypeInfo curFuncReturn
 
 	block->endsWithReturn = curStmt && (curStmt->kind == nkSmmReturn || (curStmt->kind == nkSmmBlock && ((PSmmAstBlockNode)curStmt)->endsWithReturn));
 
-	if (isFuncBlock && curFuncReturnType && !block->endsWithReturn && curStmt != &errorNode) {
-		smmPostMessage(errSmmFuncMustReturnValue, parser->curToken->filePos);
+	if (isFuncBlock) {
+		if (curFuncReturnType && curFuncReturnType->kind != tiSmmUnknown && !block->endsWithReturn && curStmt != &errorNode) {
+			smmPostMessage(errSmmFuncMustReturnValue, parser->curToken->filePos);
+		} else if ((!curFuncReturnType || curFuncReturnType->kind == tiSmmUnknown) && !block->endsWithReturn) {
+			PSmmAstNode retNode = newAstNode(nkSmmReturn, parser->allocator);
+			retNode->token = newToken(tkSmmReturn, "return", parser->curToken->filePos, parser->allocator);
+			*nextStmt = retNode;
+		}
 	}
 
 	expect(parser, '}');
@@ -718,7 +744,7 @@ static PSmmAstNode parseFunction(PSmmParser parser, PSmmAstFuncDefNode func) {
 		} else {
 			typeInfo = typeInfoNode->type;
 		}
-		getNextToken(parser);
+		if (parser->curToken->kind != '{') getNextToken(parser);
 	}
 	func->returnType = typeInfo;
 	if (parser->curToken->kind == '{') {
@@ -759,7 +785,7 @@ static PSmmAstNode getZeroValNode(PSmmParser parser, PSmmTypeInfo varType) {
 	zero->token = parser->allocator->alloc(parser->allocator, sizeof(struct SmmToken));
 	zero->token->filePos = parser->curToken->filePos;
 	if (varType->isInt) {
-		zero->token->kind = tkSmmInt;
+		zero->token->kind = tkSmmUInt;
 		zero->token->repr = "0";
 	} else if (varType->isFloat) {
 		zero->kind = nkSmmFloat;
@@ -787,18 +813,7 @@ static PSmmAstNode parseAssignment(PSmmParser parser, PSmmAstNode lval) {
 	getNextToken(parser);
 	PSmmAstNode val = parseExpression(parser);
 	if (lval != &errorNode && !lval->type) {
-		// If right value is just another variable or func call just copy its type
-		// but if it is expression then try to be a bit smarter.
-		if (val->kind == nkSmmIdent || val->kind == nkSmmCall || !val->type) {
-			lval->type = val->type;
-		}  else {
-			switch (val->type->kind) {
-			case tiSmmSoftFloat64: lval->type = &builtInTypes[tiSmmFloat32]; break;
-			case tiSmmInt8: case tiSmmInt16: lval->type = &builtInTypes[tiSmmInt32]; break;
-			case tiSmmUInt8: case tiSmmUInt16: lval->type = &builtInTypes[tiSmmUInt32]; break;
-			default: lval->type = val->type; break;
-			}
-		}
+		lval->type = deduceTypeFrom(val);
 	}
 	if (lval == &errorNode || val == &errorNode) {
 		findToken(parser, ';');
@@ -843,7 +858,8 @@ static PSmmAstNode parseDeclaration(PSmmParser parser, PSmmAstNode lval) {
 		lval->kind = nkSmmConst;
 		lval->isConst = true;
 		expr = parseAssignment(parser, lval);
-		if (expr->kind == nkSmmParam) {
+		if (expr->kind == nkSmmParamDefinition) {
+			expr->kind = nkSmmParam;
 			if (parser->curScope->level > 0) {
 				smmPostMessage(errSmmFuncUnderScope, lval->token->filePos, lval->token->repr);
 			}
@@ -961,7 +977,7 @@ static PSmmAstNode parseReturnStmt(PSmmParser parser) {
 		if (retType == &builtInTypes[tiSmmUnknown]) {
 			// We had problems trying to parse func return type so now we will assume type
 			// of this return stmt is return type of the function
-			parser->curScope->returnType = lval->type;
+			parser->curScope->returnType = deduceTypeFrom(lval);
 		} else if (!retType) {
 			smmPostMessage(errSmmNoReturnValueNeeded, retToken->filePos);
 		} else if (lval->type != retType && !isUpcastPossible(lval->type, retType) && lval->type->kind != tiSmmUnknown) {
