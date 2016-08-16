@@ -32,7 +32,13 @@ static void processExpression(PSmmAstNode expr, FILE* f, PSmmAllocator a) {
 			processExpression(expr->left, f, a);
 			break;
 		}
-	case nkSmmNot: case nkSmmCast:
+	case nkSmmNot:
+		{
+			fprintf(f, "%s:%u:%s ", expr->token->repr, getFlags(expr), expr->type->name);
+			processExpression(expr->left, f, a);
+			break;
+		}
+	case nkSmmCast:
 		{
 			fprintf(f, "%s:%u:%s ", nodeKindToString[expr->kind], getFlags(expr), expr->type->name);
 			processExpression(expr->left, f, a);
@@ -155,7 +161,7 @@ static void processGlobalSymbols(PSmmAstNode decl, FILE* f, PSmmAllocator a) {
 				fprintf(f, "%s:%u:%s", param->token->repr, getFlags((PSmmAstNode)param), param->type->name);
 				param = param->next;
 				while (param) {
-					fprintf(f, ", %s:%s", param->token->repr, param->type->name);
+					fprintf(f, ", %s:%u:%s", param->token->repr, getFlags((PSmmAstNode)param), param->type->name);
 					param = param->next;
 				}
 			}

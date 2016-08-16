@@ -61,7 +61,7 @@ static void processExpression(PSmmAstNode* exprField, PSmmLexer lex, PSmmAllocat
 	case tkSmmLtEq: kind = nkSmmLtEq; break;
 	case tkSmmGtEq: kind = nkSmmGtEq; break;
 	case '(': kind = nkSmmCall; break;
-	case tkSmmNot: kind = nkSmmNot; break;
+	case '!': case tkSmmNot: kind = nkSmmNot; break;
 	case tkSmmAndOp: kind = nkSmmAndOp; break;
 	case tkSmmXorOp: kind = nkSmmXorOp; break;
 	case tkSmmOrOp: kind = nkSmmOrOp; break;

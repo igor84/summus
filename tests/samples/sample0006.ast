@@ -1,0 +1,35 @@
+errSmmBangUsedAsNot
+errSmmIdentTaken
+errSmmRedefinition
+errSmmUnknownType
+errSmmGotUnexpectedToken
+errSmmUnknownType
+errSmmUndefinedIdentifier
+errSmmIdentTaken
+errSmmUndefinedIdentifier
+errSmmNotAFunction
+errSmmIdentTaken
+errSmmGotUnexpectedToken
+errSmmRedefinition
+
+MODULE sample0006
+:0 x:1:bool = bool:2:false:bool 
+:0 y:1:bool = bool:2:false:bool 
+:0 doNothing:3(a:1:int32, b:1:unknown)
+{
+    return
+}
+:0 beLazy:3(p1:1:unknown)
+{
+    return
+}
+:0 orWork:3(p1:1:unknown)
+{
+    return
+}
+:0 const1:3:int32 : +:6:int16 int:2:123:int8 int:2:456:int16 
+:0 someVar:1:int32 = +:6:int32 Const:3:const1:int32 int:2:12:int8 
+:0 otherVar:1:int16 = int:2:0:int16 
+= y:1:bool  !:0:bool Ident:1:x:bool 
+= otherVar:1:int16  int:2:12:int8 
+return:int32 int:2:0:int32 

@@ -4,7 +4,7 @@ tst1 := 100;
 
 {
 	tst :: (a: int) -> int { // Func not allowed outside global scope
-		y := a; // Undefined 'a'
+		y := a;
 		return y;
 		y = y + 3; //Unreachable code
 	}

@@ -287,7 +287,6 @@ static PSmmAstNode createNewIdent(PSmmParser parser, PSmmToken identToken) {
 	var->isIdent = true;
 	var->token = identToken;
 	var->level = parser->curScope->level;
-	smmPushDictValue(parser->idents, var->token->repr, var);
 	return (PSmmAstNode)var;
 }
 
@@ -303,13 +302,7 @@ static PSmmAstNode parseIdentFactor(PSmmParser parser) {
 			if (var->kind == nkSmmType) {
 				// If type identifier was used as variable identifier
 				const char* tokenStr = nodeKindToString[var->kind];
-				smmPostMessage(errSmmIdentTaken, parser->curToken->filePos, parser->curToken->repr, tokenStr);
-			} else if (!var->isIdent) {
-				// If variable name equals some keyword
-				const char* tokenStr = nodeKindToString[var->kind];
-				smmPostMessage(errSmmIdentTaken, parser->curToken->filePos, parser->curToken->repr, tokenStr);
-			} else if (!var->type) {
-				smmPostMessage(errSmmUndefinedIdentifier, parser->curToken->filePos, parser->curToken->repr);
+				smmPostMessage(errSmmIdentTaken, identToken->filePos, identToken->repr, tokenStr);
 			} else if (var->level < parser->curScope->level) {
 				res = createNewIdent(parser, identToken);
 			} else {
@@ -370,7 +363,7 @@ static PSmmAstNode parseIdentFactor(PSmmParser parser) {
 			if (var->kind == nkSmmType || !var->isIdent) {
 				// if type or keyword is used in place of variable
 				const char* tokenStr = nodeKindToString[var->kind];
-				smmPostMessage(errSmmIdentTaken, parser->curToken->filePos, parser->curToken->repr, tokenStr);
+				smmPostMessage(errSmmIdentTaken, identToken->filePos, identToken->repr, tokenStr);
 			} else {
 				res = newAstNode(nkSmmIdent, parser->allocator);
 				*res = *(PSmmAstNode)var;
@@ -415,11 +408,11 @@ static PSmmAstNode parseFuncParams(PSmmParser parser, PSmmAstParamNode firstPara
 	firstParam->type = typeInfo;
 	firstParam->isIdent = true;
 	firstParam->level = parser->curScope->level + 1;
+	smmPushDictValue(parser->idents, firstParam->token->repr, firstParam);
 
 	PSmmAstParamNode param = firstParam;
 
 	while (parser->curToken->kind == ',') {
-		paramCount++;
 		getNextToken(parser);
 		PSmmToken paramName = expect(parser, tkSmmIdent);
 		if (!paramName) {
@@ -438,14 +431,14 @@ static PSmmAstNode parseFuncParams(PSmmParser parser, PSmmAstParamNode firstPara
 		PSmmAstNode typeInfoNode = smmGetDictValue(parser->idents, paramTypeToken->repr, false);
 		PSmmTypeInfo paramTypeInfo = NULL;
 		if (!typeInfoNode || typeInfoNode->kind != nkSmmType) {
-			smmPostMessage(errSmmUnknownType, parser->curToken->filePos, parser->curToken->repr);
+			smmPostMessage(errSmmUnknownType, paramTypeToken->filePos, paramTypeToken->repr);
 			paramTypeInfo = &builtInTypes[tiSmmUnknown];
 		} else {
 			paramTypeInfo = typeInfoNode->type;
 		}
 		PSmmAstParamNode newParam = smmGetDictValue(parser->idents, paramName->repr, false);
 		if (newParam) {
-			if (newParam->kind == nkSmmParam && newParam->level == parser->curScope->level + 1) {
+			if (newParam->level == parser->curScope->level + 1) {
 				smmPostMessage(errSmmRedefinition, paramName->filePos, paramName->repr);
 				continue;
 			} else if (!newParam->isIdent) {
@@ -454,11 +447,13 @@ static PSmmAstNode parseFuncParams(PSmmParser parser, PSmmAstParamNode firstPara
 				continue;
 			}
 		}
+		paramCount++;
 		newParam = newAstNode(nkSmmParam, parser->allocator);
 		newParam->isIdent = true;
 		newParam->level = parser->curScope->level + 1;
 		newParam->token = paramName;
 		newParam->type = paramTypeInfo;
+		smmPushDictValue(parser->idents, paramName->repr, newParam);
 		param->next = newParam;
 		param = newParam;
 	}
@@ -603,6 +598,7 @@ static PSmmAstNode parseFactor(PSmmParser parser) {
 				neg->type = &builtInTypes[tiSmmInt32]; // Sem pass should handle this
 			}
 			neg->isConst = res->isConst;
+			neg->token = unary;
 			res = neg;
 		}
 		break;
@@ -612,6 +608,7 @@ static PSmmAstNode parseFactor(PSmmParser parser) {
 			not->left = res;
 			not->type = &builtInTypes[tiSmmBool];
 			not->isConst = res->isConst;
+			not->token = unary;
 			res = not;
 			break;
 		}
@@ -748,19 +745,9 @@ static PSmmAstNode parseFunction(PSmmParser parser, PSmmAstFuncDefNode func) {
 	}
 	func->returnType = typeInfo;
 	if (parser->curToken->kind == '{') {
-		PSmmAstParamNode param = func->params;
-		while (param) {
-			smmPushDictValue(parser->idents, param->token->repr, param);
-			param = param->next;
-		}
 		func->body = parseBlock(parser, typeInfo, true);
 		if (func->returnType == &builtInTypes[tiSmmUnknown]) {
 			func->returnType = func->body->scope->returnType;
-		}
-		param = func->params;
-		while (param) {
-			smmPopDictValue(parser->idents, param->token->repr);
-			param = param->next;
 		}
 	} else if (parser->curToken->kind != ';') {
 		if (!ignoreMissingSemicolon && parser->curToken->kind != tkSmmErr) {
@@ -774,6 +761,11 @@ static PSmmAstNode parseFunction(PSmmParser parser, PSmmAstFuncDefNode func) {
 		}
 		// Otherwise we assume ';' is forgotten so we don't do findToken here hoping normal stmt starts next
 		return &errorNode;
+	}
+	PSmmAstParamNode param = func->params;
+	while (param) {
+		smmPopDictValue(parser->idents, param->token->repr);
+		param = param->next;
 	}
 	return (PSmmAstNode)func;
 }
@@ -853,6 +845,7 @@ static PSmmAstNode parseDeclaration(PSmmParser parser, PSmmAstNode lval) {
 	PSmmAstNode expr = NULL;
 	if (parser->curToken->kind == '=') {
 		expr = parseAssignment(parser, lval);
+		smmPushDictValue(parser->idents, lval->token->repr, lval);
 	} else if (parser->curToken->kind == ':') {
 		PSmmToken constAssignToken = parser->curToken;
 		lval->kind = nkSmmConst;
@@ -871,6 +864,7 @@ static PSmmAstNode parseDeclaration(PSmmParser parser, PSmmAstNode lval) {
 				spareNode->kind = nkSmmDecl;
 				func->params = NULL;
 			}
+			smmPushDictValue(parser->idents, lval->token->repr, lval);
 			lval = parseFunction(parser, func);
 			expr = NULL;
 			if (parser->curScope->level > 0) {
@@ -878,8 +872,11 @@ static PSmmAstNode parseDeclaration(PSmmParser parser, PSmmAstNode lval) {
 				return NULL; // Skip adding the func to any scope
 			}
 		} else if (expr != &errorNode && !expr->isConst) {
+			smmPushDictValue(parser->idents, lval->token->repr, lval);
 			smmPostMessage(errNonConstInConstExpression, constAssignToken->filePos);
 			expr = NULL;
+		} else {
+			smmPushDictValue(parser->idents, lval->token->repr, lval);
 		}
 	} else if (parser->curToken->kind != ';') {
 		expr = &errorNode;
@@ -894,6 +891,8 @@ static PSmmAstNode parseDeclaration(PSmmParser parser, PSmmAstNode lval) {
 		if (!typeErrorReported) {
 			smmPostMessage(errSmmGotUnexpectedToken, parser->curToken->filePos, "type", "';'");
 		}
+	} else {
+		smmPushDictValue(parser->idents, lval->token->repr, lval);
 	}
 
 	if (expr == &errorNode || lval == &errorNode) {

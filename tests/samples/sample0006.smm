@@ -1,0 +1,32 @@
+x := false;
+y := !x; // Bang used as not
+
+doNothing :: (a: int32, int8: int32, a: int32, b: int33) {
+
+}
+
+beLazy :: (p1: +) {}
+
+orWork :: (p1: int33) {}
+
+z := z;
+
+typeUsedAsVar := 12 + int;
+
+missingFunc := z + mf();
+
+notAFunc := z - missingFunc();
+
+uint8 := 12; // ident taken as type
+
+and := 234;
+
+beLazy := 23; // Redefinition
+
+const1 :: 123 + 456;
+
+someVar := const1 + 12; // OK
+
+otherVar:int16;
+
+otherVar = 12; // OK
