@@ -56,6 +56,7 @@ struct SmmToken {
 	const char* repr;
 	struct SmmFilePos filePos;
 	union {
+		char* stringVal;
 		uint64_t uintVal;
 		int64_t sintVal;
 		double floatVal;

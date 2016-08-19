@@ -8,6 +8,8 @@ static PSmmAstNode getCastNode(PSmmAllocator a, PSmmAstNode node, PSmmTypeInfo p
 	cast->kind = nkSmmCast;
 	cast->left = node;
 	cast->type = parentType;
+	cast->next = node->next;
+	node->next = NULL;
 	return cast;
 }
 

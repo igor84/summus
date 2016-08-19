@@ -205,42 +205,15 @@ static bool isUpcastPossible(PSmmTypeInfo srcType, PSmmTypeInfo dstType) {
 	bool bothInts = dstType->isInt && srcType->isInt && (dstType->isUnsigned == srcType->isUnsigned);
 	bool bothFloats = dstType->isFloat && srcType->isFloat;
 	bool floatAndSoftFloat = srcType->kind == tiSmmSoftFloat64 && dstType->isFloat;
-	return floatAndSoftFloat || ((bothInts || bothFloats) && (dstType->kind > srcType->kind));
+	bool sameKindAndDstBigger = floatAndSoftFloat || ((bothInts || bothFloats) && (dstType->kind > srcType->kind));
+	bool intToFloat = srcType->isInt && dstType->isFloat;
+	return sameKindAndDstBigger || intToFloat;
 }
 
-/**
- * When func node is read from identDict it is copied to a new node whose params pointer
- * is then setup to point to original func node and is given here. Original func node is
- * linked with other overloaded funcs (funcs with same name but different parameters) over
- * the nextOverload pointer. Each func node has a list of params nodes. The given node
- * also has a list of concrete args with which it is called. This function goes through
- * all overloaded funcs and tries to match given arguments with each function's parameters.
- * If exact match is not found but a match where some arguments can be upcast to a bigger
- * type of the same kind (like from int8 to int32 but not to uint32) that func will be
- * used. If there are multiple such funcs we will say that it is undefined which one will
- * be called (because compiler implementation can change) and that explicit casts should
- * be used in such cases.
- *
- * Example:
- * func : (int32, float64, bool) -> int8;
- * func : (int32, float32) -> int16;
- * func(1000, 54.234, true);
- * Received node:                      ___node___
- *                              ___func          int16___
- *                      ___int32     |                   softFloat64___
- *               float32        ___func                                bool
- *                      ___int32
- *            ___float64
- *        bool
- * Output node:                        ___node___
- *                             ___int32          int16___
- *                   ___float64                          softFloat64___
- *               bool                                                  bool
- */
-static PSmmAstNode resolveCall(PSmmParser parser, PSmmAstCallNode node, PSmmAstFuncDefNode curFunc) {
+static PSmmAstFuncDefNode findFuncWithMatchingParams(PSmmAstNode argNode, PSmmAstFuncDefNode curFunc, bool softMatch) {
 	PSmmAstFuncDefNode softFunc = NULL;
 	while (curFunc) {
-		PSmmAstNode curArg = node->args;
+		PSmmAstNode curArg = argNode;
 		PSmmAstParamNode curParam = curFunc->params;
 		PSmmAstFuncDefNode tmpSoftFunc = NULL;
 		while (curParam && curArg) {
@@ -263,17 +236,51 @@ static PSmmAstNode resolveCall(PSmmParser parser, PSmmAstCallNode node, PSmmAstF
 			curFunc = curFunc->nextOverload;
 		}
 	}
-	if (!curFunc && softFunc) curFunc = softFunc;
-	if (curFunc) {
-		node->returnType = curFunc->returnType;
-		node->params = curFunc->params;
+	if (curFunc) return curFunc;
+	if (!softMatch) return NULL;
+	return softFunc;
+}
+
+/**
+ * When func node is read from identDict it is linked with other overloaded funcs (funcs
+ * with same name but different parameters) over the nextOverload pointer. Each func node
+ * has a list of params nodes. The given node also has a list of concrete args with which
+ * it is called. This function goes through all overloaded funcs and tries to match given
+ * arguments with each function's parameters. If exact match is not found but a match
+ * where some arguments can be upcast to a bigger type of the same kind (like from int8
+ * to int32 but not to uint32) that func will be used. If there are multiple such funcs
+ * we will say that it is undefined which one will be called (because compiler
+ * implementation can change) and that explicit casts should be used in such cases.
+ *
+ * Example:
+ * func : (int32, float64, bool) -> int8;
+ * func : (int32, float32) -> int16;
+ * func(1000, 54.234, true);
+ * Received node:                      ___node___
+ *                              ___func          int16___
+ *                      ___int32     |                   softFloat64___
+ *               float32        ___func                                bool
+ *                      ___int32
+ *            ___float64
+ *        bool
+ * Output node:                        ___node___
+ *                             ___int32          int16___
+ *                   ___float64                          softFloat64___
+ *               bool                                                  bool
+ */
+static PSmmAstNode resolveCall(PSmmAstCallNode node, PSmmAstFuncDefNode curFunc) {
+	PSmmAstFuncDefNode foundFunc = findFuncWithMatchingParams(node->args, curFunc, true);
+	if (foundFunc) {
+		node->returnType = foundFunc->returnType;
+		node->params = foundFunc->params;
+		node->token->stringVal = foundFunc->token->stringVal; // Copy mangled name
 		return (PSmmAstNode)node;
 	}
 	// Report error that we got a call with certain arguments but expected one of...
 	char callWithArgsBuf[FUNC_SIGNATURE_LENGTH] = { 0 };
 	char funcSignatures[8 * FUNC_SIGNATURE_LENGTH] = { 0 };
 	char* callWithArgs = getFuncCallAsString(node->token->repr, node->args, callWithArgsBuf);
-	char* signatures = getFuncsSignatureAsString((PSmmAstFuncDefNode)node->params, funcSignatures);
+	char* signatures = getFuncsSignatureAsString(curFunc, funcSignatures);
 	smmPostMessage(errSmmGotSomeArgsButExpectedOneOf, node->token->filePos, callWithArgs, signatures);
 	return &errorNode;
 }
@@ -304,6 +311,9 @@ static PSmmAstNode parseIdentFactor(PSmmParser parser) {
 				const char* tokenStr = nodeKindToString[var->kind];
 				smmPostMessage(errSmmIdentTaken, identToken->filePos, identToken->repr, tokenStr);
 			} else if (var->level < parser->curScope->level) {
+				res = createNewIdent(parser, identToken);
+			} else if (var->kind == nkSmmFunc) {
+				//Posible overload
 				res = createNewIdent(parser, identToken);
 			} else {
 				smmPostMessage(errSmmRedefinition, identToken->filePos, identToken->repr);
@@ -347,7 +357,8 @@ static PSmmAstNode parseIdentFactor(PSmmParser parser) {
 					findToken(parser, ')');
 				}
 				if (expect(parser, ')') && resCall->kind != nkSmmError) {
-					res = resolveCall(parser, resCall, (PSmmAstFuncDefNode)var);
+					res = resolveCall(resCall, (PSmmAstFuncDefNode)var);
+					res->isConst = false; // We need to reset this because 1 is copied from func def node
 				}
 				// Otherwise res remains equal to &errorNode
 			} else {
@@ -776,7 +787,8 @@ static PSmmAstNode getZeroValNode(PSmmParser parser, PSmmTypeInfo varType) {
 	zero->type = varType;
 	zero->token = parser->allocator->alloc(parser->allocator, sizeof(struct SmmToken));
 	zero->token->filePos = parser->curToken->filePos;
-	if (varType->isInt) {
+	if (varType->isInt || varType->kind == tiSmmUnknown) {
+		//Unknown type means there was some earlier error so we just default to int 0
 		zero->token->kind = tkSmmUInt;
 		zero->token->repr = "0";
 	} else if (varType->isFloat) {
@@ -823,6 +835,37 @@ static PSmmAstNode parseAssignment(PSmmParser parser, PSmmAstNode lval) {
 	return assignment;
 }
 
+static char* getMangledName(PSmmAstFuncDefNode func, PSmmAllocator a) {
+	size_t count = 1;
+	PSmmAstParamNode param = func->params;
+	if (param) count += param->count;
+	size_t* lengths = a->alloca(a, count * sizeof(size_t));
+	int part = 0;
+	size_t totalLen = 0;
+	lengths[part] = strlen(func->token->repr);
+	totalLen += lengths[part++] + 1;
+	while (param) {
+		lengths[part] = strlen(param->type->name);
+		totalLen += lengths[part++] + 1;
+		param = param->next;
+	}
+
+	char* buf = a->alloc(a, totalLen);
+	part = 0;
+	size_t pos = lengths[part++];
+	memcpy(buf, func->token->repr, pos);
+	param = func->params;
+	while (param) {
+		buf[pos++] = '_';
+		memcpy(&buf[pos], param->type->name, lengths[part]);
+		pos += lengths[part];
+		part++;
+		param = param->next;
+	}
+	a->freea(a, lengths);
+	return buf;
+}
+
 static PSmmAstNode parseDeclaration(PSmmParser parser, PSmmAstNode lval) {
 	PSmmToken declToken = parser->curToken;
 	assert(parser->curToken->kind == ':');
@@ -845,7 +888,15 @@ static PSmmAstNode parseDeclaration(PSmmParser parser, PSmmAstNode lval) {
 	PSmmAstNode expr = NULL;
 	if (parser->curToken->kind == '=') {
 		expr = parseAssignment(parser, lval);
-		smmPushDictValue(parser->idents, lval->token->repr, lval);
+		PSmmAstNode existing = smmGetDictValue(parser->idents, lval->token->repr, false);
+		if (existing && ((PSmmAstIdentNode)existing)->level == parser->curScope->level) {
+			// This can happen if existing is a function and only here we find out lval isn't overload
+			smmPostMessage(errSmmRedefinition, lval->token->filePos, lval->token->repr);
+			expr = &errorNode;
+		} else {
+			// even if expr returns error we want to add it to dict but its type might be unknown
+			smmPushDictValue(parser->idents, lval->token->repr, lval);
+		}
 	} else if (parser->curToken->kind == ':') {
 		PSmmToken constAssignToken = parser->curToken;
 		lval->kind = nkSmmConst;
@@ -864,19 +915,44 @@ static PSmmAstNode parseDeclaration(PSmmParser parser, PSmmAstNode lval) {
 				spareNode->kind = nkSmmDecl;
 				func->params = NULL;
 			}
+			PSmmAstFuncDefNode overload = smmGetDictValue(parser->idents, func->token->repr, false);
+			if (overload && overload->kind != nkSmmFunc) overload = NULL;
+			PSmmAstFuncDefNode redefinition = NULL;
+			if (overload) {
+				redefinition = findFuncWithMatchingParams((PSmmAstNode)func->params, overload, false);
+			}
 			smmPushDictValue(parser->idents, lval->token->repr, lval);
 			lval = parseFunction(parser, func);
 			expr = NULL;
-			if (parser->curScope->level > 0) {
+			if (redefinition) {
+				smmPostMessage(errSmmFuncRedefinition, func->token->filePos);
+			}
+			if (parser->curScope->level > 0 || redefinition) {
 				smmPopDictValue(parser->idents, lval->token->repr); // Remove func name from idents
 				return NULL; // Skip adding the func to any scope
 			}
+			func->nextOverload = overload;
+			func->token->stringVal = getMangledName(func, parser->allocator);
 		} else if (expr != &errorNode && !expr->isConst) {
-			smmPushDictValue(parser->idents, lval->token->repr, lval);
-			smmPostMessage(errNonConstInConstExpression, constAssignToken->filePos);
-			expr = NULL;
+			PSmmAstNode existing = smmGetDictValue(parser->idents, lval->token->repr, false);
+			if (existing && ((PSmmAstIdentNode)existing)->level == parser->curScope->level) {
+				// This can happen if existing is a function and only here we find out lval isn't overload
+				smmPostMessage(errSmmRedefinition, lval->token->filePos, lval->token->repr);
+				expr = &errorNode;
+			} else {
+				smmPushDictValue(parser->idents, lval->token->repr, lval);
+				smmPostMessage(errNonConstInConstExpression, constAssignToken->filePos);
+				expr = NULL;
+			}
 		} else {
-			smmPushDictValue(parser->idents, lval->token->repr, lval);
+			PSmmAstNode existing = smmGetDictValue(parser->idents, lval->token->repr, false);
+			if (existing && ((PSmmAstIdentNode)existing)->level == parser->curScope->level) {
+				// This can happen if existing is a function and only here we find out lval isn't overload
+				smmPostMessage(errSmmRedefinition, lval->token->filePos, lval->token->repr);
+				expr = &errorNode;
+			} else {
+				smmPushDictValue(parser->idents, lval->token->repr, lval);
+			}
 		}
 	} else if (parser->curToken->kind != ';') {
 		expr = &errorNode;

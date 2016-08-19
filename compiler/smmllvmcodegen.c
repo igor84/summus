@@ -213,7 +213,7 @@ static LLVMValueRef processExpression(PSmmLLVMCodeGenData data, PSmmAstNode expr
 	case nkSmmCall:
 		{
 			PSmmAstCallNode callNode = (PSmmAstCallNode)expr;
-			LLVMValueRef func = smmGetDictValue(data->localVars, callNode->token->repr, false);
+			LLVMValueRef func = smmGetDictValue(data->localVars, callNode->token->stringVal, false);
 			LLVMValueRef* args = NULL;
 			size_t argCount = 0;
 			if (callNode->params) {
@@ -335,8 +335,8 @@ static LLVMValueRef createFunc(PSmmLLVMCodeGenData data, PSmmAstFuncDefNode astF
 		a->freea(a, params);
 		params = NULL;
 	}
-	LLVMValueRef func = LLVMAddFunction(data->llvmModule, astFunc->token->repr, funcType);
-	smmPushDictValue(data->localVars, astFunc->token->repr, func);
+	LLVMValueRef func = LLVMAddFunction(data->llvmModule, astFunc->token->stringVal, funcType);
+	smmPushDictValue(data->localVars, astFunc->token->stringVal, func);
 	return func;
 }
 

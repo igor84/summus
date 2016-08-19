@@ -19,6 +19,7 @@ struct PrivAllocator {
 	size_t used;
 	size_t size;
 	size_t free;
+	size_t stackSize;
 	unsigned char* memory;
 	unsigned char* stack;
 };
@@ -35,6 +36,9 @@ typedef struct PrivDict* PPrivDict;
 Private Functions
 *********************************************************/
 
+//We align memory on 8 bytes and it mustn't be less then pointer size
+#define MEM_ALIGN 0x7
+
 static void abortWithAllocError(const char* msg, const char* allocatorName, size_t size, const int line) {
 	char wholeMsg[500] = {0};
 	snprintf(wholeMsg, 500, "ERROR: %s %s; Requested size: %zu", msg, allocatorName, size);
@@ -44,7 +48,7 @@ static void abortWithAllocError(const char* msg, const char* allocatorName, size
 static void* globalAlloc(PSmmAllocator allocator, size_t size) {
 	PPrivAllocator privAllocator = (PPrivAllocator) allocator;
 	privAllocator->used += size;
-	size = (size + 0xf) & ~0xf; //We align memory on 16 bytes
+	size = (size + MEM_ALIGN) & ~MEM_ALIGN;
 	if (size > privAllocator->free) {
 		smmPrintAllocatorInfo(allocator);
 		abortWithAllocError("Failed allocating memory in allocator", allocator->name, size, __LINE__);
@@ -62,9 +66,14 @@ static void* globalCAlloc(PSmmAllocator allocator, size_t count, size_t size) {
 static void* globalAllocA(PSmmAllocator allocator, size_t size) {
 	PPrivAllocator privAllocator = (PPrivAllocator)allocator;
 	void* loc = privAllocator->stack;
-	size = (size + 0x1f) & ~0xf;
+	size = (size + MEM_ALIGN + MEM_ALIGN) & ~MEM_ALIGN;
+	if (size > privAllocator->stackSize) {
+		smmPrintAllocatorInfo(allocator);
+		abortWithAllocError("Stack overflow in allocator", allocator->name, size, __LINE__);
+	}
 	privAllocator->stack += size;
-	*((size_t *)(privAllocator->stack - 0x10)) = size;
+	privAllocator->stackSize -= size;
+	*((size_t *)(privAllocator->stack - MEM_ALIGN - 1)) = size;
 	return loc;
 }
 
@@ -75,9 +84,10 @@ static void globalFree(PSmmAllocator allocator, void* ptr) {
 static void globalFreeA(PSmmAllocator allocator, void* ptr) {
 	if (!ptr) return;
 	PPrivAllocator privAllocator = (PPrivAllocator)allocator;
-	size_t lastSize = *((size_t *)(privAllocator->stack - 0x10));
+	size_t lastSize = *((size_t *)(privAllocator->stack - MEM_ALIGN - 1));
 	assert(lastSize);
 	privAllocator->stack -= lastSize;
+	privAllocator->stackSize += lastSize;
 	assert(privAllocator->stack == ptr);
 	memset(privAllocator->stack, 0, lastSize);
 }
@@ -243,16 +253,15 @@ void* smmPopDictValue(PSmmDict dict, const char* key) {
 }
 
 PSmmAllocator smmCreatePermanentAllocator(const char* name, size_t size) {
-	size = (size + 0xf) & ~0xf;
+	size = (size + MEM_ALIGN) & ~MEM_ALIGN;
 	size_t sizeWithStack = (size + 0x2fff) & ~0xfff; // Stack size is 8KB + round up to 4KB
 	PPrivAllocator smmAllocator = (PPrivAllocator)calloc(1, sizeWithStack);
 	if (!smmAllocator) {
 		abortWithAllocError("Failed creating allocator", name, sizeWithStack, __LINE__);
 	}
 	size_t skipBytes = sizeof(struct PrivAllocator);
-	skipBytes = (skipBytes + 0xf) & ~0xf;
-	smmAllocator->memory = (unsigned char*)smmAllocator + skipBytes;
-	smmAllocator->allocator.name = (char*)smmAllocator->memory;
+	skipBytes = (skipBytes + MEM_ALIGN) & ~MEM_ALIGN;
+	smmAllocator->allocator.name = (char*)smmAllocator + skipBytes;
 	strcpy(smmAllocator->allocator.name, name);
 	smmAllocator->allocator.alloc = globalAlloc;
 	smmAllocator->allocator.malloc = globalAlloc;
@@ -260,13 +269,14 @@ PSmmAllocator smmCreatePermanentAllocator(const char* name, size_t size) {
 	smmAllocator->allocator.free = globalFree;
 	smmAllocator->allocator.alloca = globalAllocA;
 	smmAllocator->allocator.freea = globalFreeA;
-	skipBytes += (strlen(name) + 1 + 0xf) & ~0xf;
+	skipBytes += (strlen(name) + 1 + MEM_ALIGN) & ~MEM_ALIGN;
 	smmAllocator->size = size - skipBytes;
 	smmAllocator->memory = (unsigned char*)smmAllocator + skipBytes;
 	smmAllocator->stack = (unsigned char*)smmAllocator + size;
 	smmAllocator->free = smmAllocator->size;
-	//We make sure we did setup everything so next mem alloc starts from 16 bytes aligned address
-	assert(((uintptr_t)smmAllocator->memory & 0xf) == 0);
+	smmAllocator->stackSize = sizeWithStack - size;
+	//We make sure we did setup everything so next mem alloc starts from aligned address
+	assert(((uintptr_t)smmAllocator->memory & MEM_ALIGN) == 0);
 	return &smmAllocator->allocator;
 }
 

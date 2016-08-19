@@ -145,7 +145,7 @@ struct SmmAstBlockNode {
 	SmmAstNodeKind kind;
 	uint32_t endsWithReturn : 1;
 	PSmmToken token;
-	PSmmTypeInfo zzNotUsed2;
+	PSmmTypeInfo zzNotUsed1;
 	PSmmAstNode next;
 	PSmmAstScopeNode scope;
 	PSmmAstNode stmts;

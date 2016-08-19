@@ -1,0 +1,26 @@
+add :: (l: float, r: float) -> float {
+	return l + r;
+}
+
+add :: (l: int, r: int) -> int {
+	return l + r;
+}
+
+add :: (z: float, u: float) -> float { // Func with same params already defined
+	return z + u;
+}
+
+a := 12;
+b := c : a; // Expected operatotor but got ':'
+
+a :: (param1:int) -> int { // a is alredy defined
+	return param1 + 2;     // param1 is not defined
+}
+
+b = add(a, 12.4); 
+
+sub :: (l: int, r: int) -> int {
+	return l - r;
+}
+
+sub := b;

@@ -39,6 +39,7 @@ static const char* msgTypeToString[] = {
 	"'%s' is not a function",
 	"expected expression that produces a value",
 	"function should not return any value",
+	"function with same parameters already defined",
 	
 	"possible loss of data in conversion from %s to %s",
 	"statement without effect",
