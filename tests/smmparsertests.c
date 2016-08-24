@@ -1,11 +1,12 @@
 #include "../compiler/smmcommon.h"
 #include "CuTest.h"
-#include "../compiler/smmparser.c"
+#include "../compiler/smmparser.h"
 #include "smmastwritter.h"
 #include "smmastreader.h"
 #include "smmastmatcher.h"
 #include "smmmsgsMockup.h"
 
+#include <string.h>
 #include <stdlib.h>
 
 static int sampleNo = 1;

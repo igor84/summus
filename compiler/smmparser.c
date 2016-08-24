@@ -178,6 +178,7 @@ static char* getFuncsSignatureAsString(PSmmAstFuncDefNode funcs, char* buf) {
 		if (buf[len - 1] != '(') len--;
 		buf[len++] = ')';
 		buf[len++] = '\n';
+		buf[len++] = ' ';
 		curFunc = curFunc->nextOverload;
 	}
 	buf[len - 1] = 0;

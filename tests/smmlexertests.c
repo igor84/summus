@@ -1,6 +1,6 @@
 #include "../compiler/smmcommon.h"
 #include "CuTest.h"
-#include "../compiler/smmlexer.c"
+#include "../compiler/smmlexer.h"
 #include "smmmsgsMockup.h"
 
 static PSmmAllocator allocator;
@@ -8,18 +8,6 @@ static SmmMsgType lastGotMsg;
 
 static void lexOnPostMessageCalled(SmmMsgType msgType) {
 	lastGotMsg = msgType;
-}
-
-static void TestSkipWhiteSpace(CuTest *tc) {
-#define spaces "   "
-#define newLines "\n\n"
-	char buf[] = spaces newLines spaces "whatever";
-	PSmmLexer lex = smmCreateLexer(buf, "testWhiteSpace", allocator);
-	skipWhitespaceFromBuffer(lex);
-	CuAssertIntEquals(tc, 'w', *lex->curChar);
-	CuAssertUIntEquals(tc, strlen(spaces newLines spaces), (int)lex->scanCount);
-	CuAssertUIntEquals(tc, strlen(spaces), lex->filePos.lineNumber);
-	CuAssertUIntEquals(tc, strlen(newLines) + 2, lex->filePos.lineOffset);
 }
 
 static void TestParseIdent(CuTest *tc) {
@@ -236,7 +224,6 @@ CuSuite* SmmLexerGetSuite() {
 	allocator = smmCreatePermanentAllocator("lexerTest", 64 * 1024 * 1024);
 	CuSuite* suite = CuSuiteNew();
 
-	SUITE_ADD_TEST(suite, TestSkipWhiteSpace);
 	SUITE_ADD_TEST(suite, TestParseIdent);
 	SUITE_ADD_TEST(suite, TestParseHexNumber);
 	SUITE_ADD_TEST(suite, TestParseNumber);

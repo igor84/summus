@@ -3,6 +3,7 @@ errSmmGotUnexpectedToken
 errSmmRedefinition
 errSmmUndefinedIdentifier
 errSmmRedefinition
+errSmmRedefinition
 
 MODULE sample0007
 :0 add:3:float32(l:1:float32, r:1:float32)
