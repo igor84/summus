@@ -75,7 +75,6 @@ static void TestSample(CuTest *tc) {
 	if (!module) return;
 	FILE* f = fopen(outFileName, "rb");
 	if (!f) {
-		snprintf(outFileName, 30, "samples/%sTST.ast", baseName);
 		f = fopen(outFileName, "ab");
 		if (!f) {
 			printf("Can't open %s for writing!\n", outFileName);

@@ -8,19 +8,24 @@ errSmmGotUnexpectedToken
 MODULE sample0005
 :0 NoRetTypeAndNoRetStmt:3()
 {
+    blockFlags:0
     return
 }
 :0 UndefinedType:3:unknown()
 {
+    blockFlags:0
     return
 }
 :0 UnexpectedToken:3()
 {
+    blockFlags:0
     return
 }
 :0 UndefinedTypeButLegalReturn:3:int32()
 {
+    blockFlags:1
     return:int32 int:2:123:int8 
 }
 :0 x:1:int64 = int:2:-0xf000000000000000:int64 
+blockFlags:0
 return:int32 int:2:0:int32 

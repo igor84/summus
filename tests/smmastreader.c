@@ -230,6 +230,10 @@ static void processReturn(PSmmAstNode stmt, PSmmLexer lex, PSmmAllocator a) {
 
 static void processBlock(PSmmAstBlockNode block, PSmmLexer lex, PSmmAllocator a) {
 	PSmmAstNode* stmt = &block->stmts;
+	assert(lastToken->kind == tkSmmIdent && lastToken->repr[0] == 'b');
+	smmGetNextToken(lex); // Skip ':'
+	readFlags((PSmmAstNode)block, smmGetNextToken(lex));
+	lastToken = smmGetNextToken(lex);
 	while (lastToken->kind != tkSmmEof && lastToken->kind != '}') {
 		switch (lastToken->kind) {
 		case '{':
@@ -312,6 +316,10 @@ static void processGlobalSymbols(PSmmAstScopeNode scope, PSmmLexer lex, PSmmAllo
 				processLocalSymbols(funcNode->body->scope, lex, a);
 				processBlock(funcNode->body, lex, a);
 				lastToken = smmGetNextToken(lex);
+			} else if (lastToken->kind == ';') {
+				lastToken = smmGetNextToken(lex);
+			} else {
+				assert(false && "Got function that is followed by unknown token");
 			}
 		} else {
 			if (lastToken->kind == ':') decl->left->kind = nkSmmConst;

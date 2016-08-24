@@ -122,6 +122,8 @@ static void processReturn(PSmmAstNode stmt, FILE* f, PSmmAllocator a) {
 
 static void processBlock(PSmmAstBlockNode block, int level, FILE* f, PSmmAllocator a) {
 	PSmmAstNode stmt = block->stmts;
+	if (level) fprintf(f, "%*s", level, " ");
+	fprintf(f, "blockFlags:%u\n", getFlags((PSmmAstNode)block));
 	while (stmt) {
 		if (level) fprintf(f, "%*s", level, " ");
 		switch (stmt->kind) {
@@ -165,12 +167,14 @@ static void processGlobalSymbols(PSmmAstNode decl, FILE* f, PSmmAllocator a) {
 					param = param->next;
 				}
 			}
-			fputs(")\n", f);
+			fputs(")", f);
 			if (funcNode->body) {
-				fputs("{\n", f);
+				fputs("\n{\n", f);
 				processLocalSymbols(funcNode->body->scope->decls, 4, f, a);
 				processBlock(funcNode->body, 4, f, a);
 				fputs("}\n", f);
+			} else {
+				fputs(";\n", f);
 			}
 		} else {
 			assert(decl->right && "Global var must have initializer");

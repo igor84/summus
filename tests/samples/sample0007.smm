@@ -25,3 +25,5 @@ sub :: (l: int, r: int) -> int {
 }
 
 sub := b;
+
+return b // Missing ';' on return statement

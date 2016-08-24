@@ -1,0 +1,26 @@
+func1 :: (a: int -> int { // Missing ')'
+	return a + 12;
+}
+
+func2 :: (a: int b:int); // Missing ')' before b
+
+func3 :: (a3: int, :int); // Expected identifier
+
+func4 :: (a3: int, b3); // Expected ':'
+
+func5 :: (a3: int, b3:); // Expected identifier
+
+func6 :: (a3: int,); // Expected ':'
+
+{
+	a := 122 // Missing ';'
+
+	b := int(a + 12; // Missing ')'
+
+	c := int(a,a); // Expected ')' after first a
+
+	func1(b; // Missing ')'
+
+	return b // Missing ';' on return statement
+
+// Missing }

@@ -134,6 +134,7 @@ static int findEitherToken(PSmmParser parser, int tokenKind1, int tokenKind2) {
 
 static PSmmToken expect(PSmmParser parser, int type) {
 	PSmmToken token = parser->curToken;
+	struct SmmFilePos filePos = token->filePos;
 	if (token->kind != type) {
 		if (token->kind != tkSmmErr && token->filePos.lineNumber != parser->lastErrorLine) {
 			// If it is smmErr, lexer already reported the error
@@ -142,15 +143,12 @@ static PSmmToken expect(PSmmParser parser, int type) {
 			struct SmmToken tmpToken = {type};
 			tmpToken.repr = tmpRepr;
 			const char* expected = smmTokenToString(&tmpToken, expBuf);
-			struct SmmFilePos filePos;
 			if (token->isFirstOnLine && parser->prevToken) {
 				filePos = parser->prevToken->filePos;
-			} else {
-				filePos = token->filePos;
 			}
 			smmPostMessage(errSmmNoExpectedToken, filePos, expected);
 		}
-		parser->lastErrorLine = token->filePos.lineNumber;
+		parser->lastErrorLine = filePos.lineNumber;
 		return NULL;
 	}
 	getNextToken(parser);
@@ -554,6 +552,14 @@ static PSmmAstNode parseFactor(PSmmParser parser) {
 		if (!expect(parser, ')')) {
 			int tk = parser->curToken->kind;
 			if (res->kind != nkSmmParamDefinition || (tk != tkSmmRArrow && tk != '{' && tk != ';')) {
+				if (res->kind == nkSmmParamDefinition) {
+					while (res) {
+						smmPopDictValue(parser->idents, res->token->repr);
+						PSmmAstNode oldParam = res;
+						res = res->next;
+						parser->allocator->free(parser->allocator, oldParam);
+					}
+				}
 				if (findToken(parser, ')')) getNextToken(parser);
 				return &errorNode;
 			}
@@ -1124,7 +1130,7 @@ static PSmmAstNode parseStatement(PSmmParser parser) {
 		return NULL;
 	case ';': return NULL; // Just skip empty statements
 	default:
-		if (parser->curToken->kind != tkSmmErr) {
+		if (parser->curToken->kind != tkSmmErr && parser->lastErrorLine != parser->curToken->filePos.lineNumber) {
 			char gotBuf[4];
 			const char* got = smmTokenToString(parser->curToken, gotBuf);
 			smmPostMessage(errSmmGotUnexpectedToken, parser->curToken->filePos, "valid statement", got);
