@@ -1,0 +1,38 @@
+bla :: (a: int16, b: int16) -> int32 {
+	return a + b;
+}
+
+// External definition
+putchar :: (char: int32) -> int32;
+
+ui32 : uint32 = 100;
+{
+	i8 : int8 = -1;
+	ui32 : uint32 = 20;
+	result := 123 + ui32 div i8;
+
+	z : uint8 = 180;
+	x :: 2- 4 * 0x817972143abcdef div 12312 - 3;
+	y:int64;
+	y = x - 123 + 0x23423fffdc - 123 * x;
+	y = 567 - (2 + 5 * int16(345.564));
+	f64:float64 = 123 + x / y;
+	f32:float32 = f64 * 323.23 / 54.543;
+	f64 = f32 * 2143.23/543.23;
+	r:int32=float64(f64+32.34);
+	r = r + bla(2,3);
+	putchar(65);
+	putchar(10);
+	
+	a := y > z and z;
+	b := f64 < f32 or f32 > x;
+	c := false;
+	d := true;
+	e := true;
+	f := false;
+	g := false;
+	h := true;
+	res := uint((a or b) and not (c or d) xor (e or f or g and h));
+	
+	return int(res);
+}

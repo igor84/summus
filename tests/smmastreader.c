@@ -152,17 +152,26 @@ static void processExpression(PSmmAstNode* exprField, PSmmLexer lex, PSmmAllocat
 		}
 	case nkSmmParam: case nkSmmIdent: case nkSmmConst:
 	case nkSmmInt: case nkSmmFloat: case nkSmmBool:
-		readFlags(expr, smmGetNextToken(lex));
-		smmGetNextToken(lex); // skip ':'
-		expr->token = smmGetNextToken(lex);
-		if (expr->token->kind == '-') {
+		{
+			readFlags(expr, smmGetNextToken(lex));
+			smmGetNextToken(lex); // skip ':'
 			expr->token = smmGetNextToken(lex);
-			if (expr->kind == nkSmmInt) expr->token->sintVal = -expr->token->sintVal;
-			else expr->token->floatVal = -expr->token->floatVal;
+			bool isNeg = false;
+			if (expr->token->kind == '-') {
+				isNeg = true;
+				expr->token = smmGetNextToken(lex);
+			}
+			if (expr->kind == nkSmmFloat && expr->token->kind != tkSmmFloat) {
+				expr->token->floatVal = (double)expr->token->uintVal;
+			}
+			if (isNeg) {
+				if (expr->kind == nkSmmInt) expr->token->sintVal = -expr->token->sintVal;
+				else expr->token->floatVal = -expr->token->floatVal;
+			}
+			smmGetNextToken(lex); // skip ':'
+			expr->type = smmGetDictValue(typeDict, smmGetNextToken(lex)->repr, false);
+			break;
 		}
-		smmGetNextToken(lex); // skip ':'
-		expr->type = smmGetDictValue(typeDict, smmGetNextToken(lex)->repr, false);
-		break;
 	default:
 		assert(false && "Got unexpected node type in processExpression while parsing AST");
 		break;
@@ -234,7 +243,8 @@ static void processBlock(PSmmAstBlockNode block, PSmmLexer lex, PSmmAllocator a)
 	smmGetNextToken(lex); // Skip ':'
 	readFlags((PSmmAstNode)block, smmGetNextToken(lex));
 	lastToken = smmGetNextToken(lex);
-	while (lastToken->kind != tkSmmEof && lastToken->kind != '}') {
+	while (lastToken->kind != tkSmmEof && lastToken->kind != '}' &&
+			!(lastToken->kind == tkSmmIdent && strcmp(lastToken->repr, "ENDMODULE") == 0)) {
 		switch (lastToken->kind) {
 		case '{':
 			{
@@ -353,7 +363,6 @@ PSmmAstNode smmLoadAst(PSmmLexer lex, PSmmAllocator a) {
 	initTypeDict();
 	PSmmAstNode module = newAstNode(nkSmmProgram, a);
 	module->token = smmGetNextToken(lex);
-
 
 	PSmmAstBlockNode globalBlock = newAstNode(nkSmmBlock, a);
 	module->next = (PSmmAstNode)globalBlock;

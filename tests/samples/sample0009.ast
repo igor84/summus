@@ -1,0 +1,114 @@
+wrnSmmComparingSignedAndUnsigned
+
+MODULE sample0009
+:0 bla:3:int32(a:1:int16, b:1:int16)
+{
+    blockFlags:1
+    return:int32 +:4:int16 param:1:a:int16 param:1:b:int16 
+}
+:0 putchar:3:int32(char:1:int32);
+:0 ui32:1:uint32 = int:2:100:int8 
+blockFlags:0
+{
+    :0 i8:1:int8
+    :0 ui32:1:uint32
+    :0 result:1:int32
+    :0 z:1:uint8
+    :0 x:3:int64 = -:6:int64 -:6:int64 int:2:2:int8 sdiv:6:int64 *:6:int64 int:2:4:int8 int:2:0x817972143abcdef:int64 int:2:12312:int16 int:2:3:int8 
+    :0 y:1:int64
+    :0 f64:1:float64
+    :0 f32:1:float32
+    :0 r:1:int32
+    :0 a:1:bool
+    :0 b:1:bool
+    :0 c:1:bool
+    :0 d:1:bool
+    :0 e:1:bool
+    :0 f:1:bool
+    :0 g:1:bool
+    :0 h:1:bool
+    :0 res:1:uint32
+    blockFlags:1
+    = i8:1:int8  int:2:-1:int8 
+    = ui32:1:uint32  int:2:20:int8 
+    = result:1:int32  +:4:int32 int:2:123:int8 sdiv:4:int32 Ident:1:ui32:uint32 Ident:1:i8:int8 
+    = z:1:uint8  int:2:180:int16 
+    = y:1:int64  int:2:0:int64 
+    = y:1:int64  -:6:int64 +:6:int64 -:6:int64 Const:3:x:int64 int:2:123:int8 int:2:0x23423fffdc:int64 *:6:int64 int:2:123:int8 Const:3:x:int64 
+    = y:1:int64  -:6:int16 int:2:567:int16 +:6:int16 int:2:2:int8 *:6:int16 int:2:5:int8 cast:2:int16 float:2:345.564:sfloat64 
+    = f64:1:float64  +.:4:sfloat64 int:2:123:int8 /:4:sfloat64 Const:3:x:int64 Ident:1:y:int64 
+    = f32:1:float32  /:4:sfloat64 *.:4:sfloat64 Ident:1:f64:float64 float:2:323.23:sfloat64 float:2:54.543:sfloat64 
+    = f64:1:float64  /:4:sfloat64 *.:4:sfloat64 Ident:1:f32:float32 float:2:2143.23:sfloat64 float:2:543.23:sfloat64 
+    = r:1:int32  cast:0:float64 +.:4:sfloat64 Ident:1:f64:float64 float:2:32.34:sfloat64 
+    = r:1:int32  +:4:int32 Ident:1:r:int32 (bla:1:int32(int:2:2:int8 , int:2:3:int8 )) 
+    (putchar:1:int32(int:2:65:int8 )) 
+    (putchar:1:int32(int:2:10:int8 )) 
+    = a:1:bool  and:4:bool >:4:bool Ident:1:y:int64 cast:0:int64 Ident:1:z:uint8 Ident:1:z:uint8 
+    = b:1:bool  or:4:bool <:4:bool Ident:1:f64:float64 Ident:1:f32:float32 >:4:bool Ident:1:f32:float32 Const:3:x:int64 
+    = c:1:bool  bool:2:false:bool 
+    = d:1:bool  bool:2:true:bool 
+    = e:1:bool  bool:2:true:bool 
+    = f:1:bool  bool:2:false:bool 
+    = g:1:bool  bool:2:false:bool 
+    = h:1:bool  bool:2:true:bool 
+    = res:1:uint32  cast:0:uint32 xor:4:bool and:4:bool or:4:bool Ident:1:a:bool Ident:1:b:bool not:0:bool or:4:bool Ident:1:c:bool Ident:1:d:bool or:4:bool or:4:bool Ident:1:e:bool Ident:1:f:bool and:4:bool Ident:1:g:bool Ident:1:h:bool 
+    return:int32 cast:0:int32 Ident:1:res:uint32 
+}
+ENDMODULE
+
+wrnSmmConversionDataLoss
+
+MODULE sample0009
+:0 bla:3:int32(a:1:int16, b:1:int16)
+{
+    blockFlags:1
+    return:int32 +:4:int32 cast:0:int32 param:1:a:int16 cast:0:int32 param:1:b:int16 
+}
+:0 putchar:3:int32(char:1:int32);
+:0 ui32:1:uint32 = int:2:100:uint32 
+blockFlags:0
+{
+    :0 i8:1:int8
+    :0 ui32:1:uint32
+    :0 result:1:int32
+    :0 z:1:uint8
+    :0 x:3:int64 = -:6:int64 -:6:int64 int:2:2:int64 sdiv:6:int64 *:6:int64 int:2:4:int64 int:2:0x817972143abcdef:int64 int:2:12312:int64 int:2:3:int64 
+    :0 y:1:int64
+    :0 f64:1:float64
+    :0 f32:1:float32
+    :0 r:1:int32
+    :0 a:1:bool
+    :0 b:1:bool
+    :0 c:1:bool
+    :0 d:1:bool
+    :0 e:1:bool
+    :0 f:1:bool
+    :0 g:1:bool
+    :0 h:1:bool
+    :0 res:1:uint32
+    blockFlags:1
+    = i8:1:int8  int:2:-1:int8 
+    = ui32:1:uint32  int:2:20:uint32 
+    = result:1:int32  +:4:int32 int:2:123:int32 sdiv:4:int32 cast:0:int32 Ident:1:ui32:uint32 cast:0:int32 Ident:1:i8:int8 
+    = z:1:uint8  int:2:180:uint8 
+    = y:1:int64  int:2:0:int64 
+    = y:1:int64  -:6:int64 +:6:int64 -:6:int64 Const:3:x:int64 int:2:123:int64 int:2:0x23423fffdc:int64 *:6:int64 int:2:123:int64 Const:3:x:int64 
+    = y:1:int64  -:6:int64 int:2:567:int64 +:6:int64 int:2:2:int64 *:6:int64 int:2:5:int64 cast:0:int64 cast:2:int16 float:2:345.564:float32 
+    = f64:1:float64  +.:4:float64 float:2:123:float64 /:4:float64 cast:0:float64 Const:3:x:int64 cast:0:float64 Ident:1:y:int64 
+    = f32:1:float32  /:4:float32 *.:4:float32 cast:0:float32 Ident:1:f64:float64 float:2:323.23:float32 float:2:54.543:float32 
+    = f64:1:float64  /:4:float64 *.:4:float64 cast:0:float64 Ident:1:f32:float32 float:2:2143.23:float64 float:2:543.23:float64 
+    = r:1:int32  cast:0:int32 +.:4:float64 Ident:1:f64:float64 float:2:32.34:float64 
+    = r:1:int32  +:4:int32 Ident:1:r:int32 (bla:1:int32(int:2:2:int16 , int:2:3:int16 )) 
+    (putchar:1:int32(int:2:65:int32 )) 
+    (putchar:1:int32(int:2:10:int32 )) 
+    = a:1:bool  and:4:bool >:4:bool Ident:1:y:int64 cast:0:int64 Ident:1:z:uint8 !=:4:bool Ident:1:z:uint8 int:2:-!=:uint8 
+    = b:1:bool  or:4:bool <:4:bool Ident:1:f64:float64 cast:0:float64 Ident:1:f32:float32 >:4:bool Ident:1:f32:float32 cast:0:float32 Const:3:x:int64 
+    = c:1:bool  bool:2:false:bool 
+    = d:1:bool  bool:2:true:bool 
+    = e:1:bool  bool:2:true:bool 
+    = f:1:bool  bool:2:false:bool 
+    = g:1:bool  bool:2:false:bool 
+    = h:1:bool  bool:2:true:bool 
+    = res:1:uint32  cast:0:uint32 xor:4:bool and:4:bool or:4:bool Ident:1:a:bool Ident:1:b:bool not:0:bool or:4:bool Ident:1:c:bool Ident:1:d:bool or:4:bool or:4:bool Ident:1:e:bool Ident:1:f:bool and:4:bool Ident:1:g:bool Ident:1:h:bool 
+    return:int32 cast:0:int32 Ident:1:res:uint32 
+}

@@ -1,6 +1,7 @@
 #include "../compiler/smmcommon.h"
 #include "CuTest.h"
 #include "../compiler/smmparser.h"
+#include "../compiler/smmsempass.h"
 #include "smmastwritter.h"
 #include "smmastreader.h"
 #include "smmastmatcher.h"
@@ -14,10 +15,12 @@ static char* msgTypeEnumToString[hintSmmTerminator + 1];
 static PSmmDict msgTypeStrToEnum;
 
 #define MAX_MSGS 100
+#define WARNING_START wrnSmmConversionDataLoss
 
 static struct {
 	char* msgs[MAX_MSGS];
 	int msgCount;
+	bool thereWereErrors;
 } receivedMsgs;
 
 #define SAMPLE_FORMAT "sample%.4d"
@@ -25,6 +28,11 @@ static struct {
 void parserOnPostMessage(SmmMsgType msgType) {
 	receivedMsgs.msgs[receivedMsgs.msgCount] = msgTypeEnumToString[msgType];
 	receivedMsgs.msgCount++;
+	receivedMsgs.thereWereErrors = receivedMsgs.thereWereErrors || (msgType < WARNING_START);
+}
+
+static void clearReceivedMsgs() {
+	memset(&receivedMsgs, 0, sizeof(receivedMsgs));
 }
 
 static PSmmAstNode loadModule(const char* filename, const char* moduleName, PSmmAllocator a) {
@@ -37,13 +45,11 @@ static PSmmAstNode loadModule(const char* filename, const char* moduleName, PSmm
 	fread(filebuf, 1, 64 * 1024, f);
 	fclose(f);
 
-	onPostMessageCalled = parserOnPostMessage;
 	PSmmLexer lex = smmCreateLexer(filebuf, moduleName, a);
 
 	PSmmParser parser = smmCreateParser(lex, a);
 
 	PSmmAstNode module = smmParse(parser);
-	onPostMessageCalled = NULL;
 
 	return module;
 }
@@ -61,8 +67,16 @@ static void checkMsgs(CuTest* tc, PSmmLexer lex) {
 	CuAssertIntEquals_Msg(tc, "Number of reported messages not matched", msgCount, receivedMsgs.msgCount);
 }
 
+static void writeReceivedMsgs(FILE* f) {
+	for (int i = 0; i < receivedMsgs.msgCount; i++) {
+		fprintf(f, "%s\n", receivedMsgs.msgs[i]);
+	}
+	fputs("\n", f);
+}
+
 static void TestSample(CuTest *tc) {
-	memset(&receivedMsgs, 0, sizeof(receivedMsgs));
+	clearReceivedMsgs();
+	onPostMessageCalled = parserOnPostMessage;
 
 	char baseName[20] = { 0 };
 	snprintf(baseName, 20, SAMPLE_FORMAT, sampleNo++);
@@ -80,11 +94,15 @@ static void TestSample(CuTest *tc) {
 			printf("Can't open %s for writing!\n", outFileName);
 			exit(EXIT_FAILURE);
 		}
-		for (int i = 0; i < receivedMsgs.msgCount; i++) {
-			fprintf(f, "%s\n", receivedMsgs.msgs[i]);
-		}
-		fputs("\n", f);
+		writeReceivedMsgs(f);
 		smmOutputAst(module, f, a);
+		if (!receivedMsgs.thereWereErrors) {
+			clearReceivedMsgs();
+			fputs("ENDMODULE\n\n", f);
+			smmExecuteSemPass(module, a);
+			writeReceivedMsgs(f);
+			smmOutputAst(module, f, a);
+		}
 		fclose(f);
 		printf("Generated new test data for %s\n", baseName);
 	} else {
@@ -95,8 +113,18 @@ static void TestSample(CuTest *tc) {
 		checkMsgs(tc, lex);
 		PSmmAstNode refModule = smmLoadAst(lex, a);
 		smmAssertASTEquals(tc, refModule, module);
+		a->free(a, refModule);
+		refModule = NULL;
+		if (!receivedMsgs.thereWereErrors) {
+			clearReceivedMsgs();
+			smmExecuteSemPass(module, a);
+			checkMsgs(tc, lex);
+			refModule = smmLoadAst(lex, a);
+			smmAssertASTEquals(tc, refModule, module);
+		}
 	}
 
+	onPostMessageCalled = NULL;
 	smmPrintAllocatorInfo(a);
 	smmFreePermanentAllocator(a);
 }
@@ -138,7 +166,7 @@ static void loadMsgStrings(PSmmAllocator a) {
 CuSuite* SmmParserGetSuite() {
 	CuSuite* suite = CuSuiteNew();
 	loadMsgStrings(smmCreatePermanentAllocator("msgData", 4 * 1024));
-	for (int i = 1; i < 10000; i++) {
+	for (int i = sampleNo; i < 10000; i++) {
 		char filename[30] = { 0 };
 		snprintf(filename, 30, "samples/" SAMPLE_FORMAT ".smm", i);
 		FILE* f = fopen(filename, "rb");
