@@ -1,0 +1,16 @@
+testFunc :: (p1: int) {}
+testFunc :: (p1: int, p2: int) {}
+
+testFunc :: 23; // Redefinition
+testFunc := 23; // Redefinition
+a := 12;
+testFunc :: 23 + a; // Redefinition
+
+test :: (test: int) -> int {
+	test(12); // Not a function
+	return test;
+}
+
+z := test; // Expected '(' after function ident
+
+return test(12);

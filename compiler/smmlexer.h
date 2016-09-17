@@ -50,9 +50,9 @@ struct SmmSymbol {
 typedef struct SmmSymbol* PSmmSymbol;
 
 struct SmmToken {
-	int kind;
-	int isFirstOnLine : 1;
-	int canBeNewSymbol : 1;
+	uint32_t kind;
+	uint32_t isFirstOnLine : 1;
+	uint32_t canBeNewSymbol : 1;
 	const char* repr;
 	struct SmmFilePos filePos;
 	union {

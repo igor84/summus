@@ -70,7 +70,10 @@ typedef enum {
 	nkSmmAndOp, nkSmmXorOp, nkSmmOrOp,
 	nkSmmEq, nkSmmNotEq, nkSmmGt, nkSmmGtEq, nkSmmLt, nkSmmLtEq, nkSmmNot,
 
-	nkSmmTerminator
+	nkSmmTerminator,
+
+	// We define temporary needed node kinds with huge start value so they don't overlap with real node kinds
+	nkSmmParamDefinition = 100000
 } SmmAstNodeKind;
 
 const char* nodeKindToString[nkSmmTerminator];
@@ -81,7 +84,7 @@ const char* nodeKindToString[nkSmmTerminator];
  * Float32 or Float64 and will be converted to those types eventually.
  */
 typedef enum {
-	tiSmmUnknown, tiSmmBool,
+	tiSmmUnknown, tiSmmUnspecified, tiSmmBool,
 	tiSmmUInt8, tiSmmUInt16, tiSmmUInt32, tiSmmUInt64,
 	tiSmmInt8, tiSmmInt16, tiSmmInt32, tiSmmInt64,
 	tiSmmFloat32, tiSmmFloat64, tiSmmSoftFloat64,

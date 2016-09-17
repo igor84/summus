@@ -29,19 +29,16 @@ const char* nodeKindToString[] = {
 	"==", "!=", ">", ">=", "<", "<=", "not",
 };
 
+// Flags after the name: isInt, isUnsigned, isFloat, isBool
 static struct SmmTypeInfo builtInTypes[] = {
-	{ tiSmmUnknown, 0, "/unknown/"}, { tiSmmBool, 1, "bool", 0, 0, 0, 1 },
+	{ tiSmmUnknown, 0, "/unknown/"}, { tiSmmUnspecified, 0, "/unspecified/"},
+	{ tiSmmBool, 1, "bool", 0, 0, 0, 1 },
 	{ tiSmmUInt8, 1, "uint8", 1, 1 }, { tiSmmUInt16, 2, "uint16", 1, 1 },
 	{ tiSmmUInt32, 4, "uint32", 1, 1 }, { tiSmmUInt64, 8, "uint64", 1, 1 },
 	{ tiSmmInt8, 1, "int8", 1 }, { tiSmmInt16, 2, "int16", 1 },
 	{ tiSmmInt32, 4, "int32", 1 }, { tiSmmInt64, 8, "int64", 1 },
 	{ tiSmmFloat32, 4, "float32", 0, 0, 1 }, { tiSmmFloat64, 8, "float64", 0, 0, 1 },
 	{ tiSmmSoftFloat64, 8, "/sfloat64/", 0, 0, 1 },
-};
-
-// We define temporary needed node kinds with huge start value so they don't overlap with real node kinds
-enum {
-	nkSmmParamDefinition = 100000
 };
 
 static PSmmBinaryOperator binOpPrecs[128] = { 0 };
@@ -132,7 +129,7 @@ static int findEitherToken(PSmmParser parser, int tokenKind1, int tokenKind2) {
 	return 0;
 }
 
-static PSmmToken expect(PSmmParser parser, int type) {
+static PSmmToken expect(PSmmParser parser, uint32_t type) {
 	PSmmToken token = parser->curToken;
 	struct SmmFilePos filePos = token->filePos;
 	if (token->kind != type) {
@@ -374,6 +371,8 @@ static PSmmAstNode parseIdentFactor(PSmmParser parser) {
 				// if type or keyword is used in place of variable
 				const char* tokenStr = nodeKindToString[var->kind];
 				smmPostMessage(errSmmIdentTaken, identToken->filePos, identToken->repr, tokenStr);
+			} else if (var->kind == nkSmmFunc) {
+				smmPostMessage(errSmmGotUnexpectedToken, parser->curToken->filePos, "(", parser->curToken->repr);
 			} else {
 				res = newAstNode(nkSmmIdent, parser->allocator);
 				*res = *(PSmmAstNode)var;
@@ -741,7 +740,7 @@ static PSmmAstNode parseFunction(PSmmParser parser, PSmmAstFuncDefNode func) {
 			do {
 				getNextToken(parser);
 				curKind = parser->curToken->kind;
-			} while (curKind != tkSmmRArrow && curKind != '{' && curKind != ';' && curKind != tkSmmEof);
+			} while (curKind != tkSmmRArrow && !isTerminatingToken(curKind));
 		} 
 		// Otherwise assume ';' was forgotten
 		ignoreMissingSemicolon = true;
@@ -896,8 +895,9 @@ static PSmmAstNode parseDeclaration(PSmmParser parser, PSmmAstNode lval) {
 	if (parser->curToken->kind == '=') {
 		expr = parseAssignment(parser, lval);
 		PSmmAstNode existing = smmGetDictValue(parser->idents, lval->token->repr, false);
-		if (existing && ((PSmmAstIdentNode)existing)->level == parser->curScope->level) {
+		if (existing && existing->kind == nkSmmFunc && parser->curScope->level == 0) {
 			// This can happen if existing is a function and only here we find out lval isn't overload
+			// because only here we get to assignment after we already recognized it is declaration
 			smmPostMessage(errSmmRedefinition, lval->token->filePos, lval->token->repr);
 			expr = &errorNode;
 		} else {
@@ -922,13 +922,25 @@ static PSmmAstNode parseDeclaration(PSmmParser parser, PSmmAstNode lval) {
 				spareNode->kind = nkSmmDecl;
 				func->params = NULL;
 			}
+			PSmmAstParamNode param = NULL;
 			PSmmAstFuncDefNode overload = smmGetDictValue(parser->idents, func->token->repr, false);
+			if (overload && overload->kind == nkSmmParam) {
+				// This can happen if param of this function is called the same as the function
+				// and we now need to exchange positions in idents stack for this name
+				param = smmPopDictValue(parser->idents, func->token->repr);
+				overload = smmGetDictValue(parser->idents, func->token->repr, false);
+			}
 			if (overload && overload->kind != nkSmmFunc) overload = NULL;
 			PSmmAstFuncDefNode redefinition = NULL;
 			if (overload) {
 				redefinition = findFuncWithMatchingParams((PSmmAstNode)func->params, overload, false);
 			}
+			// We add this func to dict even if it is redefinition so that following parseFunction
+			// can do its job properly in case of recursive calls for example. We remove it later
+			// from idents if it is redefition.
 			smmPushDictValue(parser->idents, lval->token->repr, lval);
+			// If there was a param named the same as func we now return it to top of ident stack
+			if (param) smmPushDictValue(parser->idents, param->token->repr, param);
 			lval = parseFunction(parser, func);
 			expr = NULL;
 			if (redefinition) {
@@ -942,7 +954,7 @@ static PSmmAstNode parseDeclaration(PSmmParser parser, PSmmAstNode lval) {
 			func->token->stringVal = getMangledName(func, parser->allocator);
 		} else if (expr != &errorNode && !expr->isConst) {
 			PSmmAstNode existing = smmGetDictValue(parser->idents, lval->token->repr, false);
-			if (existing && ((PSmmAstIdentNode)existing)->level == parser->curScope->level) {
+			if (existing && existing->kind == nkSmmFunc && parser->curScope->level == 0) {
 				// This can happen if existing is a function and only here we find out lval isn't overload
 				smmPostMessage(errSmmRedefinition, lval->token->filePos, lval->token->repr);
 				expr = &errorNode;
@@ -953,7 +965,7 @@ static PSmmAstNode parseDeclaration(PSmmParser parser, PSmmAstNode lval) {
 			}
 		} else {
 			PSmmAstNode existing = smmGetDictValue(parser->idents, lval->token->repr, false);
-			if (existing && ((PSmmAstIdentNode)existing)->level == parser->curScope->level) {
+			if (existing && existing->kind == nkSmmFunc && parser->curScope->level == 0) {
 				// This can happen if existing is a function and only here we find out lval isn't overload
 				smmPostMessage(errSmmRedefinition, lval->token->filePos, lval->token->repr);
 				expr = &errorNode;
@@ -972,6 +984,7 @@ static PSmmAstNode parseDeclaration(PSmmParser parser, PSmmAstNode lval) {
 	} else if (typeInfo == NULL) {
 		expr = &errorNode;
 		if (!typeErrorReported) {
+			// In case of a statement like 'a :;'
 			smmPostMessage(errSmmGotUnexpectedToken, parser->curToken->filePos, "type", "';'");
 		}
 	} else {
@@ -1154,7 +1167,7 @@ static PSmmTypeInfo getCommonTypeFromOperands(PSmmAstNode res) {
 	} else {
 		// Otherwise floats are always considered bigger then int
 		type = (res->left->type->kind > res->right->type->kind) ? res->left->type : res->right->type;
-		if (type->kind == tkSmmBool) type = &builtInTypes[tiSmmUInt8];
+		if (type->kind == tiSmmBool) type = &builtInTypes[tiSmmUInt8];
 	}
 	return type;
 }
