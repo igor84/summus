@@ -179,68 +179,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="compiler\smmdebugprinter.c" />
-    <ClCompile Include="compiler\smmlexer.c" />
-    <ClCompile Include="compiler\smmllvmcodegen.c" />
-    <ClCompile Include="compiler\smmmsgs.c">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Test|x64'">true</ExcludedFromBuild>
-    </ClCompile>
-    <ClCompile Include="compiler\smmparser.c" />
-    <ClCompile Include="compiler\smmpasses.c" />
-    <ClCompile Include="compiler\smmsempass.c" />
-    <ClCompile Include="compiler\smmtest.c">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Test|x64'">true</ExcludedFromBuild>
-    </ClCompile>
-    <ClCompile Include="compiler\smmutil.c" />
-    <ClCompile Include="tests\AllTests.c">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-    </ClCompile>
-    <ClCompile Include="tests\CuTest.c">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-    </ClCompile>
-    <ClCompile Include="tests\smmastmatcher.c">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-    </ClCompile>
-    <ClCompile Include="tests\smmastreader.c">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-    </ClCompile>
-    <ClCompile Include="tests\smmastwritter.c">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-    </ClCompile>
-    <ClCompile Include="tests\smmlexertests.c">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-    </ClCompile>
-    <ClCompile Include="tests\smmmsgsMockup.c">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-    </ClCompile>
-    <ClCompile Include="tests\smmparsertests.c">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
     <ClInclude Include="compiler\smmcommon.h" />
-    <ClInclude Include="compiler\smmdebugprinter.h" />
-    <ClInclude Include="compiler\smmlexer.h" />
-    <ClInclude Include="compiler\smmllvmcodegen.h" />
-    <ClInclude Include="compiler\smmmsgs.h" />
-    <ClInclude Include="compiler\smmparser.h" />
-    <ClInclude Include="compiler\smmsempass.h" />
-    <ClInclude Include="compiler\smmutil.h" />
-    <ClInclude Include="tests\CuTest.h">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-    </ClInclude>
-    <ClInclude Include="tests\smmastmatcher.h">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-    </ClInclude>
-    <ClInclude Include="tests\smmastreader.h">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-    </ClInclude>
-    <ClInclude Include="tests\smmastwritter.h">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-    </ClInclude>
-    <ClInclude Include="tests\smmmsgsMockup.h">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="readme.md" />
