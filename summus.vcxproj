@@ -181,6 +181,7 @@
   <ItemGroup>
     <ClInclude Include="compiler\ibsallocator.h" />
     <ClInclude Include="compiler\ibscommon.h" />
+    <ClInclude Include="compiler\ibsdictionary.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="readme.md" />
@@ -188,6 +189,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="compiler\ibsallocator.c" />
+    <ClCompile Include="compiler\ibsdictionary.c" />
     <ClCompile Include="compiler\summus.c" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
