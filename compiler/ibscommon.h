@@ -1,5 +1,4 @@
-#ifndef SMM_COMMON_H
-#define SMM_COMMON_H
+#pragma once
 
 /**
  * All files in project should include this file as the first include
@@ -40,9 +39,7 @@
 //		4800 - 'type' : forcing value to bool 'true' or 'false' (performance warning)
 //		4805 - unsafe mix of two different types in operation
 // -w14062 - enumerator value in switch is not handled
-#pragma warning (disable : 4068 4100 4127 4201 4204)
+// #pragma warning (disable : 4068 4100 4127 4201 4204)
 
 
 #endif // if MSVC
-
-#endif

@@ -179,11 +179,16 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="compiler\smmcommon.h" />
+    <ClInclude Include="compiler\ibsallocator.h" />
+    <ClInclude Include="compiler\ibscommon.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="readme.md" />
     <None Include="tests\test.smm" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="compiler\ibsallocator.c" />
+    <ClCompile Include="compiler\summus.c" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
