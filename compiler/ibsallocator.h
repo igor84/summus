@@ -23,6 +23,7 @@ struct IbsAllocator {
 	size_t size;
 	size_t free;
 	size_t used;
+	size_t reserved;
 	uint8_t* memory;
 };
 typedef struct IbsAllocator* PIbsAllocator;
@@ -40,3 +41,17 @@ void ibsSimpleAllocatorPrintInfo(const PIbsAllocator allocator);
  * Allocates the requested number of bytes from the given allocator
  */
 void* ibsAlloc(PIbsAllocator a, size_t size);
+
+/**
+ * Just returns the next avaiable memory address but before calling any ibsAlloc
+ * you must call ibsEndAlloc to tell the allocator how much memory you ended up
+ * occupying. This is useful when you need string buffers for formatting and you
+ * don't know the needed length of result string in advance. You must only use
+ * this if you are sure the resulting size will be available though.
+ */
+void* ibsStartAlloc(PIbsAllocator a);
+
+/**
+ * This needs to be called after ibsStartAlloc
+ */
+void ibsEndAlloc(PIbsAllocator a, size_t size);

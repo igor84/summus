@@ -27,6 +27,9 @@
     <ClInclude Include="compiler\ibsdictionary.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="compiler\smmmsgs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="tests\test.smm">
@@ -44,6 +47,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="compiler\ibsallocator.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="compiler\smmmsgs.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

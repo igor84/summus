@@ -6,7 +6,6 @@
  * Dictionary is implemented as a variation on Trie (https://en.wikipedia.org/wiki/Trie)
  */
 
-#include "ibscommon.h"
 #include "ibsallocator.h"
 #include <stdlib.h>
 

@@ -1,3 +1,4 @@
+#include "ibscommon.h"
 #include "ibsdictionary.h"
 #include <string.h>
 

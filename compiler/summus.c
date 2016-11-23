@@ -1,6 +1,7 @@
 #include "ibscommon.h"
 #include "ibsallocator.h"
 #include "ibsdictionary.h"
+#include "smmmsgs.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -44,6 +45,19 @@ int main(int argc, char* argv[]) {
 	printf("Pop second = %s\n", secondPop);
 	printf("Get elem1 = %s\n", elem1);
 	printf("Get elem2 = %s\n", elem2);
+
+	struct SmmMsgs msgs = { 0 };
+	msgs.a = a;
+	struct SmmFilePos filePos = { "test", 12, 32 };
+	smmPostGotBadReturnType(&msgs, filePos, "type1", "type2");
+	filePos.lineNumber += 10;
+	smmPostMessage(&msgs, errSmmCantAssignToConst, filePos);
+	filePos.lineNumber -= 5;
+	smmPostMessage(&msgs, errSmmNonConstInConstExpression, filePos);
+	filePos.lineNumber -= 10;
+	smmPostMessage(&msgs, errSmmFuncMustReturnValue, filePos);
+
+	smmFlushMessages(&msgs);
 
 	fputs("\nAllocator info after dict allocs: ", stdout);
 	ibsSimpleAllocatorPrintInfo(a);

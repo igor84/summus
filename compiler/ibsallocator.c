@@ -85,3 +85,16 @@ void* ibsAlloc(PIbsAllocator a, size_t size) {
 	a->free -= size;
 	return location;
 }
+
+void* ibsStartAlloc(PIbsAllocator a) {
+	assert(a->free > 0);
+	a->reserved = a->free;
+	a->free = 0;
+	return &a->memory[a->size - a->reserved];
+}
+
+void ibsEndAlloc(PIbsAllocator a, size_t size) {
+	a->free = a->reserved;
+	a->reserved = 0;
+	ibsAlloc(a, size);
+}
