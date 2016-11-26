@@ -59,12 +59,12 @@ void smmPostMessage(PSmmMsgs msgs, SmmMsgType msgType, struct SmmFilePos filePos
 
 // We define separate functions for all messages that take two or more params so autocomplete
 // can help us avoid confusion what are the params and in which order should they be given
-void smmPostGotUnexpectedToken(PSmmMsgs msgs, struct SmmFilePos filePos, char* expected, char* got);
-void smmPostIdentTaken(PSmmMsgs msgs, struct SmmFilePos filePos, char* identifier, char* takenAs);
-void smmPostGotBadOperands(PSmmMsgs msgs, struct SmmFilePos filePos, char* operator, char* gotType);
-void smmPostGotBadArgs(PSmmMsgs msgs, struct SmmFilePos filePos, char* gotSig, char* expectedSigs);
-void smmPostGotBadReturnType(PSmmMsgs msgs, struct SmmFilePos filePos, char* gotType, char* expectedType);
-void smmPostConversionLoss(PSmmMsgs msgs, struct SmmFilePos filePos, char* fromType, char* toType);
+void smmPostGotUnexpectedToken(PSmmMsgs msgs, struct SmmFilePos filePos, const char* expected, const char* got);
+void smmPostIdentTaken(PSmmMsgs msgs, struct SmmFilePos filePos, const char* identifier, const char* takenAs);
+void smmPostGotBadOperands(PSmmMsgs msgs, struct SmmFilePos filePos, const char* operator, const char* gotType);
+void smmPostGotBadArgs(PSmmMsgs msgs, struct SmmFilePos filePos, const char* gotSig, const char* expectedSigs);
+void smmPostGotBadReturnType(PSmmMsgs msgs, struct SmmFilePos filePos, const char* gotType, const char* expectedType);
+void smmPostConversionLoss(PSmmMsgs msgs, struct SmmFilePos filePos, const char* fromType, const char* toType);
 
 void smmFlushMessages(PSmmMsgs msgs);
 void smmAbortWithMessage(const char* msg, const char* filename, const int line);

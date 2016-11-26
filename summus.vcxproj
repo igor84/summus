@@ -182,7 +182,11 @@
     <ClInclude Include="compiler\ibsallocator.h" />
     <ClInclude Include="compiler\ibscommon.h" />
     <ClInclude Include="compiler\ibsdictionary.h" />
+    <ClInclude Include="compiler\smmlexer.h" />
     <ClInclude Include="compiler\smmmsgs.h" />
+    <ClInclude Include="tests\CuTest.h">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="readme.md" />
@@ -191,8 +195,22 @@
   <ItemGroup>
     <ClCompile Include="compiler\ibsallocator.c" />
     <ClCompile Include="compiler\ibsdictionary.c" />
+    <ClCompile Include="compiler\smmlexer.c" />
     <ClCompile Include="compiler\smmmsgs.c" />
-    <ClCompile Include="compiler\summus.c" />
+    <ClCompile Include="compiler\summus.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+      </ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Test|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="tests\AllTests.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="tests\CuTest.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="tests\smmlexertests.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </ClCompile>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -30,6 +30,12 @@
     <ClInclude Include="compiler\smmmsgs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="compiler\smmlexer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="tests\CuTest.h">
+      <Filter>Tests</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="tests\test.smm">
@@ -51,6 +57,18 @@
     </ClCompile>
     <ClCompile Include="compiler\smmmsgs.c">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="compiler\smmlexer.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="tests\AllTests.c">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="tests\CuTest.c">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="tests\smmlexertests.c">
+      <Filter>Tests</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

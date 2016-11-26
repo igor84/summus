@@ -17,24 +17,30 @@ int main(int argc, char* argv[]) {
 	ibsSimpleAllocatorPrintInfo(a);
 	
 	void* testData = ibsAlloc(a, 4 * 1024 + 50);
-	assert(testData != NULL);
+	if (testData == NULL) assert(false);
 
 	PIbsDict dict = ibsDictCreate(a);
-	ibsDictPut(dict, "asda", "fsdfsa");
-	ibsDictPut(dict, "adsfssda", "fsdfsa");
-	ibsDictPut(dict, "asgdsda", "fsdfsa");
-	ibsDictPut(dict, "sdfgsasda", "fsdfsa");
-	ibsDictPut(dict, "asdgfdsfa", "also found");
-	ibsDictPut(dict, "dfgajgfsda", "fsdfsa");
-	ibsDictPut(dict, "xcvbxcasda", "fsdfsa");
-	ibsDictPut(dict, "jkhdfgasda", "found");
-	ibsDictPut(dict, "jhgfcfasda", "fsdfsa");
-	ibsDictPut(dict, "mnsbjasda", "fsdfsa");
-	ibsDictPut(dict, "psdjhdfasda", "fsdfsa");
-	ibsDictPut(dict, "uksflasda", "fsdfsa");
+	char val[] = "fsdfsa";
+	char alsofound[] = "also found";
+	char found[] = "found";
+	char first[] = "first";
+	char second[] = "second";
 
-	ibsDictPush(dict, "PUSH", "first");
-	ibsDictPush(dict, "PUSH", "second");
+	ibsDictPut(dict, "asda", val);
+	ibsDictPut(dict, "adsfssda", val);
+	ibsDictPut(dict, "asgdsda", val);
+	ibsDictPut(dict, "sdfgsasda", val);
+	ibsDictPut(dict, "asdgfdsfa", alsofound);
+	ibsDictPut(dict, "dfgajgfsda", val);
+	ibsDictPut(dict, "xcvbxcasda", val);
+	ibsDictPut(dict, "jkhdfgasda", found);
+	ibsDictPut(dict, "jhgfcfasda", val);
+	ibsDictPut(dict, "mnsbjasda", val);
+	ibsDictPut(dict, "psdjhdfasda", val);
+	ibsDictPut(dict, "uksflasda", val);
+
+	ibsDictPush(dict, "PUSH", first);
+	ibsDictPush(dict, "PUSH", second);
 
 	char* firstPop = ibsDictPop(dict, "PUSH");
 	char* secondPop = ibsDictPop(dict, "PUSH");

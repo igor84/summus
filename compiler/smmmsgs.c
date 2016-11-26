@@ -84,27 +84,27 @@ void smmPostMessage(PSmmMsgs msgs, SmmMsgType msgType, struct SmmFilePos filePos
 	*curMsgField = msg;
 }
 
-void smmPostGotUnexpectedToken(PSmmMsgs msgs, struct SmmFilePos filePos, char* expected, char* got) {
+void smmPostGotUnexpectedToken(PSmmMsgs msgs, struct SmmFilePos filePos, const char* expected, const char* got) {
 	smmPostMessage(msgs, errSmmGotUnexpectedToken, filePos, expected, got);
 }
 
-void smmPostIdentTaken(PSmmMsgs msgs, struct SmmFilePos filePos, char* identifier, char* takenAs) {
+void smmPostIdentTaken(PSmmMsgs msgs, struct SmmFilePos filePos, const char* identifier, const char* takenAs) {
 	smmPostMessage(msgs, errSmmIdentTaken, filePos, identifier, takenAs);
 }
 
-void smmPostGotBadOperands(PSmmMsgs msgs, struct SmmFilePos filePos, char* operator,char* gotType) {
+void smmPostGotBadOperands(PSmmMsgs msgs, struct SmmFilePos filePos, const char* operator, const char* gotType) {
 	smmPostMessage(msgs, errSmmBadOperandsType, filePos, operator, gotType);
 }
 
-void smmPostGotBadArgs(PSmmMsgs msgs, struct SmmFilePos filePos, char* gotSig, char* expectedSigs) {
+void smmPostGotBadArgs(PSmmMsgs msgs, struct SmmFilePos filePos, const char* gotSig, const char* expectedSigs) {
 	smmPostMessage(msgs, errSmmGotBadArgs, filePos, gotSig, expectedSigs);
 }
 
-void smmPostGotBadReturnType(PSmmMsgs msgs, struct SmmFilePos filePos, char* gotType, char* expectedType) {
+void smmPostGotBadReturnType(PSmmMsgs msgs, struct SmmFilePos filePos, const char* gotType, const char* expectedType) {
 	smmPostMessage(msgs, errSmmBadReturnStmtType, filePos, gotType, expectedType);
 }
 
-void smmPostConversionLoss(PSmmMsgs msgs, struct SmmFilePos filePos, char* fromType, char* toType) {
+void smmPostConversionLoss(PSmmMsgs msgs, struct SmmFilePos filePos, const char* fromType, const char* toType) {
 	smmPostMessage(msgs, wrnSmmConversionDataLoss, filePos, fromType, toType);
 }
 
@@ -143,3 +143,4 @@ void smmAbortWithMessage(const char * msg, const char * filename, const int line
 bool smmHadErrors(PSmmMsgs msgs) {
 	return msgs->errorCount > 0;
 }
+

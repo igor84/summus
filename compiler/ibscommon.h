@@ -40,6 +40,10 @@
 //		4805 - unsafe mix of two different types in operation
 // -w14062 - enumerator value in switch is not handled
 // #pragma warning (disable : 4068 4100 4127 4201 4204)
+#pragma warning (disable :  4068 4201)
 
+#else
+
+#pragma GCC diagnostic ignored "-Wunknown-pragmas"
 
 #endif // if MSVC

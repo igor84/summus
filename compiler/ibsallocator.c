@@ -21,7 +21,7 @@ static void abortWithAllocError(const char* msg, const char* allocatorName, size
 }
 
 static void printSize(const char* name, size_t size) {
-	static char* units[] = { "B", "KB", "MB" };
+	static const char* units[] = { "B", "KB", "MB" };
 	int unit = 0;
 	while (size > 5 * 1024 && unit < 2) {
 		size = size >> 10;
