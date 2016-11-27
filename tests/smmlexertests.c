@@ -68,24 +68,24 @@ static void TestParseHexNumber(CuTest *tc) {
 	CuAssertPtrEquals_Msg(tc, "Got unexpected error reported", NULL, msgs.items);
 	// 0x10000000000000000
 	token = smmGetNextToken(lex);
-	CuAssertIntEquals(tc, tkSmmErr, token->kind);
+	CuAssertIntEquals(tc, tkSmmUInt, token->kind);
 	CuAssertPtrNotNullMsg(tc, "Expected err that int is too big not received", msgs.items);
 	PSmmMsg curMsg = msgs.items;
 	CuAssertIntEquals_Msg(tc, "Expected message not received", errSmmIntTooBig, curMsg->type);
 
 	// 0xxrg
 	token = smmGetNextToken(lex);
-	CuAssertIntEquals(tc, tkSmmErr, token->kind);
+	CuAssertIntEquals(tc, tkSmmUInt, token->kind);
 	CuAssertPtrNotNullMsg(tc, "Expected err that hex number is invalid not received", curMsg->next);
 	curMsg = curMsg->next;
-	CuAssertIntEquals_Msg(tc, "Expected message not received", errSmmInvalidHexDigit, curMsg->type);
+	CuAssertIntEquals_Msg(tc, "Expected message not received", errSmmInvalidDigit, curMsg->type);
 
 	// 0x123asd
 	token = smmGetNextToken(lex);
-	CuAssertIntEquals(tc, tkSmmErr, token->kind);
+	CuAssertIntEquals(tc, tkSmmUInt, token->kind);
 	CuAssertPtrNotNullMsg(tc, "Expected err that hex number is invalid not received", curMsg->next);
 	curMsg = curMsg->next;
-	CuAssertIntEquals_Msg(tc, "Expected message not received", errSmmInvalidHexDigit, curMsg->type);
+	CuAssertIntEquals_Msg(tc, "Expected message not received", errSmmInvalidDigit, curMsg->type);
 
 	// 0x123.324
 	token = smmGetNextToken(lex);
@@ -97,9 +97,9 @@ static void TestParseHexNumber(CuTest *tc) {
 }
 
 static void TestParseNumber(CuTest *tc) {
-	char buf[] = "0 1 1234567890 4294967295 4294967296 18446744073709551615 18446744073709551616 02342 43abc "
-		"123.321 4.2 456E2 789E-2  901.234E+123 56789.01235E-456 234.3434E-234.34 37.b "
-		"1111111111111111111111111111111.456 1.12345678901234567890";
+	char buf[] = "0 1 1234567890 4294967295 4294967296 18446744073709551615 18446744073709551616 "
+		"002342 02392 02342 43abc 123.321 4.2 456E2 789E-2 901.234E+123 56789.01235E-456 "
+		"234.3434E-234.34 37.b 1111111111111111111111111111111.456 1.12345678901234567890";
 	struct SmmMsgs msgs = { 0 };
 	msgs.a = a;
 	PSmmLexer lex = smmCreateLexer(buf, "TestParseNumber", &msgs, a);
@@ -130,17 +130,30 @@ static void TestParseNumber(CuTest *tc) {
 	CuAssertPtrEquals_Msg(tc, "Got unexpected error reported", NULL, msgs.items);
 	// 18446744073709551616 MAX_UINT64 + 1
 	token = smmGetNextToken(lex);
-	CuAssertIntEquals(tc, tkSmmErr, token->kind);
+	CuAssertIntEquals(tc, tkSmmUInt, token->kind);
 	CuAssertPtrNotNullMsg(tc, "Expected err that int is too big not received", msgs.items);
 	PSmmMsg curMsg = msgs.items;
 	CuAssertIntEquals_Msg(tc, "Expected message not received", errSmmIntTooBig, curMsg->type);
 
-	// 02342
+	// 002342
 	token = smmGetNextToken(lex);
-	CuAssertIntEquals(tc, tkSmmErr, token->kind);
+	CuAssertIntEquals(tc, tkSmmUInt, token->kind);
 	CuAssertPtrNotNullMsg(tc, "Expected err that number is invalid not received", curMsg->next);
 	curMsg = curMsg->next;
 	CuAssertIntEquals_Msg(tc, "Expected message not received", errSmmInvalid0Number, curMsg->type);
+
+	// 02392
+	token = smmGetNextToken(lex);
+	CuAssertIntEquals(tc, tkSmmUInt, token->kind);
+	CuAssertPtrNotNullMsg(tc, "Expected err that number is invalid octal not received", curMsg->next);
+	curMsg = curMsg->next;
+	CuAssertIntEquals_Msg(tc, "Expected message not received", errSmmInvalidDigit, curMsg->type);
+
+	// 02342
+	token = smmGetNextToken(lex);
+	CuAssertIntEquals(tc, tkSmmUInt, token->kind);
+	CuAssertPtrEquals_Msg(tc, "Got Unexpected err while parsing octal number", NULL, curMsg->next);
+	CuAssertUIntEquals(tc, 02342, token->uintVal);
 
 	// 43abc
 	token = smmGetNextToken(lex);
@@ -192,7 +205,7 @@ static void TestParseNumber(CuTest *tc) {
 	// 37.b
 	CuAssertPtrEquals_Msg(tc, "Got unexpected error reported", NULL, curMsg->next);
 	token = smmGetNextToken(lex);
-	CuAssertIntEquals(tc, tkSmmUInt, token->kind);
+	CuAssertIntEquals(tc, tkSmmFloat, token->kind);
 	CuAssertPtrNotNullMsg(tc, "Expected err that number is invalid not received", curMsg->next);
 	curMsg = curMsg->next;
 	CuAssertIntEquals_Msg(tc, "Expected message not received", errSmmInvalidNumber, curMsg->type);
@@ -232,7 +245,7 @@ static void TestParseNegNumber(CuTest *tc) {
 	CuAssertIntEquals(tc, '-', token->kind);
 	token = smmGetNextToken(lex);
 	CuAssertIntEquals(tc, tkSmmFloat, token->kind);
-	CuAssertDblEquals(tc, -23423.2342, token->floatVal, 0.00000000001);
+	CuAssertDblEquals(tc, -23423.2342, token->floatVal, 0);
 	token = smmGetNextToken(lex);
 	CuAssertIntEquals(tc, ';', token->kind);
 

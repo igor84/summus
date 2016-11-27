@@ -9,7 +9,7 @@
 
 static const char* msgTypeToString[] = {
 	"unknown error",
-	"invalid hex digit",
+	"invalid %s digit",
 	"integer literal too big",
 	"invalid exponent in float literal",
 	"only binary, hex and float literals can start with 0",

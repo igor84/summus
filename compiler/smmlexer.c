@@ -8,8 +8,12 @@
 #include <stdio.h>
 #include <math.h>
 
-#define SMM_STDIN_BUFFER_LENGTH 64 * 1024
-#define SMM_MAX_HEX_DIGITS 16
+#define STDIN_BUFFER_LENGTH 64 * 1024
+#define MAX_HEX_DIGITS 16
+#define MAX_OCTAL_DIGITS 21
+
+#define MAX_MANTISSA_FOR_FAST_CONVERSION 0x20000000000000
+#define MAX_EXP_FOR_FAST_CONVERSION 22
 
 static const char* tokenTypeToString[] = {
 	"identifier",
@@ -19,6 +23,10 @@ static const char* tokenTypeToString[] = {
 	"->", "return",
 	"eof"
 };
+
+static char decimalSeparator;
+
+typedef enum {octalNumber = 3, hexNumber = 4} BinNumberKind;
 
 /********************************************************
 Type Definitions
@@ -34,6 +42,7 @@ struct PrivLexer {
 	struct SmmLexer lex;
 	PSmmMsgs msgs;
 	PIbsAllocator a;
+	PIbsAllocator syma; // Used for symTable allocations
 	void(*skipWhitespace)(const PSmmLexer);
 	PIbsDict symTable;
 };
@@ -43,11 +52,15 @@ typedef struct PrivLexer* PPrivLexer;
 Private Functions
 *********************************************************/
 
-static char nextChar(const PSmmLexer lex) {
-	lex->filePos.lineOffset++;
-	lex->curChar++;
-	lex->scanCount++;
+static char moveFor(const PSmmLexer lex, int move) {
+	lex->filePos.lineOffset += move;
+	lex->curChar += move;
+	lex->scanCount += move;
 	return *lex->curChar;
+}
+
+static char nextChar(const PSmmLexer lex) {
+	return moveFor(lex, 1);
 }
 
 static void skipWhitespaceFromBuffer(const PSmmLexer lex) {
@@ -94,7 +107,7 @@ static void skipWhitespaceFromStdIn(const PSmmLexer lex) {
 		if (cc == 0) {
 			if (feof(stdin)) return;
 			lex->buffer[0] = 0; // We set first character to null in case fgets just reads eof
-			fgets(lex->buffer, SMM_STDIN_BUFFER_LENGTH, stdin);
+			fgets(lex->buffer, STDIN_BUFFER_LENGTH, stdin);
 			lex->curChar = lex->buffer;
 			cc = *lex->curChar;
 			lex->filePos.lineNumber++;
@@ -157,20 +170,30 @@ static bool parseIdent(PPrivLexer privLex, PSmmToken token) {
 	return true;
 }
 
-static void parseHexNumber(PPrivLexer privLex, PSmmToken token) {
+static void parseBinNumber(PPrivLexer privLex, PSmmToken token, BinNumberKind bitsPerDigit) {
 	PSmmLexer lex = &privLex->lex;
 	int64_t res = 0;
-	int digitsLeft = SMM_MAX_HEX_DIGITS;
+	token->kind = tkSmmUInt;
+	int digitsLeft = MAX_HEX_DIGITS;
+	int maxDigit = '9';
+	if (bitsPerDigit == octalNumber) {
+		digitsLeft = lex->curChar[0] == '1' ? MAX_OCTAL_DIGITS + 1 : MAX_OCTAL_DIGITS;
+		maxDigit = '7';
+	}
 	char cc = *lex->curChar;
 	do {
-		if (cc >= '0' && cc <= '9') {
-			res = (res << 4) + cc - '0';
+		if (cc >= '0' && cc <= maxDigit) {
+			res = (res << bitsPerDigit) + cc - '0';
+		} else if (bitsPerDigit == octalNumber && isalnum(cc)) {
+			smmPostMessage(privLex->msgs, errSmmInvalidDigit, lex->filePos, "octal");
+			skipAlNum(lex);
+			return;
 		} else {
 			cc |= 0x20; //to lowercase
 			if (cc >= 'a' && cc <= 'f') {
 				res = (res << 4) + cc - 'a' + 10;
 			} else if (cc > 'f' && cc < 'z') {
-				smmPostMessage(privLex->msgs, errSmmInvalidHexDigit, lex->filePos);
+				smmPostMessage(privLex->msgs, errSmmInvalidDigit, lex->filePos, "hex");
 				skipAlNum(lex);
 				return;
 			} else {
@@ -185,96 +208,171 @@ static void parseHexNumber(PPrivLexer privLex, PSmmToken token) {
 		smmPostMessage(privLex->msgs, errSmmIntTooBig, lex->filePos);
 		skipAlNum(lex);
 	} else {
-		token->kind = tkSmmUInt;
 		token->uintVal = res;
 	}
 }
 
 static void parseNumber(PPrivLexer privLex, PSmmToken token) {
 	PSmmLexer lex = &privLex->lex;
-	uint64_t res = 0;
-	bool parseAsInt = true;
-	enum { smmMainInt, smmFraction, smmExponent } part = smmMainInt;
-	double dres = 0;
-	int exp = 0; // Exponent for decimals, not the ones after E in 12.43E+12
-	int expSign = 1;
-	char cc = *lex->curChar;
 	token->kind = tkSmmUInt;
-	do {
-		if (cc >= '0' && cc <= '9') {
-			int d = cc - '0';
-			if (parseAsInt || part == smmExponent) {
-				// If we are parsing int or exponent first check if we are about to overflow
-				if (res <= ((UINT64_MAX - d) / 10)) {
-					res = res * 10 + d;
-				} else {
-					if (parseAsInt) {
-						// Since the number can't fit in the largest int we assume it is double
-						parseAsInt = false;
-						dres = res * 10.0 + d;
-					} else {
-						// If we get here we are parsing exponent after E and it is too big
-						// so we just skip remaining digits and later return error
-						do {
-							cc = nextChar(lex);
-						} while (isdigit(cc));
-						break;
-					}
-				}
-			} else if (part == smmMainInt) {
-				dres = dres * 10 + d;
-			} else if (part == smmFraction) {
-				exp++;
-				dres = dres * 10 + d;
-			}
-		} else if (cc == '.' && part == smmMainInt) {
-			if (!isdigit(lex->curChar[1])) {
-				smmPostMessage(privLex->msgs, errSmmInvalidNumber, lex->filePos);
-				nextChar(lex);
-				skipAlNum(lex);
-				break;
-			}
-			// If int part was too big for int then we already switched to using dres
-			if (parseAsInt) dres = (double)res;
-			res = 0;
-			parseAsInt = false;
-			part = smmFraction;
-		} else if ((cc == 'e' || cc == 'E') && part != smmExponent) {
-			part = smmExponent;
-			if (parseAsInt) {
-				dres = (double)res;
-				parseAsInt = false;
-			}
-			res = 0;
-			if (lex->curChar[1] == '-' || lex->curChar[1] == '+') {
-				expSign = '+' - lex->curChar[1] + 1; // 1 or -1
-				nextChar(lex);
-			}
-			if (!isdigit(lex->curChar[1])) {
-				smmPostMessage(privLex->msgs, errSmmInvalidFloatExponent, lex->filePos);
-				nextChar(lex);
-				skipAlNum(lex);
-				break;
-			}
-		} else {
-			break;
-		}
-		cc = nextChar(lex);
-	} while (true);
-
-	if (part != smmMainInt) {
-		// This combination of operations is the only one that passes all the tests
-		dres *= pow(10, -exp);
-		dres /= pow(10, -expSign * (double)res);
+	int i = 0;
+	int exp = 0;
+	int esign = 1;
+	int Eexp = 0;
+	char* dot = NULL;
+	while ('0' <= lex->curChar[i] && lex->curChar[i] <= '9') {
+		i++;
 	}
-	if (parseAsInt) {
-		token->uintVal = res;
-	} else if (part != smmMainInt) {
+	int sigDigits = i;
+	if (lex->curChar[i] == '.') {
+		dot = &lex->curChar[i];
 		token->kind = tkSmmFloat;
-		token->floatVal = dres;
+		i++;
+		while ('0' <= lex->curChar[i] && lex->curChar[i] <= '9') {
+			i++;
+		}
+		exp = sigDigits - i + 1;
+		if (exp == 0) {
+			// Non digit after dot
+			smmPostMessage(privLex->msgs, errSmmInvalidNumber, lex->filePos);
+			moveFor(lex, i);
+			skipAlNum(lex);
+			return;
+		}
+		sigDigits = i - 1;
+	}
+	if (lex->curChar[i] == 'e' || lex->curChar[i] == 'E') {
+		token->kind = tkSmmFloat;
+		i++;
+		switch (lex->curChar[i]) {
+		case '-': esign = -1; // fallthrough
+		case '+': i++; break;
+		}
+		if (!('0' <= lex->curChar[i] && lex->curChar[i] <= '9')) {
+			smmPostMessage(privLex->msgs, errSmmInvalidFloatExponent, lex->filePos);
+			moveFor(lex, i);
+			skipAlNum(lex);
+			return;
+		}
+		// Exp should be short so we just parse it immediately
+		int stopAt = i + 4;
+		while ('0' <= lex->curChar[i] && lex->curChar[i] <= '9' && i < stopAt) {
+			Eexp = Eexp * 10 + esign * (lex->curChar[i] - '0');
+			i++;
+		}
+		while ('0' <= lex->curChar[i] && lex->curChar[i] <= '9') {
+			// We are not interested in other digits because we already know exp is too long
+			// for our fast algorithm and number will be parsed using strtod c function
+			i++;
+		}
+		exp += Eexp;
+	}
+
+	uint64_t res = 0;
+	char* pc = lex->curChar;
+	moveFor(lex, i);
+	if (token->kind == tkSmmUInt) {
+		if (sigDigits > 20) {
+			smmPostMessage(privLex->msgs, errSmmIntTooBig, lex->filePos);
+			return;
+		}
+		while (pc < lex->curChar) {
+			int d = *pc - '0';
+			if (res > ((UINT64_MAX - d) / 10)) {
+				smmPostMessage(privLex->msgs, errSmmIntTooBig, lex->filePos);
+				return;
+			}
+			res = res * 10 + d;
+			pc++;
+		}
+		token->uintVal = res;
+		return;
+	}
+
+	// We are here if it is float
+	int zerosToAdd = 15 - sigDigits;
+	if (exp > 22 && zerosToAdd > 0) {
+		exp -= zerosToAdd;
 	} else {
-		token->kind = tkSmmErr;
-		smmPostMessage(privLex->msgs, errSmmIntTooBig, lex->filePos);
+		zerosToAdd = 0;
+	}
+	if (sigDigits > 16 || exp > MAX_EXP_FOR_FAST_CONVERSION || exp < -MAX_EXP_FOR_FAST_CONVERSION) {
+		// We can't simply and correctly do the conversion so we fallback to strtod
+		char* end = NULL;
+		if (dot) *dot = decimalSeparator;
+		token->floatVal = strtod(pc, &end);
+		if (dot) *dot = '.';
+		if (end != lex->curChar) {
+			smmPostMessage(privLex->msgs, errSmmInvalidNumber, lex->filePos);
+		}
+		return;
+	}
+	while ('0' <= *pc && *pc <= '9') {
+		res = res * 10 + (*pc - '0');
+		pc++;
+	}
+	if (*pc == '.') {
+		pc++;
+		while ('0' <= *pc && *pc <= '9') {
+			res = res * 10 + (*pc - '0');
+			pc++;
+		}
+	}
+
+	static uint64_t i10[16] = {
+		1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000,
+		10000000000, 100000000000, 1000000000000, 10000000000000, 100000000000000,
+		1000000000000000
+	};
+	static double d10[MAX_EXP_FOR_FAST_CONVERSION + 1] = {
+		1, 10, 100, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10, 1e11, 1e12, 1e13,
+		1e14, 1e15, 1e16, 1e17, 1e18, 1e19, 1e20, 1e21, 1e22
+	};
+
+	res *= i10[zerosToAdd];
+	if (res > MAX_MANTISSA_FOR_FAST_CONVERSION) {
+		char* end = NULL;
+		if (dot) *dot = decimalSeparator;
+		token->floatVal = strtod(pc, &end);
+		if (dot) *dot = '.';
+		if (end != lex->curChar) {
+			smmPostMessage(privLex->msgs, errSmmInvalidNumber, lex->filePos);
+		}
+		return;
+	}
+
+	bool multiply = exp >= 0;
+	if (!multiply) {
+		exp = -exp;
+	}
+
+	double dres = (double)res;
+	if (multiply) {
+		dres *= d10[exp];
+	} else {
+		dres /= d10[exp];
+	}
+	token->floatVal = dres;
+}
+
+static void parseZeroNumber(PPrivLexer privLex, PSmmToken token) {
+	PSmmLexer lex = &privLex->lex;
+	if (lex->curChar[1] == 'x') {
+		moveFor(lex, 2);
+		parseBinNumber(privLex, token, hexNumber);
+	} else if (lex->curChar[1] == '.') {
+		parseNumber(privLex, token);
+	} else if ('1' <= lex->curChar[1] && lex->curChar[1] <= '7') {
+		nextChar(lex);
+		parseBinNumber(privLex, token, octalNumber);
+	} else if (!isalnum(lex->curChar[1])) {
+		// It is just 0
+		token->kind = tkSmmUInt;
+		nextChar(lex);
+	} else {
+		token->kind = tkSmmUInt;
+		smmPostMessage(privLex->msgs, errSmmInvalid0Number, lex->filePos);
+		skipAlNum(lex);
 	}
 }
 
@@ -302,11 +400,22 @@ API Functions
 * "Enter - CTRL+Z - Enter" on Windows and CTRL+D on *nix systems
 */
 PSmmLexer smmCreateLexer(char* buffer, const char* filename, PSmmMsgs msgs, PIbsAllocator a) {
+	if (!decimalSeparator) {
+		char* end = NULL;
+		if (strtod("0,5", &end) == 0.5) decimalSeparator = ',';
+		else decimalSeparator = '.';
+	}
+
 	PPrivLexer privLex = ibsAlloc(a, sizeof(struct PrivLexer));
+	char symaName[1004] = { 'l', 'e', 'x' };
+	strncpy(&symaName[3], filename, 1000);
+	size_t symaSize = a->size >> 2;
+	if (symaSize < 4 * 1024) symaSize = 4 * 1024;
+	privLex->syma = ibsSimpleAllocatorCreate(symaName, symaSize);
 
 	if (!buffer) {
-		buffer = ibsAlloc(a, SMM_STDIN_BUFFER_LENGTH);
-		fgets(buffer, SMM_STDIN_BUFFER_LENGTH, stdin);
+		buffer = ibsAlloc(a, STDIN_BUFFER_LENGTH);
+		fgets(buffer, STDIN_BUFFER_LENGTH, stdin);
 		privLex->skipWhitespace = skipWhitespaceFromStdIn;
 	} else {
 		privLex->skipWhitespace = skipWhitespaceFromBuffer;
@@ -318,7 +427,7 @@ PSmmLexer smmCreateLexer(char* buffer, const char* filename, PSmmMsgs msgs, PIbs
 	privLex->lex.curChar = buffer;
 	privLex->lex.filePos.lineNumber = 1;
 	privLex->lex.filePos.lineOffset = 1;
-	privLex->symTable = ibsDictCreate(a); // TODO: See if I can use temp allocator
+	privLex->symTable = ibsDictCreate(privLex->syma);
 	initSymTableWithKeywords(privLex);
 	return &privLex->lex;
 }
@@ -327,6 +436,9 @@ PSmmToken smmGetNextToken(PSmmLexer lex) {
 	PPrivLexer privLex = (PPrivLexer)lex;
 	uint32_t lastLine = lex->filePos.lineNumber;
 	privLex->skipWhitespace(lex);
+	if (lex->curChar[0] == 0 && lex->lastToken->kind == tkSmmEof) {
+		return lex->lastToken;
+	}
 	PIbsAllocator a = privLex->a;
 
 	uint64_t pos = lex->scanCount;
@@ -339,6 +451,8 @@ PSmmToken smmGetNextToken(PSmmLexer lex) {
 	switch (*firstChar) {
 	case 0:
 		token->kind = tkSmmEof;
+		ibsSimpleAllocatorFree(privLex->syma);
+		privLex->syma = NULL;
 		return token;
 	case '-':
 		nextChar(lex);
@@ -347,7 +461,11 @@ PSmmToken smmGetNextToken(PSmmLexer lex) {
 			nextChar(lex);
 		} else if (isUnaryOpOnNumber(privLex)) {
 			privLex->skipWhitespace(lex);
-			parseNumber(privLex, token);
+			if (lex->curChar[0] == '0') {
+				parseZeroNumber(privLex, token);
+			} else {
+				parseNumber(privLex, token);
+			}
 			if (token->kind == tkSmmUInt) {
 				token->kind = tkSmmInt;
 				if (token->uintVal > INT64_MAX) {
@@ -397,16 +515,7 @@ PSmmToken smmGetNextToken(PSmmLexer lex) {
 		nextChar(lex);
 		break;
 	case '0':
-		if (lex->curChar[1] == 'x') {
-			nextChar(lex);
-			nextChar(lex);
-			parseHexNumber(privLex, token);
-		} else if (!isalnum(lex->curChar[1])) {
-			parseNumber(privLex, token);
-		} else {
-			smmPostMessage(privLex->msgs, errSmmInvalid0Number, lex->filePos);
-			skipAlNum(lex);
-		}
+		parseZeroNumber(privLex, token);
 		break;
 	case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9':
 		parseNumber(privLex, token);

@@ -15,7 +15,7 @@
 
 typedef enum {
 	errSmmUnknown,
-	errSmmInvalidHexDigit, errSmmIntTooBig, errSmmInvalidFloatExponent, errSmmInvalid0Number,
+	errSmmInvalidDigit, errSmmIntTooBig, errSmmInvalidFloatExponent, errSmmInvalid0Number,
 	errSmmInvalidNumber, errSmmInvalidCharacter,
 
 	errSmmNoExpectedToken, errSmmGotUnexpectedToken, errSmmUndefinedIdentifier, errSmmRedefinition,
