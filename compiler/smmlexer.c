@@ -170,10 +170,9 @@ static bool parseIdent(PPrivLexer privLex, PSmmToken token) {
 	return true;
 }
 
-static void parseBinNumber(PPrivLexer privLex, PSmmToken token, BinNumberKind bitsPerDigit) {
+static uint64_t parseBinNumber(PPrivLexer privLex, BinNumberKind bitsPerDigit) {
 	PSmmLexer lex = &privLex->lex;
 	int64_t res = 0;
-	token->kind = tkSmmUInt;
 	int digitsLeft = MAX_HEX_DIGITS;
 	int maxDigit = '9';
 	if (bitsPerDigit == octalNumber) {
@@ -187,7 +186,7 @@ static void parseBinNumber(PPrivLexer privLex, PSmmToken token, BinNumberKind bi
 		} else if (bitsPerDigit == octalNumber && isalnum(cc)) {
 			smmPostMessage(privLex->msgs, errSmmInvalidDigit, lex->filePos, "octal");
 			skipAlNum(lex);
-			return;
+			return 0;
 		} else {
 			cc |= 0x20; //to lowercase
 			if (cc >= 'a' && cc <= 'f') {
@@ -195,7 +194,7 @@ static void parseBinNumber(PPrivLexer privLex, PSmmToken token, BinNumberKind bi
 			} else if (cc > 'f' && cc < 'z') {
 				smmPostMessage(privLex->msgs, errSmmInvalidDigit, lex->filePos, "hex");
 				skipAlNum(lex);
-				return;
+				return 0;
 			} else {
 				break;
 			}
@@ -207,18 +206,15 @@ static void parseBinNumber(PPrivLexer privLex, PSmmToken token, BinNumberKind bi
 	if (digitsLeft == 0 && isalnum(*lex->curChar)) {
 		smmPostMessage(privLex->msgs, errSmmIntTooBig, lex->filePos);
 		skipAlNum(lex);
-	} else {
-		token->uintVal = res;
+		return 0;
 	}
+	return res;
 }
 
 static void parseNumber(PPrivLexer privLex, PSmmToken token) {
 	PSmmLexer lex = &privLex->lex;
 	token->kind = tkSmmUInt;
 	int i = 0;
-	int exp = 0;
-	int esign = 1;
-	int Eexp = 0;
 	char* dot = NULL;
 	while ('0' <= lex->curChar[i] && lex->curChar[i] <= '9') {
 		i++;
@@ -231,41 +227,27 @@ static void parseNumber(PPrivLexer privLex, PSmmToken token) {
 		while ('0' <= lex->curChar[i] && lex->curChar[i] <= '9') {
 			i++;
 		}
-		exp = sigDigits - i + 1;
-		if (exp == 0) {
+		if (i - sigDigits == 1) {
 			// Non digit after dot
 			smmPostMessage(privLex->msgs, errSmmInvalidNumber, lex->filePos);
 			moveFor(lex, i);
 			skipAlNum(lex);
 			return;
 		}
-		sigDigits = i - 1;
 	}
 	if (lex->curChar[i] == 'e' || lex->curChar[i] == 'E') {
 		token->kind = tkSmmFloat;
 		i++;
-		switch (lex->curChar[i]) {
-		case '-': esign = -1; // fallthrough
-		case '+': i++; break;
-		}
+		if (lex->curChar[i] == '-' || lex->curChar[i] == '+') i++;
 		if (!('0' <= lex->curChar[i] && lex->curChar[i] <= '9')) {
 			smmPostMessage(privLex->msgs, errSmmInvalidFloatExponent, lex->filePos);
 			moveFor(lex, i);
 			skipAlNum(lex);
 			return;
 		}
-		// Exp should be short so we just parse it immediately
-		int stopAt = i + 4;
-		while ('0' <= lex->curChar[i] && lex->curChar[i] <= '9' && i < stopAt) {
-			Eexp = Eexp * 10 + esign * (lex->curChar[i] - '0');
-			i++;
-		}
 		while ('0' <= lex->curChar[i] && lex->curChar[i] <= '9') {
-			// We are not interested in other digits because we already know exp is too long
-			// for our fast algorithm and number will be parsed using strtod c function
 			i++;
 		}
-		exp += Eexp;
 	}
 
 	uint64_t res = 0;
@@ -289,88 +271,33 @@ static void parseNumber(PPrivLexer privLex, PSmmToken token) {
 		return;
 	}
 
-	// We are here if it is float
-	int zerosToAdd = 15 - sigDigits;
-	if (exp > 22 && zerosToAdd > 0) {
-		exp -= zerosToAdd;
-	} else {
-		zerosToAdd = 0;
+	// We are here if it is float and we just use strtod since correctly parsing float is extremly complicated
+	// (even strtod on some compilers isn't completely correct). For more info read:
+	// http://www.exploringbinary.com/how-strtod-works-and-sometimes-doesnt/
+	char* end = NULL;
+	if (dot) *dot = decimalSeparator;
+	token->floatVal = strtod(pc, &end);
+	if (dot) *dot = '.';
+	if (end != lex->curChar) {
+		smmPostMessage(privLex->msgs, errSmmInvalidNumber, lex->filePos);
 	}
-	if (sigDigits > 16 || exp > MAX_EXP_FOR_FAST_CONVERSION || exp < -MAX_EXP_FOR_FAST_CONVERSION) {
-		// We can't simply and correctly do the conversion so we fallback to strtod
-		char* end = NULL;
-		if (dot) *dot = decimalSeparator;
-		token->floatVal = strtod(pc, &end);
-		if (dot) *dot = '.';
-		if (end != lex->curChar) {
-			smmPostMessage(privLex->msgs, errSmmInvalidNumber, lex->filePos);
-		}
-		return;
-	}
-	while ('0' <= *pc && *pc <= '9') {
-		res = res * 10 + (*pc - '0');
-		pc++;
-	}
-	if (*pc == '.') {
-		pc++;
-		while ('0' <= *pc && *pc <= '9') {
-			res = res * 10 + (*pc - '0');
-			pc++;
-		}
-	}
-
-	static uint64_t i10[16] = {
-		1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000,
-		10000000000, 100000000000, 1000000000000, 10000000000000, 100000000000000,
-		1000000000000000
-	};
-	static double d10[MAX_EXP_FOR_FAST_CONVERSION + 1] = {
-		1, 10, 100, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10, 1e11, 1e12, 1e13,
-		1e14, 1e15, 1e16, 1e17, 1e18, 1e19, 1e20, 1e21, 1e22
-	};
-
-	res *= i10[zerosToAdd];
-	if (res > MAX_MANTISSA_FOR_FAST_CONVERSION) {
-		char* end = NULL;
-		if (dot) *dot = decimalSeparator;
-		token->floatVal = strtod(pc, &end);
-		if (dot) *dot = '.';
-		if (end != lex->curChar) {
-			smmPostMessage(privLex->msgs, errSmmInvalidNumber, lex->filePos);
-		}
-		return;
-	}
-
-	bool multiply = exp >= 0;
-	if (!multiply) {
-		exp = -exp;
-	}
-
-	double dres = (double)res;
-	if (multiply) {
-		dres *= d10[exp];
-	} else {
-		dres /= d10[exp];
-	}
-	token->floatVal = dres;
 }
 
 static void parseZeroNumber(PPrivLexer privLex, PSmmToken token) {
+	token->kind = tkSmmUInt;
 	PSmmLexer lex = &privLex->lex;
 	if (lex->curChar[1] == 'x') {
 		moveFor(lex, 2);
-		parseBinNumber(privLex, token, hexNumber);
+		token->uintVal = parseBinNumber(privLex, hexNumber);
 	} else if (lex->curChar[1] == '.') {
 		parseNumber(privLex, token);
 	} else if ('1' <= lex->curChar[1] && lex->curChar[1] <= '7') {
 		nextChar(lex);
-		parseBinNumber(privLex, token, octalNumber);
+		token->uintVal = parseBinNumber(privLex, octalNumber);
 	} else if (!isalnum(lex->curChar[1])) {
 		// It is just 0
-		token->kind = tkSmmUInt;
 		nextChar(lex);
 	} else {
-		token->kind = tkSmmUInt;
 		smmPostMessage(privLex->msgs, errSmmInvalid0Number, lex->filePos);
 		skipAlNum(lex);
 	}

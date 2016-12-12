@@ -2,10 +2,12 @@
 #include "ibsallocator.h"
 #include "ibsdictionary.h"
 #include "smmmsgs.h"
+#include "smmlexer.h"
 
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 int main(int argc, char* argv[]) {
 	for (int i = 1; i < argc; i++) {
@@ -70,6 +72,19 @@ int main(int argc, char* argv[]) {
 
 	ibsSimpleAllocatorReset(a);
 	fputs("\nAllocator info after reset: ", stdout);
+	ibsSimpleAllocatorPrintInfo(a);
+
+	struct SmmMsgs msgs1 = { 0 };
+	msgs1.a = a;
+	clock_t t = clock();
+	for (int i = 0; i < 4000; i++) {
+		PSmmLexer lex = smmCreateLexer("1231.432234 23423E4 12.32E3", "test", &msgs1, a);
+		smmGetNextToken(lex);
+		smmGetNextToken(lex);
+		smmGetNextToken(lex);
+	}
+	t = clock() - t;
+	printf("It took %d clicks\n", t);
 	ibsSimpleAllocatorPrintInfo(a);
 
 	ibsSimpleAllocatorFree(a);
