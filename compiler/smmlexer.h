@@ -29,9 +29,16 @@ typedef enum {
 	tkSmmIntDiv, tkSmmIntMod, tkSmmNot, tkSmmAndOp, tkSmmXorOp, tkSmmOrOp,
 	tkSmmEq, tkSmmNotEq, tkSmmGtEq, tkSmmLtEq,
 	tkSmmInt, tkSmmUInt, tkSmmFloat, tkSmmBool,
+	tkSmmRawStringDelim, tkSmmStringDelim, tkSmmString,
 	tkSmmRArrow, tkSmmReturn,
 	tkSmmEof
 } SmmTokenKind;
+
+typedef enum {
+	soSmmLeaveWhitespace,
+	soSmmCollapseIdent,
+	soSmmCollapseWhitespace
+} SmmStringParseOption;
 
 typedef struct SmmToken* PSmmToken;
 
@@ -67,5 +74,6 @@ struct SmmToken {
 PSmmLexer smmCreateLexer(char* buffer, const char* filename, PSmmMsgs msgs, PIbsAllocator a);
 
 PSmmToken smmGetNextToken(PSmmLexer lex);
+PSmmToken smmGetNextStringToken(PSmmLexer lex, char termChar, SmmStringParseOption option);
 
 const char* smmTokenToString(PSmmToken token, char* buf);

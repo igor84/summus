@@ -15,6 +15,8 @@ static const char* msgTypeToString[] = {
 	"only binary, hex and float literals can start with 0",
 	"invalid number literal",
 	"invalid character",
+	"invalid string escape sequence",
+	"unclosed string literal starting at line %d",
 
 	"missing expected %s",
 	"expected %s but got %s",

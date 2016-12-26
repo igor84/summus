@@ -77,14 +77,15 @@ int main(int argc, char* argv[]) {
 	struct SmmMsgs msgs1 = { 0 };
 	msgs1.a = a;
 	clock_t t = clock();
+	char buf[] = "1231.432234 23423E4 12.32E3";
 	for (int i = 0; i < 4000; i++) {
-		PSmmLexer lex = smmCreateLexer("1231.432234 23423E4 12.32E3", "test", &msgs1, a);
+		PSmmLexer lex = smmCreateLexer(buf, "test", &msgs1, a);
 		smmGetNextToken(lex);
 		smmGetNextToken(lex);
 		smmGetNextToken(lex);
 	}
 	t = clock() - t;
-	printf("It took %d clicks\n", t);
+	printf("It took %d clicks\n", (int)t);
 	ibsSimpleAllocatorPrintInfo(a);
 
 	ibsSimpleAllocatorFree(a);

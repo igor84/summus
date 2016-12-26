@@ -25,9 +25,26 @@ Language at the moment supports:
 - type inference
 - functions and blocks
 - block scope
+- multiline string literals that parse escape sequences using <"> as delimiter
+- multiline string literals that read backslash literally using either <'> or <`> delimiter
+- string literal modificators:
+  - <-"..."> means collapse all whitespace to one space
+  - <|"..."> means remove as much leading space from every line as there is in second line of literal. This is very useful for keeping code aligned when you write multiline strings like SQL queries and similar.
+- char literals defined as <@c> for example
 - and that is it :)
 
 The goal of this project is not to create a perfect new language but to try and create a perfect compiler for minimal possible language.
+
+### Character literal examples
+| C char | Summus char |
+|:------:|:-----------:|
+| 'a'    | @a          |
+| 'z'    | @z          |
+| '\n'   | @\n         |
+| '\t'   | @\t         |
+| '@'    | @@          |
+| '\x20' | @\x20       |
+| '\20'  | @\16        |
 
 # Commands
 Built compiler outputs readable LLVM assembly into a test.ll file at the moment. Here are some useful commands you can run on that file:

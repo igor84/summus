@@ -74,6 +74,7 @@ void ibsSimpleAllocatorPrintInfo(const PIbsAllocator a) {
 }
 
 void* ibsAlloc(PIbsAllocator a, size_t size) {
+	if (size == 0) return NULL;
 	a->used += size;
 	size = (size + MEM_ALIGN) & ~MEM_ALIGN;
 	if (size > a->free) {

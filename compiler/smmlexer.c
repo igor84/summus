@@ -20,6 +20,7 @@ static const char* tokenTypeToString[] = {
 	"div", "mod", "not", "and", "or", "xor",
 	"==", "!=", ">=", "<=",
 	"int", "uint", "float", "bool",
+	"'", "\"", "string",
 	"->", "return",
 	"eof"
 };
@@ -42,7 +43,7 @@ struct PrivLexer {
 	struct SmmLexer lex;
 	PSmmMsgs msgs;
 	PIbsAllocator a;
-	PIbsAllocator syma; // Used for symTable allocations
+	PIbsAllocator tmpa; // Used for symTable allocations
 	void(*skipWhitespace)(const PSmmLexer);
 	PIbsDict symTable;
 };
@@ -317,6 +318,57 @@ static bool isUnaryOpOnNumber(PPrivLexer privLex) {
 	}
 }
 
+static char* parseEscapeChar(PPrivLexer privLex, char* str) {
+	PSmmLexer lex = &privLex->lex;
+	switch (*lex->curChar) {
+	case '\'': *str = '\''; break;
+	case '"': *str = '"'; break;
+	case '`': *str = '`'; break;
+	case '\\': *str = '\\'; break;
+	case 'a': *str = '\a'; break;
+	case 'b': *str = '\b'; break;
+	case 'f': *str = '\f'; break;
+	case 'n': *str = '\n'; break;
+	case 'r': *str = '\r'; break;
+	case 't': *str = '\t'; break;
+	case 'v': *str = '\v'; break;
+	case 'x':
+		if (!isxdigit(lex->curChar[1]) || !isxdigit(lex->curChar[2])) {
+			*str = '?';
+			smmPostMessage(privLex->msgs, errSmmBadStringEscape, lex->filePos);
+		} else {
+			nextChar(lex);
+			char r = lex->curChar[0] < 'A' ? lex->curChar[0] - '0' : (lex->curChar[0] | 0x20) - 'a' + 10;
+			r <<= 4;
+			nextChar(lex);
+			r |= lex->curChar[0] < 'A' ? lex->curChar[0] - '0' : (lex->curChar[0] | 0x20) - 'a' + 10;
+			*str = r;
+		}
+		break;
+	case '0': case '1': case '2': case '3': case '4': 
+	case '5': case '6': case '7': case '8': case '9': 
+		{
+			uint16_t r = lex->curChar[0] - '0';
+			if (isdigit(lex->curChar[1])) {
+				nextChar(lex);
+				r = r * 10 + lex->curChar[0] - '0';
+				if (isdigit(lex->curChar[1]) && r <= (255 + '0' - lex->curChar[1]) / 10) {
+					nextChar(lex);
+					r = r * 10 + lex->curChar[0] - '0';
+				}
+			}
+			*str = (char)r;
+		}
+		break;
+	default:
+		smmPostMessage(privLex->msgs, errSmmBadStringEscape, lex->filePos);
+		*str = '?';
+		break;
+	}
+	str++;
+	return str;
+}
+
 /********************************************************
 API Functions
 *********************************************************/
@@ -336,9 +388,7 @@ PSmmLexer smmCreateLexer(char* buffer, const char* filename, PSmmMsgs msgs, PIbs
 	PPrivLexer privLex = ibsAlloc(a, sizeof(struct PrivLexer));
 	char symaName[1004] = { 'l', 'e', 'x' };
 	strncpy(&symaName[3], filename, 1000);
-	size_t symaSize = a->size >> 2;
-	if (symaSize < 4 * 1024) symaSize = 4 * 1024;
-	privLex->syma = ibsSimpleAllocatorCreate(symaName, symaSize);
+	privLex->tmpa = ibsSimpleAllocatorCreate(symaName, a->size);
 
 	if (!buffer) {
 		buffer = ibsAlloc(a, STDIN_BUFFER_LENGTH);
@@ -354,7 +404,7 @@ PSmmLexer smmCreateLexer(char* buffer, const char* filename, PSmmMsgs msgs, PIbs
 	privLex->lex.curChar = buffer;
 	privLex->lex.filePos.lineNumber = 1;
 	privLex->lex.filePos.lineOffset = 1;
-	privLex->symTable = ibsDictCreate(privLex->syma);
+	privLex->symTable = ibsDictCreate(privLex->tmpa);
 	initSymTableWithKeywords(privLex);
 	return &privLex->lex;
 }
@@ -378,13 +428,21 @@ PSmmToken smmGetNextToken(PSmmLexer lex) {
 	switch (*firstChar) {
 	case 0:
 		token->kind = tkSmmEof;
-		ibsSimpleAllocatorFree(privLex->syma);
-		privLex->syma = NULL;
+		ibsSimpleAllocatorFree(privLex->tmpa);
+		privLex->tmpa = NULL;
 		return token;
 	case '-':
 		nextChar(lex);
 		if (lex->curChar[0] == '>') {
 			token->kind = tkSmmRArrow;
+			nextChar(lex);
+		} else if (lex->curChar[0] == '"') {
+			token->kind = tkSmmStringDelim;
+			token->sintVal = soSmmCollapseWhitespace;
+			nextChar(lex);
+		} else if (lex->curChar[0] == '\'' || lex->curChar[0] == '`') {
+			token->kind = tkSmmRawStringDelim;
+			token->sintVal = soSmmCollapseWhitespace;
 			nextChar(lex);
 		} else if (isUnaryOpOnNumber(privLex)) {
 			privLex->skipWhitespace(lex);
@@ -441,11 +499,33 @@ PSmmToken smmGetNextToken(PSmmLexer lex) {
 		token->kind = *firstChar;
 		nextChar(lex);
 		break;
+	case '|':
+		nextChar(lex);
+		if (lex->curChar[0] == '"') {
+			token->kind = tkSmmStringDelim;
+			token->sintVal = soSmmCollapseIdent;
+			nextChar(lex);
+		} else if (lex->curChar[0] == '\'' || lex->curChar[0] == '`') {
+			token->kind = tkSmmRawStringDelim;
+			token->sintVal = soSmmCollapseIdent;
+			nextChar(lex);
+		} else {
+			smmPostMessage(privLex->msgs, errSmmInvalidCharacter, lex->filePos);
+		}
+		break;
 	case '0':
 		parseZeroNumber(privLex, token);
 		break;
 	case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9':
 		parseNumber(privLex, token);
+		break;
+	case '\'': case '`':
+		token->kind = tkSmmRawStringDelim;
+		nextChar(lex);
+		break;
+	case '"':
+		token->kind = tkSmmStringDelim;
+		nextChar(lex);
 		break;
 	default:
 		if (isalpha(*firstChar)) {
@@ -464,6 +544,84 @@ PSmmToken smmGetNextToken(PSmmLexer lex) {
 		token->repr = repr;
 	}
 	lex->lastToken = token;
+	return token;
+}
+
+PSmmToken smmGetNextStringToken(PSmmLexer lex, char termChar, SmmStringParseOption option) {
+	PPrivLexer privLex = (PPrivLexer)lex;
+	if (lex->curChar[0] == 0 && lex->lastToken->kind == tkSmmEof) {
+		return lex->lastToken;
+	}
+	PIbsAllocator a = privLex->a;
+
+	int identSize = -1;
+	uint64_t pos = lex->scanCount;
+	PSmmToken token = ibsAlloc(a, sizeof(struct SmmToken));
+	token->filePos = lex->filePos;
+	char* str = (char*)ibsStartAlloc(privLex->tmpa);
+	token->stringVal = str;
+	char* firstChar = lex->curChar;
+	while (*lex->curChar && *lex->curChar != termChar) {
+		if (*lex->curChar == '\\' && (termChar == '"' || lex->curChar[1] == termChar)) {
+			nextChar(lex);
+			str = parseEscapeChar(privLex, str);
+		} else if (*lex->curChar == '\n' || *lex->curChar == '\r') {
+			if (option == soSmmCollapseWhitespace) {
+				if (str[-1] != ' ') {
+					*str = ' ';
+					str++;
+				}
+			} else if (str != token->stringVal || option != soSmmCollapseIdent) {
+				*str = '\n';
+				str++;
+			}
+			if (lex->curChar[0] + lex->curChar[1] == '\n' + '\r') {
+				nextChar(lex);
+			}
+			lex->filePos.lineNumber++;
+			lex->filePos.lineOffset = 0;
+			if (option == soSmmCollapseIdent) {
+				if (identSize == -1) {
+					identSize = 0;
+					while (lex->curChar[1] == ' ' || lex->curChar[1] == '\t') {
+						nextChar(lex);
+						identSize++;
+					}
+				} else {
+					for (int i = identSize; i > 0 && (lex->curChar[1] == ' ' || lex->curChar[1] == '\t'); i--) {
+						nextChar(lex);
+					}
+				}
+			}
+		} else if (option == soSmmCollapseWhitespace && isspace(*lex->curChar)) {
+			if (str[-1] != ' ') {
+				*str = ' ';
+				str++;
+			}
+			while (isspace(lex->curChar[1])) {
+				nextChar(lex);
+			}
+		} else {
+			*str = *lex->curChar;
+			str++;
+		}
+		nextChar(lex);
+	}
+	size_t length = str + 1 - token->stringVal;
+	str = ibsAlloc(a, length);
+	strncpy(str, token->stringVal, length);
+	memset(token->stringVal, 0, length);
+	token->stringVal = str;
+	ibsEndAlloc(privLex->tmpa, 0);
+	
+	if (!*lex->curChar) {
+		smmPostMessage(privLex->msgs, errSmmUnclosedString, token->filePos, token->filePos.lineNumber);
+	}
+	token->kind = tkSmmString;
+	int cnt = (int)(lex->scanCount - pos);
+	char* repr = ibsAlloc(privLex->a, cnt + 1);
+	strncpy(repr, firstChar, cnt);
+	token->repr = repr;
 	return token;
 }
 
