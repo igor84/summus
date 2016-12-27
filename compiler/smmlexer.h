@@ -29,7 +29,7 @@ typedef enum {
 	tkSmmIntDiv, tkSmmIntMod, tkSmmNot, tkSmmAndOp, tkSmmXorOp, tkSmmOrOp,
 	tkSmmEq, tkSmmNotEq, tkSmmGtEq, tkSmmLtEq,
 	tkSmmInt, tkSmmUInt, tkSmmFloat, tkSmmBool,
-	tkSmmRawStringDelim, tkSmmStringDelim, tkSmmString,
+	tkSmmChar, tkSmmString,
 	tkSmmRArrow, tkSmmReturn,
 	tkSmmEof
 } SmmTokenKind;
@@ -63,6 +63,7 @@ struct SmmToken {
 		int64_t sintVal;
 		double floatVal;
 		bool boolVal;
+		char charVal;
 	};
 };
 

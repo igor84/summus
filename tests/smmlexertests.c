@@ -273,9 +273,70 @@ static void TestParseNegNumber(CuTest *tc) {
 	CuAssertIntEquals_Msg(tc, "Expected message not received", errSmmIntTooBig, curMsg->type);
 }
 
+static void TestParseChar(CuTest *tc) {
+	char buf[] = "@a @z @\\n @\\t @@ @\\x20 @\\16 @\\\\ @  @\\z @\\xxx";
+	struct SmmMsgs msgs = { 0 };
+	msgs.a = a;
+	PSmmLexer lex = smmCreateLexer(buf, "TestParseChar", &msgs, a);
+
+	PSmmToken token = smmGetNextToken(lex);
+	CuAssertIntEquals(tc, tkSmmChar, token->kind);
+	CuAssertIntEquals(tc, 'a', token->charVal);
+	
+	token = smmGetNextToken(lex);
+	CuAssertIntEquals(tc, tkSmmChar, token->kind);
+	CuAssertIntEquals(tc, 'z', token->charVal);
+	
+	token = smmGetNextToken(lex);
+	CuAssertIntEquals(tc, tkSmmChar, token->kind);
+	CuAssertIntEquals(tc, '\n', token->charVal);
+	
+	token = smmGetNextToken(lex);
+	CuAssertIntEquals(tc, tkSmmChar, token->kind);
+	CuAssertIntEquals(tc, '\t', token->charVal);
+	
+	token = smmGetNextToken(lex);
+	CuAssertIntEquals(tc, tkSmmChar, token->kind);
+	CuAssertIntEquals(tc, '@', token->charVal);
+	
+	token = smmGetNextToken(lex);
+	CuAssertIntEquals(tc, tkSmmChar, token->kind);
+	CuAssertIntEquals(tc, '\x20', token->charVal);
+	
+	token = smmGetNextToken(lex);
+	CuAssertIntEquals(tc, tkSmmChar, token->kind);
+	CuAssertIntEquals(tc, '\20', token->charVal);
+	
+	token = smmGetNextToken(lex);
+	CuAssertIntEquals(tc, tkSmmChar, token->kind);
+	CuAssertIntEquals(tc, '\\', token->charVal);
+	
+	token = smmGetNextToken(lex);
+	CuAssertIntEquals(tc, tkSmmChar, token->kind);
+	CuAssertIntEquals(tc, ' ', token->charVal);
+
+	CuAssertPtrEquals_Msg(tc, "Got unexpected error reported", NULL, msgs.items);
+
+	token = smmGetNextToken(lex);
+	CuAssertIntEquals(tc, tkSmmChar, token->kind);
+	CuAssertIntEquals(tc, '?', token->charVal);
+
+	CuAssertPtrNotNullMsg(tc, "Expected err that escape sequence is invalid not received", msgs.items);
+	PSmmMsg curMsg = msgs.items;
+	CuAssertIntEquals_Msg(tc, "Expected message not received", errSmmBadStringEscape, curMsg->type);
+
+	token = smmGetNextToken(lex);
+	CuAssertIntEquals(tc, tkSmmChar, token->kind);
+	CuAssertIntEquals(tc, '?', token->charVal);
+
+	CuAssertPtrNotNullMsg(tc, "Expected err that escape sequence is invalid not received", curMsg->next);
+	curMsg = curMsg->next;
+	CuAssertIntEquals_Msg(tc, "Expected message not received", errSmmBadStringEscape, curMsg->type);
+}
+
 static void assertStringToken(CuTest* tc, const char* expected, PSmmLexer lex) {
 	PSmmToken token = smmGetNextToken(lex);
-	CuAssertIntEquals(tc, tkSmmStringDelim, token->kind);
+	CuAssertIntEquals(tc, '"', token->kind);
 	CuAssertStrEquals(tc, "\"", token->repr);
 	
 	token = smmGetNextStringToken(lex, '"', soSmmLeaveWhitespace);
@@ -283,7 +344,7 @@ static void assertStringToken(CuTest* tc, const char* expected, PSmmLexer lex) {
 	CuAssertStrEquals(tc, expected, token->stringVal);
 
 	token = smmGetNextToken(lex);
-	CuAssertIntEquals(tc, tkSmmStringDelim, token->kind);
+	CuAssertIntEquals(tc, '"', token->kind);
 	CuAssertStrEquals(tc, "\"", token->repr);
 }
 
@@ -291,7 +352,7 @@ static void assertRawStringToken(CuTest* tc, const char* startDelim, const char*
 	const char* termChar = startDelim;
 	if (startDelim[1] != 0) termChar = &startDelim[1];
 	PSmmToken token = smmGetNextToken(lex);
-	CuAssertIntEquals(tc, tkSmmRawStringDelim, token->kind);
+	CuAssertIntEquals(tc, *termChar, token->kind);
 	CuAssertStrEquals(tc, startDelim, token->repr);
 	
 	token = smmGetNextStringToken(lex, *termChar, token->sintVal);
@@ -299,7 +360,7 @@ static void assertRawStringToken(CuTest* tc, const char* startDelim, const char*
 	CuAssertStrEquals(tc, expected, token->stringVal);
 
 	token = smmGetNextToken(lex);
-	CuAssertIntEquals(tc, tkSmmRawStringDelim, token->kind);
+	CuAssertIntEquals(tc, *termChar, token->kind);
 	CuAssertStrEquals(tc, termChar, token->repr);
 }
 
@@ -347,7 +408,7 @@ static void TestParseString(CuTest *tc) {
 	const char* termChar = startDelim;
 	if (startDelim[1] != 0) termChar = &startDelim[1];
 	PSmmToken token = smmGetNextToken(lex);
-	CuAssertIntEquals(tc, tkSmmRawStringDelim, token->kind);
+	CuAssertIntEquals(tc, *termChar, token->kind);
 	CuAssertStrEquals(tc, startDelim, token->repr);
 
 	CuAssertPtrEquals_Msg(tc, "Got unexpected error reported", NULL, curMsg->next);
@@ -387,6 +448,7 @@ CuSuite* SmmLexerGetSuite() {
 	SUITE_ADD_TEST(suite, TestParseNumber);
 	SUITE_ADD_TEST(suite, TestParseNegNumber);
 	SUITE_ADD_TEST(suite, TestParseString);
+	SUITE_ADD_TEST(suite, TestParseChar);
 	SUITE_ADD_TEST(suite, TestTokenToString);
 
 	return suite;

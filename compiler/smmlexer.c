@@ -20,7 +20,7 @@ static const char* tokenTypeToString[] = {
 	"div", "mod", "not", "and", "or", "xor",
 	"==", "!=", ">=", "<=",
 	"int", "uint", "float", "bool",
-	"'", "\"", "string",
+	"char", "string",
 	"->", "return",
 	"eof"
 };
@@ -436,12 +436,8 @@ PSmmToken smmGetNextToken(PSmmLexer lex) {
 		if (lex->curChar[0] == '>') {
 			token->kind = tkSmmRArrow;
 			nextChar(lex);
-		} else if (lex->curChar[0] == '"') {
-			token->kind = tkSmmStringDelim;
-			token->sintVal = soSmmCollapseWhitespace;
-			nextChar(lex);
-		} else if (lex->curChar[0] == '\'' || lex->curChar[0] == '`') {
-			token->kind = tkSmmRawStringDelim;
+		} else if (lex->curChar[0] == '"' || lex->curChar[0] == '\'' || lex->curChar[0] == '`') {
+			token->kind = lex->curChar[0];
 			token->sintVal = soSmmCollapseWhitespace;
 			nextChar(lex);
 		} else if (isUnaryOpOnNumber(privLex)) {
@@ -494,19 +490,26 @@ PSmmToken smmGetNextToken(PSmmLexer lex) {
 			nextChar(lex);
 		} else token->kind = *firstChar;
 		break;
-	case '+': case '*': case '/': case '%': case ':': case ';':
-	case '(': case ')': case '{': case '}': case ',': case '.':
+	case '@':
+		token->kind = tkSmmChar;
+		nextChar(lex);
+		if (lex->curChar[0] == '\\') {
+			nextChar(lex);
+			parseEscapeChar(privLex, &token->charVal);
+		} else {
+			token->charVal = lex->curChar[0];
+		}
+		nextChar(lex);
+		break;
+	case '+': case '*': case '/': case '%': case ':': case ';': case '.':
+	case ',': case '(': case ')': case '{': case '}': case '[': case ']':
 		token->kind = *firstChar;
 		nextChar(lex);
 		break;
 	case '|':
 		nextChar(lex);
-		if (lex->curChar[0] == '"') {
-			token->kind = tkSmmStringDelim;
-			token->sintVal = soSmmCollapseIdent;
-			nextChar(lex);
-		} else if (lex->curChar[0] == '\'' || lex->curChar[0] == '`') {
-			token->kind = tkSmmRawStringDelim;
+		if (lex->curChar[0] == '"' || lex->curChar[0] == '\'' || lex->curChar[0] == '`') {
+			token->kind = lex->curChar[0];
 			token->sintVal = soSmmCollapseIdent;
 			nextChar(lex);
 		} else {
@@ -519,12 +522,8 @@ PSmmToken smmGetNextToken(PSmmLexer lex) {
 	case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9':
 		parseNumber(privLex, token);
 		break;
-	case '\'': case '`':
-		token->kind = tkSmmRawStringDelim;
-		nextChar(lex);
-		break;
-	case '"':
-		token->kind = tkSmmStringDelim;
+	case '"': case '\'': case '`':
+		token->kind = lex->curChar[0];
 		nextChar(lex);
 		break;
 	default:
