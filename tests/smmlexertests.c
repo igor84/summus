@@ -222,7 +222,8 @@ static void TestParseNumber(CuTest *tc) {
 }
 
 static void TestParseNegNumber(CuTest *tc) {
-	char buf[] = "123 - 321.23; -234532 - - 23423.2342; -9223372036854775807; -9223372036854775808; -18446744073709551615";
+	char buf[] = "123 - 321.23; -234532 - - 23423.2342; -9223372036854775807; "
+		"-9223372036854775808; -9223372036854775809; -18446744073709551615";
 	struct SmmMsgs msgs = { 0 };
 	msgs.a = a;
 	PSmmLexer lex = smmCreateLexer(buf, "TestParseNegNumber", &msgs, a);
@@ -257,6 +258,14 @@ static void TestParseNegNumber(CuTest *tc) {
 
 	CuAssertPtrEquals_Msg(tc, "Got unexpected error reported", NULL, msgs.items);
 	// -9223372036854775808 MAX_INT64 + 1
+	token = smmGetNextToken(lex);
+	CuAssertIntEquals(tc, tkSmmInt, token->kind);
+	CuAssertPtrEquals_Msg(tc, "Got unexpected error reported", NULL, msgs.items);
+	CuAssertTrue(tc, INT64_MIN == token->sintVal);
+	token = smmGetNextToken(lex);
+	CuAssertIntEquals(tc, ';', token->kind);
+
+	// -9223372036854775809 MAX_INT64 + 2
 	token = smmGetNextToken(lex);
 	CuAssertIntEquals(tc, tkSmmInt, token->kind);
 	CuAssertPtrNotNullMsg(tc, "Expected err that int is too big not received", msgs.items);

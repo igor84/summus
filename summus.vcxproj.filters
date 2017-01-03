@@ -36,6 +36,9 @@
     <ClInclude Include="tests\CuTest.h">
       <Filter>Tests</Filter>
     </ClInclude>
+    <ClInclude Include="compiler\smmparser.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="tests\test.smm">
@@ -69,6 +72,9 @@
     </ClCompile>
     <ClCompile Include="tests\smmlexertests.c">
       <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="compiler\smmparser.c">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

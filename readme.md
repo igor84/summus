@@ -46,7 +46,7 @@ The goal of this project is not to create a perfect new language but to try and 
 | '\x20' | @\x20       |
 | '\20'  | @\16        |
 | '\\'   | @\\         |
-| ' '    | @           |
+| ' '    | @&nbsp;     |
 
 # Commands
 Built compiler outputs readable LLVM assembly into a test.ll file at the moment. Here are some useful commands you can run on that file:

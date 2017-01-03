@@ -3,6 +3,7 @@
 #include "ibsdictionary.h"
 #include "smmmsgs.h"
 #include "smmlexer.h"
+#include "smmparser.h"
 
 #include <assert.h>
 #include <stdio.h>

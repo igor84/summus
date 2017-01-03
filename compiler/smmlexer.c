@@ -449,10 +449,11 @@ PSmmToken smmGetNextToken(PSmmLexer lex) {
 			}
 			if (token->kind == tkSmmUInt) {
 				token->kind = tkSmmInt;
-				if (token->uintVal > INT64_MAX) {
+				if (token->uintVal > 0x8000000000000000) {
 					smmPostMessage(privLex->msgs, errSmmIntTooBig, token->filePos);
 				}
-				token->sintVal = -(int64_t)token->uintVal;
+				if (token->uintVal == 0x8000000000000000) token->sintVal = INT64_MIN;
+				else token->sintVal = -(int64_t)token->uintVal;
 			} else if (token->kind == tkSmmFloat) {
 				token->floatVal = -token->floatVal;
 			} else {
