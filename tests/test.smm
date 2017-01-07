@@ -5,6 +5,7 @@ bla :: (a: int16, b: int16) -> int32 {
 putchar :: (char: int32) -> int32;
 
 ui32 : uint32 = 100;
+tconst :: 256;
 {
 	i8 : int8 = -1;
 	ui32 : uint32 = 20;

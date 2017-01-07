@@ -53,6 +53,7 @@ Built compiler outputs readable LLVM assembly into a test.ll file at the moment.
 - `clang -x ir -o test.exe test.ll` to make executable from ll file
 - `clang -c -x ir -o test.o test.ll` to make native object file from ll file
 - `llvm-objdump.exe -disassemble test.o` to get native disassembly of object file
+- `summus -pp1 | dot -Tsvg -oast.svg` to generate image of AST tree if you have [GraphViz](http://www.graphviz.org/) installed (pp1 stands for `print pass 1`)
 
 ## TODO
 - Do complete code review and add all the comments

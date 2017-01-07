@@ -206,7 +206,7 @@ static PSmmAstNode parseIdentFactor(PSmmParser parser) {
 				// If type identifier was used as variable identifier
 				const char* tokenStr = nodeKindToString[var->kind];
 				smmPostMessage(parser->msgs, errSmmIdentTaken, identToken->filePos, identToken->repr, tokenStr);
-			} else if (var->level > parser->curScope->level) {
+			} else if (var->level < parser->curScope->level) {
 				res = createNewIdent(parser, identToken);
 			} else if (var->kind == nkSmmFunc) {
 				//Posible overload
@@ -402,7 +402,7 @@ static PSmmAstNode parseFactor(PSmmParser parser) {
 	} else {
 		switch (parser->curToken->kind) {
 		case tkSmmIdent: res = parseIdentFactor(parser); break;
-		case tkSmmUInt: case tkSmmFloat: case tkSmmBool:
+		case tkSmmUInt: case tkSmmInt: case tkSmmFloat: case tkSmmBool:
 			res = getLiteralNode(parser);
 			break;
 		default:

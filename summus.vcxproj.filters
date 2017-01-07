@@ -16,6 +16,9 @@
     <Filter Include="Tests">
       <UniqueIdentifier>{3731b16b-ecca-42a4-be53-a9d275773514}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Utility">
+      <UniqueIdentifier>{23cb5e4d-f34b-457f-9900-220c2b96fef2}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="compiler\ibscommon.h">
@@ -38,6 +41,12 @@
     </ClInclude>
     <ClInclude Include="compiler\smmparser.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="compiler\smmtypeinference.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="utility\smmgvpass.h">
+      <Filter>Utility</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -75,6 +84,12 @@
     </ClCompile>
     <ClCompile Include="compiler\smmparser.c">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="compiler\smmtypeinference.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="utility\smmgvpass.c">
+      <Filter>Utility</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>
