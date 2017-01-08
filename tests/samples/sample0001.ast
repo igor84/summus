@@ -1,0 +1,25 @@
+errSmmIntTooBig:4:31
+errSmmInvalidCharacter:7:9
+errSmmInvalidDigit:8:19
+errSmmInvalidNumber:9:6
+errSmmInvalidFloatExponent:10:6
+errSmmIntTooBig:11:46
+
+MODULE sample0001
+: x:1:int32 
+: y:1:int32 
+: z:1:float32 
+: a:1:float32 
+: b:1:float32 
+: test1:3:int32(a:1:int32)
+{
+    blockFlags:1
+    return:int32 *:4:int32 param:1:a:int32 int:2:0xaaaaaaaaabbbbbbbbbbbb1231231:int8 
+}
+blockFlags:0
+: = x:1:int32  int:2:34:int8 
+: = y:1:int32  (test1:1:int32(int:2:0x55abcgf:int8 )) 
+: = z:1:float32  +.:4:sfloat64 float:2:12. :sfloat64 *.:4:sfloat64 float:2:3.12:sfloat64 Ident:1:y:int32 
+: = a:1:float32  float:2:12ez:sfloat64 
+: = b:1:float32  -.:4:float32 +.:4:float32 Ident:1:a:float32 Ident:1:y:int32 int:2:12361753871387152387165238716523:int8 
+return:int32 Ident:1:x:int32 

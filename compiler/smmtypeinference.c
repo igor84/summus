@@ -418,7 +418,7 @@ static PSmmTypeInfo processExpression(PSmmAstNode expr, PTIData tidata, PIbsAllo
 			if (!funcDefDecl) {
 				smmPostMessage(tidata->msgs, errSmmUndefinedIdentifier, callNode->token->filePos, callNode->token->repr);
 				expr->type = &builtInTypes[tiSmmUnknown];
-			} else if (funcDefDecl->left->kind != nkSmmFunc) {
+			} else if (funcDefDecl->kind == nkSmmParam || funcDefDecl->left->kind != nkSmmFunc) {
 				smmPostMessage(tidata->msgs, errSmmNotAFunction, callNode->token->filePos, callNode->token->repr);
 				expr->type = &builtInTypes[tiSmmUnknown];
 			} else {
@@ -440,10 +440,11 @@ static PSmmTypeInfo processExpression(PSmmAstNode expr, PTIData tidata, PIbsAllo
 			if (!decl) {
 				smmPostMessage(tidata->msgs, errSmmUndefinedIdentifier, expr->token->filePos, expr->token->repr);
 				expr->type = &builtInTypes[tiSmmUnknown];
-			} else if (decl->left->kind == nkSmmFunc) {
-				// TODO: Expected ( after function call;
-				assert(false && "Used function as regular ident");
-				if (!expr->type) expr->type = decl->left->type;
+			} else if (decl->kind == nkSmmParam) {
+				if (tidata->acceptOnlyConsts) {
+					smmPostMessage(tidata->msgs, errSmmNonConstInConstExpression, expr->token->filePos);
+				}
+				expr->type = ((PSmmAstParamNode)decl)->type;
 			} else {
 				if (decl->left->left->kind == nkSmmConst) {
 					expr->kind = nkSmmConst;
@@ -470,14 +471,6 @@ static PSmmTypeInfo processExpression(PSmmAstNode expr, PTIData tidata, PIbsAllo
 			if (!decl) {
 				smmPostMessage(tidata->msgs, errSmmUndefinedIdentifier, expr->token->filePos, expr->token->repr);
 				expr->type = &builtInTypes[tiSmmUnknown];
-			} else if (decl->left->kind == nkSmmFunc) {
-				// TODO: Expected ( after function call or should I report non const used in const expression
-				assert(false && "Func used as a constant");
-				expr->type = decl->left->type;
-				/*} else if (decl->left->kind == nkSmmIdent) {
-				// This can happen in case of decl with usage like var := var;
-				smmPostMessage(tidata->msgs, errSmmUndefinedIdentifier, expr->token->filePos, expr->token->repr);
-				expr->type = decl->left->type;*/
 			} else {
 				if (!decl->left->type) {
 					processDeclarationWithExpr(decl, tidata, a);

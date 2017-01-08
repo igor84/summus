@@ -14,8 +14,8 @@ UndefinedTypeButLegalReturn :: () -> int33 {
 	return 123;
 }
 
-x := -0xf000000000000000; // Warning loss of data
+x := -0xf000000000000000; // Int too big
 
-y := x---; //Expected literal or identifier but got -
+y := x---; // Expected literal or identifier but got -
 
 z := x - (); // Expected expression but got )

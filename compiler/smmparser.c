@@ -510,7 +510,7 @@ static PSmmAstNode parseExpression(PSmmParser parser) {
 static void removeScopeVars(PSmmParser parser) {
 	PSmmAstDeclNode curDecl = parser->curScope->decls;
 	while (curDecl) {
-		ibsDictPop(parser->idents, curDecl->left->token->repr);
+		ibsDictPop(parser->idents, curDecl->left->left->token->repr);
 		curDecl = curDecl->nextDecl;
 	}
 	PSmmAstScopeNode prevScope = parser->curScope->prevScope;
@@ -545,7 +545,6 @@ static PSmmAstBlockNode parseBlock(PSmmParser parser, PSmmTypeInfo curFuncReturn
 	if (isFuncBlock) {
 		bool funcHasReturnType = curFuncReturnType->kind != tiSmmUnknown && curFuncReturnType->kind != tiSmmVoid;
 		if (funcHasReturnType && !block->endsWithReturn && curStmt != &errorNode) {
-			// TODO: maybe move this to second pass
 			smmPostMessage(parser->msgs, errSmmFuncMustReturnValue, parser->curToken->filePos);
 		} else if (!funcHasReturnType && !block->endsWithReturn) {
 			// We add empty return statement
@@ -588,8 +587,6 @@ static PSmmAstNode parseFunction(PSmmParser parser, PSmmAstFuncDefNode func) {
 		ignoreMissingSemicolon = false;
 		getNextToken(parser);
 		typeInfo = parseType(parser);
-		// TODO: See why I need this:
-		//if (parser->curToken->kind != '{' && parser->curToken->kind != ';') getNextToken(parser);
 	}
 	func->returnType = typeInfo;
 	if (parser->curToken->kind == '{') {
@@ -688,6 +685,13 @@ static PSmmAstNode parseDeclaration(PSmmParser parser, PSmmAstNode lval) {
 		return &errorNode;
 	}
 
+	PSmmAstNode existing = ibsDictGet(parser->idents, lval->token->repr);
+	if (existing && existing->asIdent.level == lval->asIdent.level && lval->kind != nkSmmFunc) {
+		assert(existing->kind == nkSmmFunc);
+		smmPostMessage(parser->msgs, errSmmRedefinition, lval->token->filePos, lval->token->repr);
+		return &errorNode;
+	}
+
 	ibsDictPush(parser->idents, lval->token->repr, lval);
 	PSmmAstDeclNode decl = spareNode ? spareNode : smmNewAstNode(nkSmmDecl, parser->a);
 	decl->token = declToken;
@@ -704,12 +708,15 @@ static PSmmAstNode parseDeclaration(PSmmParser parser, PSmmAstNode lval) {
 	if (!expr) {
 		expr = smmNewAstNode(nkSmmAssignment, parser->a);
 		expr->left = lval;
-		// TODO: Maybe move this to second pass
 		expr->right = smmGetZeroValNode(parser->curToken->filePos, lval->type, parser->a);
 		expr->type = lval->type;
 		expr->token = ibsAlloc(parser->a, sizeof(struct SmmToken));
-		expr->token->kind = '=';
-		expr->token->repr = "=";
+		if (lval->isConst) {
+			expr->token->repr = ":";
+		} else {
+			expr->token->repr = "=";
+		}
+		expr->token->kind = expr->token->repr[0];
 		expr->token->filePos = parser->curToken->filePos;
 	}
 

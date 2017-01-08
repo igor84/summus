@@ -97,13 +97,13 @@ static void processExpression(void* parent, PSmmAstNode expr, const char* pcompa
 	}
 }
 
-static void processAssignment(void* parent, PSmmAstNode stmt, FILE* f) {
+static void processAssignment(void* parent, PSmmAstNode stmt, const char* dir, FILE* f) {
 	char buf[100] = { 0 };
 	sprintf(buf, "= %s", typeName(stmt->type));
 	if (((PSmmAstNode)parent)->kind == nkSmmDecl) {
-		printNodeConn(parent, stmt, buf, "se", f);
+		printNodeConn(parent, stmt, buf, dir, f);
 	} else {
-		printColorNodeConn(parent, stmt, buf, "palegreen", "s", f);
+		printColorNodeConn(parent, stmt, buf, "palegreen", dir, f);
 	}
 	sprintf(buf, "%s: %s", stmt->left->token->repr, typeName(stmt->left->type));
 	printNodeConn(stmt, stmt->left, buf, "sw", f);
@@ -117,7 +117,7 @@ static void processLocalSymbols(PSmmAstScopeNode scope, FILE* f) {
 		printNodeConn(prevDecl, decl, "decl", "s", f);
 		if (decl->left->kind == nkSmmAssignment) {
 			if (decl->left->left->isConst) {
-				processAssignment(decl, decl->left, f);
+				processAssignment(decl, decl->left, "se", f);
 			} else {
 				printEdge(decl, decl->left->left, "se", f);
 			}
@@ -129,10 +129,10 @@ static void processLocalSymbols(PSmmAstScopeNode scope, FILE* f) {
 	}
 }
 
-static void processReturn(void* parent, PSmmAstNode stmt, FILE* f) {
+static void processReturn(void* parent, PSmmAstNode stmt, const char* dir, FILE* f) {
 	char buf[100] = { 0 };
 	sprintf(buf, "return: %s", typeName(stmt->type));
-	printColorNodeConn(parent, stmt, buf, "palegreen", "s", f);
+	printColorNodeConn(parent, stmt, buf, "palegreen", dir, f);
 	if (stmt->left)	processExpression(stmt, stmt->left, "sw", f);
 }
 
@@ -140,6 +140,8 @@ static void processBlock(PSmmAstBlockNode block, FILE* f) {
 	void* prevStmt = block;
 	PSmmAstNode stmt = block->stmts;
 	while (stmt) {
+		const char* dir = "s";
+		if (stmt == block->stmts) dir = "se";
 		switch (stmt->kind) {
 		case nkSmmBlock:
 			{
@@ -152,11 +154,11 @@ static void processBlock(PSmmAstBlockNode block, FILE* f) {
 				break;
 			}
 		case nkSmmAssignment:
-			processAssignment(prevStmt, stmt, f);
+			processAssignment(prevStmt, stmt, dir, f);
 			prevStmt = stmt;
 			break;
 		case nkSmmReturn:
-			processReturn(prevStmt, stmt, f);
+			processReturn(prevStmt, stmt, dir, f);
 			prevStmt = stmt;
 			break;
 		case nkSmmDecl:
@@ -164,12 +166,12 @@ static void processBlock(PSmmAstBlockNode block, FILE* f) {
 				assert(false && "Const declaration should not appear as statements");
 			} else {
 				// Var declarations should appear as statements because initial value needs to be assigned
-				processAssignment(prevStmt, stmt->left, f);
+				processAssignment(prevStmt, stmt->left, dir, f);
 			}
 			prevStmt = stmt->left;
 			break;
 		default:
-			processExpression(prevStmt, stmt, "s", f);
+			processExpression(prevStmt, stmt, dir, f);
 			prevStmt = stmt;
 			break;
 		}
@@ -202,7 +204,7 @@ static void processGlobalSymbols(PSmmAstScopeNode scope, FILE* f) {
 				processBlock(funcNode->body, f);
 			}
 		} else if (decl->left->left->isConst) {
-			processAssignment(decl, decl->left, f);
+			processAssignment(decl, decl->left, "se", f);
 			assert(decl->left->right && "Global var must have initializer");
 		} else {
 			assert(decl->left->right && "Global var must have initializer");

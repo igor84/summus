@@ -2,12 +2,14 @@
 #include <stdio.h>
 
 CuSuite* SmmLexerGetSuite();
+CuSuite* SmmParserGetSuite();
 
 int RunAllTests(void) {
 	CuString *output = CuStringNew();
 	CuSuite* suite = CuSuiteNew();
 
 	CuSuiteAddSuite(suite, SmmLexerGetSuite());
+	CuSuiteAddSuite(suite, SmmParserGetSuite());
 
 	CuSuiteRun(suite);
 	CuSuiteSummary(suite, output);

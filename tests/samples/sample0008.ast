@@ -1,0 +1,35 @@
+errSmmNoExpectedToken:1:18
+errSmmNoExpectedToken:5:18
+errSmmNoExpectedToken:7:20
+errSmmNoExpectedToken:9:22
+errSmmGotUnexpectedToken:11:23
+errSmmNoExpectedToken:13:19
+errSmmNoExpectedToken:16:7
+errSmmNoExpectedToken:18:17
+errSmmNoExpectedToken:20:12
+errSmmNoExpectedToken:22:9
+errSmmNoExpectedToken:24:9
+errSmmNoExpectedToken:24:9
+
+MODULE sample0008
+: func2:3:int32 = int:2:0:int32 
+: func1:3:int32(a:1:int32)
+{
+    blockFlags:1
+    return:int32 +:4:int32 Ident:1:a:int32 int:2:12:int8 
+}
+: func3:3:void(a3:1:int32);
+: func4:3:void(a3:1:int32);
+: func5:3:void(a3:1:int32, b3:1:unknown);
+: func6:3:void(a3:1:int32);
+blockFlags:0
+{
+    : a:1:int32
+    : b:1:int32
+    : c:1:int32
+    blockFlags:1
+    : = a:1:int32  int:2:122:int8 
+    : = b:1:int32  cast:0:int32 +:4:int32 Ident:1:a:int32 int:2:12:int8 
+    : = c:1:int32  cast:0:int32 Ident:1:a:int32 
+    return:int32 Ident:1:b:int32 
+}

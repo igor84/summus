@@ -17,8 +17,8 @@ a :: (param1:int) -> int { // a is alredy defined
 	return param1 + 2;     // param1 is not defined
 }
 
-b = add(a, 12.4);
-b := add(true, false); // got bool,bool but expected one of
+b = add(true, false); // got bool,bool but expected one of
+b := add(a, 12.4);
 
 sub :: (l: int, r: int) -> int {
 	return l - r;

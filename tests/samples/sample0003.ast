@@ -1,0 +1,39 @@
+errSmmFuncMustReturnValue:3:2
+errSmmNoReturnValueNeeded:8:2
+errSmmBadReturnStmtType:12:2
+errSmmInvalidExprUsed:16:9
+errSmmGotUnexpectedToken:19:1
+wrnSmmNoEffectStmt:21:3
+errSmmUndefinedIdentifier:22:1
+errSmmOperandMustBeLVal:25:1
+
+MODULE sample0003
+: x:1:int32 
+: y:1:int32 
+: func:3:int32(param:1:int32)
+{
+    blockFlags:1
+    return:int32 
+}
+: proc:3:void(param:1:int32)
+{
+    : var1:1:int32
+    blockFlags:1
+    : = var1:1:int32  int:2:123:int8 
+    return:void Ident:1:var1:int32 
+}
+: intFunc:3:int32(param:1:int32)
+{
+    blockFlags:1
+    return:int32 float:2:123.321:sfloat64 
+}
+: proc2:3:void()
+{
+    blockFlags:1
+    return:void (proc:1:void(int:2:123:int8 )) 
+}
+blockFlags:0
+: = x:1:int32  int:2:123:int8 
++:4:int32 Ident:1:x:int32 int:2:122:int8 
+: = y:1:int32  int:2:432:int16 
+return:int32 int:2:0:int32 

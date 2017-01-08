@@ -1,0 +1,29 @@
+errSmmRedefinition:4:1
+errSmmRedefinition:5:1
+errSmmRedefinition:7:1
+errSmmNotAFunction:10:2
+errSmmGotUnexpectedToken:14:10
+
+MODULE sample0010
+: a:1:int32 
+: z:1:int32 
+: testFunc:3:void(p1:1:int32)
+{
+    blockFlags:0
+    return:void 
+}
+: testFunc:3:void(p1:1:int32, p2:1:int32)
+{
+    blockFlags:0
+    return:void 
+}
+: test:3:int32(test:1:int32)
+{
+    blockFlags:1
+    (test:1:unknown(int:2:12:int8 )) 
+    return:int32 param:1:test:int32 
+}
+blockFlags:0
+: = a:1:int32  int:2:12:int8 
+: = z:1:int32  int:2:0:int32 
+return:int32 (test:1:int32(int:2:12:int8 )) 

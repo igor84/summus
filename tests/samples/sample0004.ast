@@ -1,0 +1,27 @@
+errSmmUnknownType:2:5
+errSmmFuncUnderScope:6:2
+errSmmUnreachableCode:9:3
+errSmmFuncMustReturnValue:10:2
+errSmmFuncUnderScope:11:2
+errSmmFuncUnderScope:12:3
+errSmmNonConstInConstExpression:19:11
+errSmmGotUnexpectedToken:20:5
+errSmmGotUnexpectedToken:21:4
+errSmmCantAssignToConst:22:3
+
+MODULE sample0004
+: x:1:unknown 
+: tst1:1:int32 
+: y:3:int32 = *:4:int8 int:2:12:int8 Ident:1:x:unknown 
+: z:1:int32 
+: a:1:unknown 
+blockFlags:0
+: = x:1:unknown  int:2:123:int8 
+: = tst1:1:int32  int:2:100:int8 
+{
+    blockFlags:0
+}
+: = z:1:int32  int:2:0:int32 
+: = a:1:unknown  int:2:0:int32 
+= y:3:int32  int:2:23:int8 
+return:int32 Ident:1:tst1:int32 

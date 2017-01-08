@@ -45,6 +45,15 @@
     <ClInclude Include="compiler\smmtypeinference.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="tests\smmastmatcher.h">
+      <Filter>Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="tests\smmastreader.h">
+      <Filter>Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="tests\smmastwritter.h">
+      <Filter>Tests</Filter>
+    </ClInclude>
     <ClInclude Include="utility\smmgvpass.h">
       <Filter>Utility</Filter>
     </ClInclude>
@@ -87,6 +96,18 @@
     </ClCompile>
     <ClCompile Include="compiler\smmtypeinference.c">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="tests\smmparsertests.c">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="tests\smmastmatcher.c">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="tests\smmastreader.c">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="tests\smmastwritter.c">
+      <Filter>Tests</Filter>
     </ClCompile>
     <ClCompile Include="utility\smmgvpass.c">
       <Filter>Utility</Filter>

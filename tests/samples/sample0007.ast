@@ -1,0 +1,36 @@
+errSmmFuncRedefinition:9:1
+errSmmGotUnexpectedToken:14:8
+errSmmRedefinition:16:1
+errSmmUndefinedIdentifier:17:9
+errSmmGotBadArgs:20:5
+errSmmRedefinition:21:1
+errSmmRedefinition:27:1
+errSmmNoExpectedToken:29:44
+
+MODULE sample0007
+: a:1:int32 
+: b:1:int32 
+: add:3:float32(l:1:float32, r:1:float32)
+{
+    blockFlags:1
+    return:float32 +.:4:float32 param:1:l:float32 param:1:r:float32 
+}
+: add:3:int32(l:1:int32, r:1:int32)
+{
+    blockFlags:1
+    return:int32 +:4:int32 param:1:l:int32 param:1:r:int32 
+}
+: sub:3:int32(l:1:int32, r:1:int32)
+{
+    blockFlags:1
+    return:int32 -:4:int32 param:1:l:int32 param:1:r:int32 
+}
+blockFlags:0
+: = a:1:int32  int:2:12:int8 
+: = b:1:int32  int:2:0:int32 
+{
+    blockFlags:1
+    return:int32 +:4:int8 Ident:1:param1:unknown int:2:2:int8 
+}
+= b:1:int32  (add:1:unknown(bool:2:true:bool , bool:2:false:bool )) 
+return:int32 Ident:1:b:int32 

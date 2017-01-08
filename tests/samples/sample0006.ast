@@ -1,0 +1,50 @@
+errSmmBangUsedAsNot:2:6
+errSmmIdentTaken:4:25
+errSmmRedefinition:4:38
+errSmmUnknownType:4:51
+errSmmGotUnexpectedToken:8:16
+errSmmUnknownType:10:16
+errSmmUndefinedIdentifier:12:6
+errSmmIdentTaken:14:23
+errSmmUndefinedIdentifier:16:20
+errSmmNotAFunction:18:17
+errSmmIdentTaken:20:1
+errSmmGotUnexpectedToken:22:1
+errSmmRedefinition:24:1
+
+MODULE sample0006
+: x:1:bool 
+: y:1:bool 
+: z:1:unknown 
+: typeUsedAsVar:1:int32 
+: missingFunc:1:unknown 
+: notAFunc:1:unknown 
+: const1:3:int32 = +:6:int16 int:2:123:int8 int:2:456:int16 
+: someVar:1:int32 
+: otherVar:1:int16 
+: doNothing:3:void(a:1:int32, b:1:unknown)
+{
+    blockFlags:0
+    return:void 
+}
+: beLazy:3:void(p1:1:unknown)
+{
+    blockFlags:0
+    return:void 
+}
+: orWork:3:void(p1:1:unknown)
+{
+    blockFlags:0
+    return:void 
+}
+blockFlags:0
+: = x:1:bool  bool:2:false:bool 
+: = y:1:bool  !:0:bool Ident:1:x:bool 
+: = z:1:unknown  Ident:1:z:unknown 
+: = typeUsedAsVar:1:int32  int:2:0:int32 
+: = missingFunc:1:unknown  +:4:unknown Ident:1:z:unknown (mf:1:unknown()) 
+: = notAFunc:1:unknown  -:4:unknown Ident:1:z:unknown (missingFunc:1:unknown()) 
+: = someVar:1:int32  +:6:int32 Const:3:const1:int32 int:2:12:int8 
+: = otherVar:1:int16  int:2:0:int16 
+= otherVar:1:int16  int:2:12:int8 
+return:int32 int:2:0:int32 

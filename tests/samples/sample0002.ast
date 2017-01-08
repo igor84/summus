@@ -1,0 +1,32 @@
+errSmmGotUnexpectedToken:5:8
+wrnSmmComparingSignedAndUnsigned:14:8
+errSmmBadOperandsType:16:8
+errSmmNoExpectedToken:17:10
+
+MODULE sample0002
+: x:1:int32 
+: y:1:uint32 
+: z:1:bool 
+: f:1:float32 
+: a:1:int32 
+: b:1:int32 
+: isPositive:3:bool(a:1:int32)
+{
+    : var1:1:int32
+    : var2:1:bool
+    : var3:1:int32
+    blockFlags:1
+    : = var1:1:int32  sdiv:4:int32 param:1:a:int32 int:2:34:int8 
+    : = var2:1:bool  bool:2:true:bool 
+    : = var3:1:int32  *:4:int8 int:2:12:int8 Ident:1:var2:bool 
+    and:4:bool >:4:bool param:1:a:int32 int:2:0:int8 >:6:bool int:2:3:int8 int:2:4:int8 
+    return:bool >:4:bool param:1:a:int32 int:2:0:int8 
+}
+blockFlags:0
+: = x:1:int32  int:2:-123:int8 
+: = y:1:uint32  int:2:123:int8 
+: = z:1:bool  >:4:bool Ident:1:x:int32 cast:0:int32 Ident:1:y:uint32 
+: = f:1:float32  float:2:123.21:sfloat64 
+: = a:1:int32  sdiv:4:int32 Ident:1:x:int32 cast:0:int32 Ident:1:f:float32 
+: = b:1:int32  +:4:int32 Ident:1:a:int32 Ident:1:y:uint32 
+return:int32 Ident:1:x:int32 
