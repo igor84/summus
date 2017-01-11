@@ -5,6 +5,7 @@
 #include "smmlexer.h"
 #include "smmparser.h"
 #include "smmtypeinference.h"
+#include "smmsempass.h"
 #include "../utility/smmgvpass.h"
 
 #include <assert.h>
@@ -32,11 +33,11 @@ static PSmmAstNode loadModule(const char* filename, PSmmMsgs msgs, PIbsAllocator
 }
 
 int main(int argc, char* argv[]) {
-	bool pp1 = false;
-	bool pp2 = false;
+	bool pp[3] = { false };
 	for (int i = 1; i < argc; i++) {
-		if (strcmp("-pp1", argv[i]) == 0) pp1 = true;
-		else if (strcmp("-pp2", argv[i]) == 0) pp2 = true;
+		if (strcmp("-pp1", argv[i]) == 0) pp[0] = true;
+		else if (strcmp("-pp2", argv[i]) == 0) pp[1] = true;
+		else if (strcmp("-pp3", argv[i]) == 0) pp[2] = true;
 	}
 	PIbsAllocator a = ibsSimpleAllocatorCreate("test", 1024 * 1024);
 	
@@ -44,17 +45,23 @@ int main(int argc, char* argv[]) {
 	msgs.a = a;
 
 	PSmmAstNode module = loadModule("test.smm", &msgs, a);
-	if (pp1) {
+	if (pp[0]) {
 		smmExecuteGVPass(module, stdout);
 	}
 	smmExecuteTypeInferencePass(module, &msgs, a);
-	if (pp2) {
+	if (pp[1]) {
 		smmExecuteGVPass(module, stdout);
 	}
 
-	if (!pp1 && !pp2) {
+	smmExecuteSemPass(module, &msgs, a);
+	if (pp[2]) {
+		smmExecuteGVPass(module, stdout);
+	}
+
+	if (!pp[0] && !pp[1] && !pp[2]) {
 		smmFlushMessages(&msgs);
 	}
+
 	if (smmHadErrors(&msgs)) {
 		return EXIT_FAILURE;
 	}

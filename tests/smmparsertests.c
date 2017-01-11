@@ -2,6 +2,7 @@
 #include "CuTest.h"
 #include "../compiler/smmparser.h"
 #include "../compiler/smmtypeinference.h"
+#include "../compiler/smmsempass.h"
 #include "smmastwritter.h"
 #include "smmastreader.h"
 #include "smmastmatcher.h"
@@ -91,15 +92,13 @@ static void TestSample(CuTest *tc) {
 		}
 		writeReceivedMsgs(f, &msgs);
 		smmOutputAst(module, f, a);
-		/*
-		if (!receivedMsgs.thereWereErrors) {
-			clearReceivedMsgs();
+		if (msgs.errorCount == 0) {
+			msgs.items = NULL;
 			fputs("ENDMODULE\n\n", f);
-			smmExecuteSemPass(module, a);
-			writeReceivedMsgs(f);
+			smmExecuteSemPass(module, &msgs, a);
+			writeReceivedMsgs(f, &msgs);
 			smmOutputAst(module, f, a);
 		}
-		*/
 		fclose(f);
 		printf("Generated new test data for %s\n", baseName);
 	} else {
@@ -114,15 +113,13 @@ static void TestSample(CuTest *tc) {
 		PSmmAstNode refModule = smmLoadAst(lex, a);
 		smmAssertASTEquals(tc, refModule, module);
 		refModule = NULL;
-		/*
-		if (!receivedMsgs.thereWereErrors) {
-			clearReceivedMsgs();
-			smmExecuteSemPass(module, a);
-			checkMsgs(tc, lex);
+		if (msgs.errorCount == 0) {
+			msgs.items = NULL;
+			smmExecuteSemPass(module, &msgs, a);
+			checkMsgs(tc, lex, &msgs);
 			refModule = smmLoadAst(lex, a);
 			smmAssertASTEquals(tc, refModule, module);
 		}
-		*/
 	}
 
 	ibsSimpleAllocatorPrintInfo(a);

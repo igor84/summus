@@ -185,6 +185,7 @@
     <ClInclude Include="compiler\smmlexer.h" />
     <ClInclude Include="compiler\smmmsgs.h" />
     <ClInclude Include="compiler\smmparser.h" />
+    <ClInclude Include="compiler\smmsempass.h" />
     <ClInclude Include="compiler\smmtypeinference.h" />
     <ClInclude Include="tests\CuTest.h">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
@@ -210,6 +211,7 @@
     <ClCompile Include="compiler\smmlexer.c" />
     <ClCompile Include="compiler\smmmsgs.c" />
     <ClCompile Include="compiler\smmparser.c" />
+    <ClCompile Include="compiler\smmsempass.c" />
     <ClCompile Include="compiler\smmtypeinference.c" />
     <ClCompile Include="compiler\summus.c">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
