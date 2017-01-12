@@ -627,6 +627,8 @@ static PSmmAstDeclNode processGlobalSymbols(PSmmAstDeclNode decl, PTIData tidata
 			if (decl->left->kind == nkSmmFunc) {
 				*funcDeclField = decl;
 				funcDeclField = &decl->nextDecl;
+				PSmmAstFuncDefNode funcNode = &decl->left->asFunc;
+				funcNode->token->stringVal = getMangledName(funcNode, a);
 			} else {
 				*varDeclField = decl;
 				varDeclField = &decl->nextDecl;
@@ -666,7 +668,6 @@ void processFuncDecls(PTIData tidata, PIbsAllocator a) {
 	tidata->isInMainCode = false;
 	while (decl) {
 		PSmmAstFuncDefNode funcNode = &decl->left->asFunc;
-		funcNode->token->stringVal = getMangledName(funcNode, a);
 		if (funcNode->body) {
 			PSmmAstParamNode param = funcNode->params;
 			while (param) {

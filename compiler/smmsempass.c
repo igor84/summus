@@ -219,7 +219,7 @@ static void processExpression(
 
 static void processLocalSymbols(PSmmAstDeclNode decl, PSmmMsgs msgs, PIbsAllocator a) {
 	while (decl) {
-		if (decl->left->kind == nkSmmConst) {
+		if (decl->left->left->kind == nkSmmConst) {
 			processExpression(&decl->left->right, decl->left->type, false, msgs, a);
 		}
 		decl = decl->nextDecl;

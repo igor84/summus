@@ -60,6 +60,9 @@
     <ClInclude Include="compiler\smmsempass.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="compiler\smmllvmcodegen.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="tests\test.smm">
@@ -116,6 +119,9 @@
       <Filter>Utility</Filter>
     </ClCompile>
     <ClCompile Include="compiler\smmsempass.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="compiler\smmllvmcodegen.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

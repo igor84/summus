@@ -6,6 +6,7 @@
 #include "smmparser.h"
 #include "smmtypeinference.h"
 #include "smmsempass.h"
+#include "smmllvmcodegen.h"
 #include "../utility/smmgvpass.h"
 
 #include <assert.h>
@@ -60,10 +61,15 @@ int main(int argc, char* argv[]) {
 
 	if (!pp[0] && !pp[1] && !pp[2]) {
 		smmFlushMessages(&msgs);
+	} else {
+		return EXIT_SUCCESS;
 	}
 
 	if (smmHadErrors(&msgs)) {
 		return EXIT_FAILURE;
 	}
+
+	smmExecuteLLVMCodeGenPass(module, a);
+
 	return EXIT_SUCCESS;
 }
