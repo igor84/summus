@@ -4,6 +4,22 @@ target triple = "x86_64-pc-windows-msvc"
 
 @ui32 = global i32 100
 
+define i32 @bla_int16_int16(i16 %a, i16 %b) {
+entry:
+  %0 = alloca i16
+  %1 = alloca i16
+  store i16 %a, i16* %0
+  store i16 %b, i16* %1
+  %2 = load i16, i16* %0, align 2
+  %3 = sext i16 %2 to i32
+  %4 = load i16, i16* %1, align 2
+  %5 = sext i16 %4 to i32
+  %6 = add i32 %3, %5
+  ret i32 %6
+}
+
+declare i32 @putchar_int32(i32)
+
 define i32 @main() {
 entry:
   %i8 = alloca i8, align 1
@@ -139,19 +155,3 @@ entry:
   %66 = load i32, i32* %res, align 4
   ret i32 %66
 }
-
-define i32 @bla_int16_int16(i16 %a, i16 %b) {
-entry:
-  %0 = alloca i16
-  %1 = alloca i16
-  store i16 %a, i16* %0
-  store i16 %b, i16* %1
-  %2 = load i16, i16* %0, align 2
-  %3 = sext i16 %2 to i32
-  %4 = load i16, i16* %1, align 2
-  %5 = sext i16 %4 to i32
-  %6 = add i32 %3, %5
-  ret i32 %6
-}
-
-declare i32 @putchar_int32(i32)

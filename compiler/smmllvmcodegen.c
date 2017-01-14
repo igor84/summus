@@ -417,18 +417,18 @@ void smmExecuteLLVMCodeGenPass(PSmmAstNode module, PIbsAllocator a) {
 	LLVMSetDataLayout(data->llvmModule, "");
 	LLVMSetTarget(data->llvmModule, LLVMGetDefaultTargetTriple());
 
+	data->builder = LLVMCreateBuilder();
+
+	PSmmAstBlockNode globalBlock = (PSmmAstBlockNode)module->next;
+	assert(globalBlock->kind == nkSmmBlock);
+	processGlobalSymbols(data, globalBlock->scope->decls, la);
+
 	LLVMTypeRef funcType = LLVMFunctionType(LLVMInt32Type(), NULL, 0, 0);
 	LLVMValueRef mainfunc = LLVMAddFunction(data->llvmModule, "main", funcType);
 	data->curFunc = mainfunc;
 
 	LLVMBasicBlockRef entry = LLVMAppendBasicBlock(mainfunc, "entry");
-
-	data->builder = LLVMCreateBuilder();
 	LLVMPositionBuilderAtEnd(data->builder, entry);
-
-	PSmmAstBlockNode globalBlock = (PSmmAstBlockNode)module->next;
-	assert(globalBlock->kind == nkSmmBlock);
-	processGlobalSymbols(data, globalBlock->scope->decls, la);
 	processBlock(data, globalBlock, la);
 
 	char *error = NULL;
