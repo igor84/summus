@@ -22,6 +22,7 @@ static const char* tokenTypeToString[] = {
 	"int", "uint", "float", "bool",
 	"char", "string",
 	"->", "return",
+	"if", "then", "else", "while", "do",
 	"eof"
 };
 
@@ -129,7 +130,9 @@ static void initSymTableWithKeywords(PPrivLexer lex) {
 	static struct Symbol keywords[] = {
 		{ "div", tkSmmIntDiv },{ "mod", tkSmmIntMod },{ "not", tkSmmNot },
 		{ "and", tkSmmAndOp },{ "or", tkSmmOrOp },{ "xor", tkSmmXorOp },
-		{ "return", tkSmmReturn },{ "false", tkSmmBool },{ "true", tkSmmBool },
+		{ "return", tkSmmReturn },{ "while", tkSmmWhile },{ "do", tkSmmDo },
+		{ "if", tkSmmIf },{ "then", tkSmmThen },{ "else", tkSmmElse },
+		{ "false", tkSmmBool },{ "true", tkSmmBool },
 	};
 
 	int count = sizeof(keywords) / sizeof(struct Symbol);

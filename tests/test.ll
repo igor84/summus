@@ -77,81 +77,105 @@ entry:
   %23 = call i32 @putchar_int32(i32 65)
   %24 = call i32 @putchar_int32(i32 10)
   %25 = load i64, i64* %y, align 8
-  %26 = load i8, i8* %z, align 1
-  %27 = zext i8 %26 to i64
-  %28 = icmp sgt i64 %25, %27
-  br i1 %28, label %29, label %32
+  %26 = icmp ne i64 %25, 0
+  br i1 %26, label %if.then, label %if.end
 
-; <label>:29:                                     ; preds = %entry
-  %30 = load i8, i8* %z, align 1
-  %31 = icmp ne i8 %30, 0
-  br label %32
+if.then:                                          ; preds = %entry
+  %27 = load i8, i8* %z, align 1
+  %28 = zext i8 %27 to i64
+  store i64 %28, i64* %y, align 8
+  %29 = load i64, i64* %y, align 8
+  %30 = trunc i64 %29 to i8
+  store i8 %30, i8* %z, align 1
+  br label %if.end
 
-; <label>:32:                                     ; preds = %29, %entry
-  %33 = phi i1 [ false, %entry ], [ %31, %29 ]
-  store i1 %33, i1* %a, align 1
-  %34 = load double, double* %f64, align 8
-  %35 = load float, float* %f32, align 4
-  %36 = fpext float %35 to double
-  %37 = fcmp olt double %34, %36
-  br i1 %37, label %41, label %38
+if.end:                                           ; preds = %if.then, %entry
+  %31 = load i64, i64* %y, align 8
+  %32 = load i8, i8* %z, align 1
+  %33 = zext i8 %32 to i64
+  %34 = icmp sgt i64 %31, %33
+  br i1 %34, label %35, label %38
 
-; <label>:38:                                     ; preds = %32
-  %39 = load float, float* %f32, align 4
-  %40 = fcmp ogt float %39, 0xC2E5897900000000
-  br label %41
+; <label>:35:                                     ; preds = %if.end
+  %36 = load i8, i8* %z, align 1
+  %37 = icmp ne i8 %36, 0
+  br label %38
 
-; <label>:41:                                     ; preds = %38, %32
-  %42 = phi i1 [ true, %32 ], [ %40, %38 ]
-  store i1 %42, i1* %b, align 1
+; <label>:38:                                     ; preds = %35, %if.end
+  %39 = phi i1 [ false, %if.end ], [ %37, %35 ]
+  store i1 %39, i1* %a, align 1
+  %40 = load double, double* %f64, align 8
+  %41 = load float, float* %f32, align 4
+  %42 = fpext float %41 to double
+  %43 = fcmp olt double %40, %42
+  br i1 %43, label %47, label %44
+
+; <label>:44:                                     ; preds = %38
+  %45 = load float, float* %f32, align 4
+  %46 = fcmp ogt float %45, 0xC2E5897900000000
+  br label %47
+
+; <label>:47:                                     ; preds = %44, %38
+  %48 = phi i1 [ true, %38 ], [ %46, %44 ]
+  store i1 %48, i1* %b, align 1
   store i1 false, i1* %c, align 1
   store i1 true, i1* %d, align 1
   store i1 true, i1* %e, align 1
   store i1 false, i1* %f, align 1
   store i1 false, i1* %g, align 1
   store i1 true, i1* %h, align 1
-  %43 = load i1, i1* %a, align 1
-  br i1 %43, label %46, label %44
+  store i32 0, i32* %res, align 4
+  %49 = load i1, i1* %a, align 1
+  br i1 %49, label %52, label %50
 
-; <label>:44:                                     ; preds = %41
-  %45 = load i1, i1* %b, align 1
-  br i1 %45, label %46, label %53
+; <label>:50:                                     ; preds = %47
+  %51 = load i1, i1* %b, align 1
+  br i1 %51, label %52, label %59
 
-; <label>:46:                                     ; preds = %44, %41
-  %47 = load i1, i1* %c, align 1
-  br i1 %47, label %50, label %48
+; <label>:52:                                     ; preds = %50, %47
+  %53 = load i1, i1* %c, align 1
+  br i1 %53, label %56, label %54
 
-; <label>:48:                                     ; preds = %46
-  %49 = load i1, i1* %d, align 1
-  br label %50
+; <label>:54:                                     ; preds = %52
+  %55 = load i1, i1* %d, align 1
+  br label %56
 
-; <label>:50:                                     ; preds = %48, %46
-  %51 = phi i1 [ true, %46 ], [ %49, %48 ]
-  %52 = xor i1 %51, true
-  br label %53
+; <label>:56:                                     ; preds = %54, %52
+  %57 = phi i1 [ true, %52 ], [ %55, %54 ]
+  %58 = xor i1 %57, true
+  br label %59
 
-; <label>:53:                                     ; preds = %50, %44
-  %54 = phi i1 [ false, %44 ], [ %52, %50 ]
-  %55 = load i1, i1* %e, align 1
-  br i1 %55, label %62, label %56
+; <label>:59:                                     ; preds = %56, %50
+  %60 = phi i1 [ false, %50 ], [ %58, %56 ]
+  %61 = load i1, i1* %e, align 1
+  br i1 %61, label %68, label %62
 
-; <label>:56:                                     ; preds = %53
-  %57 = load i1, i1* %f, align 1
-  br i1 %57, label %62, label %58
+; <label>:62:                                     ; preds = %59
+  %63 = load i1, i1* %f, align 1
+  br i1 %63, label %68, label %64
 
-; <label>:58:                                     ; preds = %56
-  %59 = load i1, i1* %g, align 1
-  br i1 %59, label %60, label %62
+; <label>:64:                                     ; preds = %62
+  %65 = load i1, i1* %g, align 1
+  br i1 %65, label %66, label %68
 
-; <label>:60:                                     ; preds = %58
-  %61 = load i1, i1* %h, align 1
-  br label %62
+; <label>:66:                                     ; preds = %64
+  %67 = load i1, i1* %h, align 1
+  br label %68
 
-; <label>:62:                                     ; preds = %60, %58, %56, %53
-  %63 = phi i1 [ true, %53 ], [ true, %56 ], [ false, %58 ], [ %61, %60 ]
-  %64 = icmp ne i1 %54, %63
-  %65 = zext i1 %64 to i32
-  store i32 %65, i32* %res, align 4
-  %66 = load i32, i32* %res, align 4
-  ret i32 %66
+; <label>:68:                                     ; preds = %66, %64, %62, %59
+  %69 = phi i1 [ true, %59 ], [ true, %62 ], [ false, %64 ], [ %67, %66 ]
+  %70 = icmp ne i1 %60, %69
+  br i1 %70, label %if.then1, label %if.else
+
+if.then1:                                         ; preds = %68
+  store i32 1, i32* %res, align 4
+  br label %if.else
+
+if.else:                                          ; preds = %if.then1, %68
+  store i32 2, i32* %res, align 4
+  br label %if.end2
+
+if.end2:                                          ; preds = %if.else
+  %71 = load i32, i32* %res, align 4
+  ret i32 %71
 }

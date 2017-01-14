@@ -34,6 +34,7 @@ typedef struct SmmAstBlockNode* PSmmAstBlockNode;
 typedef struct SmmAstParamNode* PSmmAstParamNode;
 typedef struct SmmAstFuncDefNode* PSmmAstFuncDefNode;
 typedef struct SmmAstCallNode* PSmmAstCallNode;
+typedef struct SmmAstIfWhileNode* PSmmAstIfWhileNode;
 
 struct SmmParser {
 	PSmmLexer lex;
@@ -62,6 +63,7 @@ typedef enum {
 	nkSmmCast, nkSmmParam, nkSmmCall, nkSmmReturn,
 	nkSmmAndOp, nkSmmXorOp, nkSmmOrOp,
 	nkSmmEq, nkSmmNotEq, nkSmmGt, nkSmmGtEq, nkSmmLt, nkSmmLtEq, nkSmmNot,
+	nkSmmIf, nkSmmWhile,
 
 	nkSmmTerminator,
 
@@ -181,6 +183,16 @@ struct SmmAstCallNode {
 	PSmmAstNode args;
 };
 
+struct SmmAstIfWhileNode {
+	SmmAstNodeKind kind;
+	uint32_t isIdent : 1;
+	PSmmToken token;
+	PSmmAstNode cond;
+	PSmmAstNode next;
+	PSmmAstNode body;
+	PSmmAstNode elseBody;
+};
+
 union SmmAstNode {
 	struct {
 		SmmAstNodeKind kind;
@@ -200,6 +212,7 @@ union SmmAstNode {
 	struct SmmAstParamNode asParam;
 	struct SmmAstFuncDefNode asFunc;
 	struct SmmAstCallNode asCall;
+	struct SmmAstIfWhileNode asIfWhile;
 };
 
 PSmmAstNode smmGetZeroValNode(struct SmmFilePos filePos, PSmmTypeInfo varType, PIbsAllocator a);

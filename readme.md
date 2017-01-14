@@ -31,6 +31,8 @@ Language at the moment supports:
   - <-"..."> means collapse all whitespace to one space
   - <|"..."> means remove as much leading space from every line as there is in second line of literal. This is very useful for keeping code aligned when you write multiline strings like SQL queries and similar.
 - char literals defined as <@c> for example
+- if and if/else statements
+- while statements
 - and that is it :)
 
 The goal of this project is not to create a perfect new language but to try and create a perfect compiler for minimal possible language.

@@ -27,6 +27,8 @@ struct LogicalExprData {
 typedef struct LogicalExprData* PLogicalExprData;
 
 static LLVMValueRef processExpression(PSmmLLVMCodeGenData data, PSmmAstNode expr, PIbsAllocator a);
+static void processBlock(PSmmLLVMCodeGenData data, PSmmAstBlockNode block, PIbsAllocator a);
+static void processStatement(PSmmLLVMCodeGenData data, PSmmAstNode stmt, PIbsAllocator a);
 
 static LLVMTypeRef getLLVMType(PSmmTypeInfo type) {
 	if (!type) return LLVMVoidType();
@@ -296,32 +298,96 @@ static void processReturn(PSmmLLVMCodeGenData data, PSmmAstNode stmt, PIbsAlloca
 	} else LLVMBuildRetVoid(data->builder);
 }
 
+static void processIf(PSmmLLVMCodeGenData data, PSmmAstIfWhileNode stmt, PIbsAllocator a) {
+	LLVMBasicBlockRef trueBlock = LLVMAppendBasicBlock(data->curFunc, "if.then");
+	LLVMBasicBlockRef falseBlock;
+	LLVMBasicBlockRef endBlock;
+	if (stmt->elseBody) {
+		falseBlock = LLVMAppendBasicBlock(data->curFunc, "if.else");
+		endBlock = LLVMAppendBasicBlock(data->curFunc, "if.end");
+	} else {
+		falseBlock = LLVMAppendBasicBlock(data->curFunc, "if.end");
+		endBlock = falseBlock;
+	}
+	LLVMValueRef res;
+	data->endBlock = trueBlock;
+	if (stmt->cond->kind == nkSmmAndOp || stmt->cond->kind == nkSmmOrOp) {
+		struct LogicalExprData logicalExprData = { data, data->endBlock };
+		res = processAndOrInstr(&logicalExprData, stmt->cond, trueBlock, falseBlock, a);
+	} else {
+		res = processExpression(data, stmt->cond, a);
+	}
+	data->endBlock = NULL;
+	LLVMBuildCondBr(data->builder, res, trueBlock, falseBlock);
+
+	LLVMPositionBuilderAtEnd(data->builder, trueBlock);
+
+	processStatement(data, stmt->body, a);
+	LLVMBuildBr(data->builder, falseBlock);
+	LLVMPositionBuilderAtEnd(data->builder, falseBlock);
+	if (stmt->elseBody) {
+		processStatement(data, stmt->elseBody, a);
+		LLVMBuildBr(data->builder, endBlock);
+		LLVMPositionBuilderAtEnd(data->builder, endBlock);
+	}
+}
+
+static void processWhile(PSmmLLVMCodeGenData data, PSmmAstIfWhileNode stmt, PIbsAllocator a) {
+	LLVMBasicBlockRef condBlock = LLVMAppendBasicBlock(data->curFunc, "while.cond");
+	LLVMBasicBlockRef trueBlock = LLVMAppendBasicBlock(data->curFunc, "while.body");
+	LLVMBasicBlockRef falseBlock = LLVMAppendBasicBlock(data->curFunc, "while.end");
+	LLVMBuildBr(data->builder, condBlock);
+	LLVMPositionBuilderAtEnd(data->builder, condBlock);
+	LLVMValueRef res;
+	data->endBlock = trueBlock; // We initialize data.endBlock with new block
+	if (stmt->cond->kind == nkSmmAndOp || stmt->cond->kind == nkSmmOrOp) {
+		struct LogicalExprData logicalExprData = { data, data->endBlock };
+		res = processAndOrInstr(&logicalExprData, stmt->cond, trueBlock, falseBlock, a);
+	} else {
+		res = processExpression(data, stmt->cond, a);
+	}
+	data->endBlock = NULL;
+	LLVMBuildCondBr(data->builder, res, trueBlock, falseBlock);
+
+	LLVMPositionBuilderAtEnd(data->builder, trueBlock);
+
+	processStatement(data, stmt->body, a);
+	LLVMBuildBr(data->builder, condBlock);
+	LLVMPositionBuilderAtEnd(data->builder, falseBlock);
+}
+
+static void processStatement(PSmmLLVMCodeGenData data, PSmmAstNode stmt, PIbsAllocator a) {
+	switch (stmt->kind) {
+	case nkSmmBlock:
+		{
+			PSmmAstBlockNode newBlock = (PSmmAstBlockNode)stmt;
+			processLocalSymbols(data, newBlock->scope->decls, a);
+			processBlock(data, newBlock, a);
+			break;
+		}
+	case nkSmmAssignment: processAssignment(data, stmt, a); break;
+	case nkSmmIf: processIf(data, &stmt->asIfWhile, a); break;
+	case nkSmmWhile: processWhile(data, &stmt->asIfWhile, a); break;
+	case nkSmmDecl:
+		if (stmt->left->left->asIdent.level == 0) {
+			LLVMTypeRef type = getLLVMType(stmt->left->type);
+			LLVMValueRef globalVar = LLVMAddGlobal(data->llvmModule, type, stmt->left->left->token->repr);
+			LLVMSetGlobalConstant(globalVar, false);
+			LLVMSetInitializer(globalVar, processExpression(data, stmt->left->right, a));
+		} else {
+			processAssignment(data, stmt->left, a);
+		}
+		break;
+	case nkSmmReturn: processReturn(data, stmt, a); break;
+	default:
+		processExpression(data, stmt, a); break;
+	}
+}
+
 static void processBlock(PSmmLLVMCodeGenData data, PSmmAstBlockNode block, PIbsAllocator a) {
 	PSmmAstNode stmt = block->stmts;
 	while (stmt) {
-		switch (stmt->kind) {
-		case nkSmmBlock:
-			{
-				PSmmAstBlockNode newBlock = (PSmmAstBlockNode)stmt;
-				processLocalSymbols(data, newBlock->scope->decls, a);
-				processBlock(data, newBlock, a);
-				break;
-			}
-		case nkSmmAssignment: processAssignment(data, stmt, a); break;
-		case nkSmmDecl:
-			if (stmt->left->left->asIdent.level == 0) {
-				LLVMTypeRef type = getLLVMType(stmt->left->type);
-				LLVMValueRef globalVar = LLVMAddGlobal(data->llvmModule, type, stmt->left->left->token->repr);
-				LLVMSetGlobalConstant(globalVar, false);
-				LLVMSetInitializer(globalVar, processExpression(data, stmt->left->right, a));
-			} else {
-				processAssignment(data, stmt->left, a);
-			}
-			break;
-		case nkSmmReturn: processReturn(data, stmt, a); break;
-		default:
-			processExpression(data, stmt, a); break;
-		}
+		processStatement(data, stmt, a);
 		stmt = stmt->next;
 	}
 }

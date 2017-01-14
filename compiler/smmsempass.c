@@ -226,37 +226,52 @@ static void processLocalSymbols(PSmmAstDeclNode decl, PSmmMsgs msgs, PIbsAllocat
 	}
 }
 
+static void processBlock(PSmmAstBlockNode block, PSmmMsgs msgs, PIbsAllocator a);
+static void processStatement(PSmmAstNode* stmtField, PSmmMsgs msgs, PIbsAllocator a);
+
+static void processIfWhile(PSmmAstIfWhileNode stmt, PSmmMsgs msgs, PIbsAllocator a) {
+	processExpression(&stmt->cond, &builtInTypes[tiSmmBool], false, msgs, a);
+	processStatement(&stmt->body, msgs, a);
+	if (stmt->elseBody) {
+		processStatement(&stmt->elseBody, msgs, a);
+	}
+}
+
+static void processStatement(PSmmAstNode* stmtField, PSmmMsgs msgs, PIbsAllocator a) {
+	PSmmAstNode stmt = *stmtField;
+	switch (stmt->kind) {
+	case nkSmmBlock:
+		{
+			PSmmAstBlockNode newBlock = (PSmmAstBlockNode)stmt;
+			processLocalSymbols(newBlock->scope->decls, msgs, a);
+			processBlock(newBlock, msgs, a);
+			break;
+		}
+	case nkSmmAssignment:
+		assert(stmt->type == stmt->left->type);
+		processExpression(&stmt->right, stmt->type, false, msgs, a);
+		break;
+	case nkSmmIf: case nkSmmWhile: processIfWhile((PSmmAstIfWhileNode)stmt, msgs, a); break;
+	case nkSmmDecl:
+		assert(stmt->left->kind == nkSmmAssignment);
+		assert(stmt->left->type == stmt->left->left->type);
+		processExpression(&stmt->left->right, stmt->left->type, false, msgs, a);
+		break;
+	case nkSmmReturn:
+		if (stmt->left) processExpression(&stmt->left, stmt->type, false, msgs, a);
+		break;
+	default:
+		// We treat softFloat as float32
+		if (stmt->type->kind == tiSmmSoftFloat64) stmt->type -= 2;
+		processExpression(stmtField, stmt->type, stmt->kind == nkSmmCast, msgs, a); break;
+	}
+}
+
 static void processBlock(PSmmAstBlockNode block, PSmmMsgs msgs, PIbsAllocator a) {
 	PSmmAstNode* stmtField = &block->stmts;
-	PSmmAstNode stmt = block->stmts;
-	while (stmt) {
-		switch (stmt->kind) {
-		case nkSmmBlock:
-			{
-				PSmmAstBlockNode newBlock = (PSmmAstBlockNode)stmt;
-				processLocalSymbols(newBlock->scope->decls, msgs, a);
-				processBlock(newBlock, msgs, a);
-				break;
-			}
-		case nkSmmAssignment:
-			assert(stmt->type == stmt->left->type);
-			processExpression(&stmt->right, stmt->type, false, msgs, a);
-			break;
-		case nkSmmDecl:
-			assert(stmt->left->kind == nkSmmAssignment);
-			assert(stmt->left->type == stmt->left->left->type);
-			processExpression(&stmt->left->right, stmt->left->type, false, msgs, a);
-			break;
-		case nkSmmReturn:
-			if (stmt->left) processExpression(&stmt->left, stmt->type, false, msgs, a);
-			break;
-		default:
-			// We treat softFloat as float32
-			if (stmt->type->kind == tiSmmSoftFloat64) stmt->type -= 2;
-			processExpression(stmtField, stmt->type, stmt->kind == nkSmmCast, msgs, a); break;
-		}
-		stmtField = &stmt->next;
-		stmt = stmt->next;
+	while (*stmtField) {
+		processStatement(stmtField, msgs, a);
+		stmtField = &(*stmtField)->next;
 	}
 }
 

@@ -48,22 +48,21 @@ int main(int argc, char* argv[]) {
 	PSmmAstNode module = loadModule("test.smm", &msgs, a);
 	if (pp[0]) {
 		smmExecuteGVPass(module, stdout);
+		return EXIT_SUCCESS;
 	}
 	smmExecuteTypeInferencePass(module, &msgs, a);
 	if (pp[1]) {
 		smmExecuteGVPass(module, stdout);
+		return EXIT_SUCCESS;
 	}
 
 	smmExecuteSemPass(module, &msgs, a);
 	if (pp[2]) {
 		smmExecuteGVPass(module, stdout);
-	}
-
-	if (!pp[0] && !pp[1] && !pp[2]) {
-		smmFlushMessages(&msgs);
-	} else {
 		return EXIT_SUCCESS;
 	}
+
+	smmFlushMessages(&msgs);
 
 	if (smmHadErrors(&msgs)) {
 		return EXIT_FAILURE;

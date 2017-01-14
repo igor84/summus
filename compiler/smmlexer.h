@@ -31,6 +31,7 @@ typedef enum {
 	tkSmmInt, tkSmmUInt, tkSmmFloat, tkSmmBool,
 	tkSmmChar, tkSmmString,
 	tkSmmRArrow, tkSmmReturn,
+	tkSmmIf, tkSmmThen, tkSmmElse, tkSmmWhile, tkSmmDo,
 	tkSmmEof
 } SmmTokenKind;
 

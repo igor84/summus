@@ -2,6 +2,8 @@
 
 #include <assert.h>
 
+#define STMT_COLOR "palegreen"
+
 static uint32_t id(void* n) {
 	return ((uintptr_t)n) & 0xffff;
 }
@@ -51,7 +53,7 @@ static void processExpression(void* parent, PSmmAstNode expr, const char* pcompa
 			char buf[100] = { 0 };
 			sprintf(buf, "%s: %s", nodeKindToString[expr->kind], typeName(expr->type));
 			if (pcompass[0] == 's' && pcompass[1] == 0) {
-				printColorNodeConn(parent, expr, buf, "palegreen", pcompass, f);
+				printColorNodeConn(parent, expr, buf, STMT_COLOR, pcompass, f);
 			} else {
 				printNodeConn(parent, expr, buf, pcompass, f);
 			}
@@ -63,7 +65,7 @@ static void processExpression(void* parent, PSmmAstNode expr, const char* pcompa
 			char buf[100] = { 0 };
 			sprintf(buf, "call %s: %s", expr->token->repr, typeName(expr->type));
 			if (pcompass[0] == 's' && pcompass[1] == 0) {
-				printColorNodeConn(parent, expr, buf, "palegreen", pcompass, f);
+				printColorNodeConn(parent, expr, buf, STMT_COLOR, pcompass, f);
 			} else {
 				printNodeConn(parent, expr, buf, pcompass, f);
 			}
@@ -85,7 +87,7 @@ static void processExpression(void* parent, PSmmAstNode expr, const char* pcompa
 			char buf[100] = { 0 };
 			sprintf(buf, "%s: %s", expr->token->repr, typeName(expr->type));
 			if (pcompass[0] == 's' && pcompass[1] == 0) {
-				printColorNodeConn(parent, expr, buf, "palegreen", pcompass, f);
+				printColorNodeConn(parent, expr, buf, STMT_COLOR, pcompass, f);
 			} else {
 				printNodeConn(parent, expr, buf, pcompass, f);
 			}
@@ -103,7 +105,7 @@ static void processAssignment(void* parent, PSmmAstNode stmt, const char* dir, F
 	if (((PSmmAstNode)parent)->kind == nkSmmDecl) {
 		printNodeConn(parent, stmt, buf, dir, f);
 	} else {
-		printColorNodeConn(parent, stmt, buf, "palegreen", dir, f);
+		printColorNodeConn(parent, stmt, buf, STMT_COLOR, dir, f);
 	}
 	sprintf(buf, "%s: %s", stmt->left->token->repr, typeName(stmt->left->type));
 	printNodeConn(stmt, stmt->left, buf, "sw", f);
@@ -132,8 +134,54 @@ static void processLocalSymbols(PSmmAstScopeNode scope, FILE* f) {
 static void processReturn(void* parent, PSmmAstNode stmt, const char* dir, FILE* f) {
 	char buf[100] = { 0 };
 	sprintf(buf, "return: %s", typeName(stmt->type));
-	printColorNodeConn(parent, stmt, buf, "palegreen", dir, f);
+	printColorNodeConn(parent, stmt, buf, STMT_COLOR, dir, f);
 	if (stmt->left)	processExpression(stmt, stmt->left, "sw", f);
+}
+
+static void processBlock(PSmmAstBlockNode block, FILE* f);
+
+static PSmmAstNode processStatement(PSmmAstNode prevStmt, PSmmAstNode stmt, const char* dir, FILE* f) {
+	switch (stmt->kind) {
+	case nkSmmBlock:
+		{
+			printColorNodeConn(prevStmt, stmt, "block", STMT_COLOR, dir, f);
+			PSmmAstBlockNode newBlock = (PSmmAstBlockNode)stmt;
+			printNodeConn(newBlock, newBlock->scope, "scope", "sw", f);
+			processLocalSymbols(newBlock->scope, f);
+			processBlock(newBlock, f);
+			return stmt;
+		}
+	case nkSmmAssignment:
+		processAssignment(prevStmt, stmt, dir, f);
+		return stmt;
+	case nkSmmReturn:
+		processReturn(prevStmt, stmt, dir, f);
+		return stmt;
+	case nkSmmIf:
+		printColorNodeConn(prevStmt, stmt, "if", STMT_COLOR, "sw", f);
+		processExpression(stmt, stmt->asIfWhile.cond, "w", f);
+		processStatement(stmt, stmt->asIfWhile.body, "sw", f);
+		if (stmt->asIfWhile.elseBody) {
+			processStatement(stmt, stmt->asIfWhile.elseBody, "se", f);
+		}
+		return stmt;
+	case nkSmmWhile:
+		printColorNodeConn(prevStmt, stmt, "while", STMT_COLOR, "sw", f);
+		processExpression(stmt, stmt->asIfWhile.cond, "sw", f);
+		processStatement(stmt, stmt->asIfWhile.body, "se", f);
+		return stmt;
+	case nkSmmDecl:
+		if (stmt->left->left->isConst) {
+			assert(false && "Const declaration should not appear as statements");
+		} else {
+			// Var declarations should appear as statements because initial value needs to be assigned
+			processAssignment(prevStmt, stmt->left, dir, f);
+		}
+		return stmt->left;
+	default:
+		processExpression(prevStmt, stmt, dir, f);
+		return stmt;
+	}
 }
 
 static void processBlock(PSmmAstBlockNode block, FILE* f) {
@@ -142,39 +190,7 @@ static void processBlock(PSmmAstBlockNode block, FILE* f) {
 	while (stmt) {
 		const char* dir = "s";
 		if (stmt == block->stmts) dir = "se";
-		switch (stmt->kind) {
-		case nkSmmBlock:
-			{
-				printColorNodeConn(prevStmt, stmt, "block", "palegreen", "s", f);
-				PSmmAstBlockNode newBlock = (PSmmAstBlockNode)stmt;
-				printNodeConn(newBlock, newBlock->scope, "scope", "sw", f);
-				processLocalSymbols(newBlock->scope, f);
-				processBlock(newBlock, f);
-				prevStmt = stmt;
-				break;
-			}
-		case nkSmmAssignment:
-			processAssignment(prevStmt, stmt, dir, f);
-			prevStmt = stmt;
-			break;
-		case nkSmmReturn:
-			processReturn(prevStmt, stmt, dir, f);
-			prevStmt = stmt;
-			break;
-		case nkSmmDecl:
-			if (stmt->left->left->isConst) {
-				assert(false && "Const declaration should not appear as statements");
-			} else {
-				// Var declarations should appear as statements because initial value needs to be assigned
-				processAssignment(prevStmt, stmt->left, dir, f);
-			}
-			prevStmt = stmt->left;
-			break;
-		default:
-			processExpression(prevStmt, stmt, dir, f);
-			prevStmt = stmt;
-			break;
-		}
+		prevStmt = processStatement(prevStmt, stmt, dir, f);
 		stmt = stmt->next;
 	}
 }
@@ -198,7 +214,7 @@ static void processGlobalSymbols(PSmmAstScopeNode scope, FILE* f) {
 				curParam = curParam->next;
 			}
 			if (funcNode->body) {
-				printColorNodeConn(funcNode, funcNode->body, "funcBody", "palegreen", "s", f);
+				printColorNodeConn(funcNode, funcNode->body, "funcBody", STMT_COLOR, "s", f);
 				printNodeConn(funcNode->body, funcNode->body->scope, "scope", "sw", f);
 				processLocalSymbols(funcNode->body->scope, f);
 				processBlock(funcNode->body, f);
@@ -221,7 +237,7 @@ void smmExecuteGVPass(PSmmAstNode module, FILE* f) {
 	fprintf(f, "digraph \"%s\" {\n  node [ style = filled ]\n", moduleName);
 	printNode(module, moduleName, "mediumaquamarine", f);
 	PSmmAstBlockNode globalBlock = (PSmmAstBlockNode)module->next;
-	printColorNodeConn(module, globalBlock, "globalBlock", "palegreen", "s", f);
+	printColorNodeConn(module, globalBlock, "globalBlock", STMT_COLOR, "s", f);
 	assert(globalBlock->kind == nkSmmBlock);
 	printNodeConn(globalBlock, globalBlock->scope, "globalScope", "sw", f);
 	processGlobalSymbols(globalBlock->scope, f);

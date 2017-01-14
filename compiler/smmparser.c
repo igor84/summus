@@ -22,6 +22,7 @@ const char* nodeKindToString[] = {
 	"cast", "param", "call", "return",
 	"and", "xor" , "or",
 	"==", "!=", ">", ">=", "<", "<=", "not",
+	"if", "while",
 };
 
 struct SmmTypeInfo builtInTypes[] = {
@@ -787,6 +788,29 @@ static PSmmAstNode parseExpressionStmt(PSmmParser parser) {
 	return lval;
 }
 
+static PSmmAstNode parseIfWhileStmt(PSmmParser parser) {
+	PSmmToken iftoken = parser->curToken;
+	SmmAstNodeKind kind = nkSmmIf;
+	int condTerm = tkSmmThen;
+	if (iftoken->kind == tkSmmWhile) {
+		kind = nkSmmWhile;
+		condTerm = tkSmmDo;
+	}
+	getNextToken(parser);
+	PSmmAstNode cond = parseExpression(parser);
+	expect(parser, condTerm);
+	PSmmAstNode body = parseStatement(parser);
+	PSmmAstIfWhileNode ifstmt = smmNewAstNode(nkSmmIf, parser->a);
+	ifstmt->body = body;
+	ifstmt->cond = cond;
+	ifstmt->token = iftoken;
+	if (parser->curToken->kind == tkSmmElse) {
+		getNextToken(parser);
+		ifstmt->elseBody = parseStatement(parser);
+	}
+	return (PSmmAstNode)ifstmt;
+}
+
 static PSmmAstNode parseStatement(PSmmParser parser) {
 	switch (parser->curToken->kind) {
 	case tkSmmReturn:
@@ -796,6 +820,7 @@ static PSmmAstNode parseStatement(PSmmParser parser) {
 	case tkSmmIdent: case '(': case '-': case '+': case tkSmmNot:
 	case tkSmmInt: case tkSmmFloat: case tkSmmBool:
 		return parseExpressionStmt(parser);
+	case tkSmmIf: case tkSmmWhile: return parseIfWhileStmt(parser);
 	case tkSmmErr:
 		if (findToken(parser, ';')) getNextToken(parser);
 		return NULL;

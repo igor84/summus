@@ -13,6 +13,8 @@ struct TIData {
 typedef struct TIData* PTIData;
 
 static PSmmTypeInfo processExpression(PSmmAstNode expr, PTIData tidata, PIbsAllocator a);
+static bool processStatement(PSmmAstNode stmt, PTIData tidata, PIbsAllocator a);
+static void processBlock(PSmmAstBlockNode block, PTIData tidata, PIbsAllocator a);
 
 static PSmmToken newToken(int kind, const char* repr, struct SmmFilePos filePos, PIbsAllocator a) {
 	PSmmToken res = ibsAlloc(a, sizeof(struct SmmToken));
@@ -183,8 +185,7 @@ static void fixDivModOperandTypes(PSmmAstNode expr, PIbsAllocator a) {
 
 	if (!goodField) {
 		// Neither operand is int so we cast both to int32
-		PSmmAstNode cast = ibsAlloc(a, sizeof(union SmmAstNode));
-		cast->kind = nkSmmCast;
+		PSmmAstNode cast = smmNewAstNode(nkSmmCast, a);
 		cast->type = &builtInTypes[tiSmmInt32];
 		cast->token = newToken(tkSmmIdent, cast->type->name, expr->left->token->filePos, a);
 		cast->left = expr->left;
@@ -535,7 +536,7 @@ static bool processAssignment(PSmmAstNode stmt, PTIData tidata, PIbsAllocator a)
 	return true;
 }
 
-static PSmmTypeInfo processReturn(PSmmAstNode stmt, PTIData tidata, PIbsAllocator a) {
+static void processReturn(PSmmAstNode stmt, PTIData tidata, PIbsAllocator a) {
 	assert(stmt && stmt->type);
 	PSmmTypeInfo retType = stmt->type;
 	if (stmt->left) {
@@ -552,57 +553,65 @@ static PSmmTypeInfo processReturn(PSmmAstNode stmt, PTIData tidata, PIbsAllocato
 			if (ltype == &builtInTypes[tiSmmSoftFloat64]) ltype = &builtInTypes[tiSmmFloat32];
 			smmPostMessage(tidata->msgs, errSmmBadReturnStmtType, stmt->token->filePos, ltype->name, retType->name);
 		}
-		return exprType;
+		return;
 	}
 
 	if (retType->kind != tiSmmVoid && retType->kind != tiSmmUnknown) {
 		smmPostMessage(tidata->msgs, errSmmFuncMustReturnValue, stmt->token->filePos);
 	}
+}
 
-	return retType;
+static bool processStatement(PSmmAstNode stmt, PTIData tidata, PIbsAllocator a) {
+	switch (stmt->kind) {
+	case nkSmmBlock:
+		{
+			PSmmAstBlockNode newBlock = (PSmmAstBlockNode)stmt;
+			processLocalSymbols(newBlock->scope->decls, tidata, a);
+			processBlock(newBlock, tidata, a);
+			break;
+		}
+	case nkSmmAssignment: return processAssignment(stmt, tidata, a);
+	case nkSmmReturn: processReturn(stmt, tidata, a); break;
+	case nkSmmIf: case nkSmmWhile:
+		processExpression(stmt->asIfWhile.cond, tidata, a);
+		processStatement(stmt->asIfWhile.body, tidata, a);
+		if (stmt->asIfWhile.elseBody) {
+			processStatement(stmt->asIfWhile.elseBody, tidata, a);
+		}
+		break;
+	case nkSmmDecl:
+		{
+			PSmmAstNode assignment = stmt->left;
+			PSmmAstIdentNode ident = &assignment->left->asIdent;
+			if (!stmt->asDecl.isProcessed) {
+				processExpression(assignment->right, tidata, a);
+				stmt->asDecl.isProcessed = true;
+			} else {
+				assert(false && "This should not happen");
+			}
+			if (!ident->type) {
+				ident->type = deduceTypeFrom(assignment->right);
+				assignment->type = ident->type;
+			} else {
+				// Type was explicitly given in source code
+			}
+			ibsDictPush(tidata->idents, ident->token->repr, stmt);
+			break;
+		}
+	default:
+		processExpression(stmt, tidata, a); break;
+	}
+
+	return true;
 }
 
 static void processBlock(PSmmAstBlockNode block, PTIData tidata, PIbsAllocator a) {
 	PSmmAstNode* stmtField = &block->stmts;
 	while (*stmtField) {
 		PSmmAstNode stmt = *stmtField;
-		switch (stmt->kind) {
-		case nkSmmBlock:
-			{
-				PSmmAstBlockNode newBlock = (PSmmAstBlockNode)stmt;
-				processLocalSymbols(newBlock->scope->decls, tidata, a);
-				processBlock(newBlock, tidata, a);
-				break;
-			}
-		case nkSmmAssignment:
-			if (!processAssignment(stmt, tidata, a)) {
-				// If false is returned it means this statement is not needed
-				*stmtField = stmt->next;
-				continue;
-			}
-			break;
-		case nkSmmReturn: processReturn(stmt, tidata, a); break;
-		case nkSmmDecl:
-			{
-				PSmmAstNode assignment = stmt->left;
-				PSmmAstIdentNode ident = &assignment->left->asIdent;
-				if (!stmt->asDecl.isProcessed) {
-					processExpression(assignment->right, tidata, a);
-					stmt->asDecl.isProcessed = true;
-				} else {
-					assert(false && "This should not happen");
-				}
-				if (!ident->type) {
-					ident->type = deduceTypeFrom(assignment->right);
-					assignment->type = ident->type;
-				} else {
-					// Type was explicitly given in source code
-				}
-				ibsDictPush(tidata->idents, ident->token->repr, stmt);
-				break;
-			}
-		default:
-			processExpression(stmt, tidata, a); break;
+		if (!processStatement(stmt, tidata, a)) {
+			// This means the statement should be discarded
+			*stmtField = stmt->next;
 		}
 		stmtField = &stmt->next;
 	}

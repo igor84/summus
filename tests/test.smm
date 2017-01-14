@@ -27,6 +27,11 @@ tconst :: 256;
 	r = r + bla(2,3);
 	putchar(65);
 	putchar(10);
+
+	if y then {
+		y = z;
+		z = y;
+	}
 	
 	a := y > z and z;
 	b := f64 < f32 or f32 > x;
@@ -36,7 +41,9 @@ tconst :: 256;
 	f := false;
 	g := false;
 	h := true;
-	res := uint((a or b) and not (c or d) xor (e or f or g and h));
+	res := 0;
+	if (a or b) and not (c or d) xor (e or f or g and h) then res = 1;
+	else res = 2;
 	
 	return int(res);
 }
