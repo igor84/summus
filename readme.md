@@ -112,6 +112,8 @@ This is where I stopped and left the rest of the work for the reader. The next s
 ## Further things that can be done
 - Add support for `for` statement
 - Add bitwise operators
+- Add support for pointers
+- Add support for structs
 - Add support for arrays (they are most flexible if in native code they are written as struct which contains length and pointer to first element)
 - Add support for strings (lexer can already read them but parser and further passes don't know how to handle them)
 - Add some string and array operators like `[start:end]` for slicing and `~` for contcatenating
