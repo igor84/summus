@@ -5,8 +5,8 @@
  *
  * One implementation of allocator given here is Simple Allocator. It doesn't support
  * free so it only needs to save where is the next free location in memory for next
- * allocation. Only the entire allocator can be freed or it be reset if we just want
- * to reuse it from scratch.
+ * allocation. Only the entire allocator can be freed or it can be reset if we just
+ * want to reuse it from scratch.
  * This seems useful because we need a lot of small allocations for the entire
  * duration of the program and malloc is known to be slow for such use case. We also
  * get the benefit of quickly zeroing all that memory at once.

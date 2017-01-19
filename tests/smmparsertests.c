@@ -85,7 +85,7 @@ static void TestSample(CuTest *tc) {
 	smmExecuteTypeInferencePass(module, &msgs, a);
 	FILE* f = fopen(outFileName, "rb");
 	if (!f) {
-		f = fopen(outFileName, "ab");
+		f = fopen(outFileName, "wb");
 		if (!f) {
 			printf("Can't open %s for writing!\n", outFileName);
 			exit(EXIT_FAILURE);

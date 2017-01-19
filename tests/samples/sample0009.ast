@@ -74,7 +74,7 @@ blockFlags:0
     : ui32:1:uint32
     : result:1:int32
     : z:1:uint8
-    : x:3:int64 = -:6:int64 -:6:int64 int:2:2:int8 sdiv:6:int64 *:6:int64 int:2:4:int8 int:2:0x817972143abcdef:int64 int:2:12312:int16 int:2:3:int8 
+    : x:3:int64 = -:6:int64 -:6:int64 int:2:2:int64 sdiv:6:int64 *:6:int64 int:2:4:int64 int:2:0x817972143abcdef:int64 int:2:12312:int64 int:2:3:int64 
     : y:1:int64
     : f64:1:float64
     : f32:1:float32

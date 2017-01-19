@@ -5,6 +5,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+static void processStatement(PSmmAstNode* stmt, PSmmLexer lex, PIbsAllocator a);
+static void processBlock(PSmmAstBlockNode block, PSmmLexer lex, PIbsAllocator a);
+
 static PSmmToken lastToken;
 static PIbsDict typeDict;
 
@@ -229,6 +232,41 @@ static void processReturn(PSmmAstNode stmt, PSmmLexer lex, PIbsAllocator a) {
 	}
 }
 
+static void processStatement(PSmmAstNode* stmt, PSmmLexer lex, PIbsAllocator a) {
+	switch (lastToken->kind) {
+	case '{':
+		{
+			PSmmAstBlockNode newBlock = smmNewAstNode(nkSmmBlock, a);
+			*stmt = (PSmmAstNode)newBlock;
+			newBlock->scope = smmNewAstNode(nkSmmScope, a);
+			lastToken = smmGetNextToken(lex);
+			processLocalSymbols(newBlock->scope, lex, a);
+			processBlock(newBlock, lex, a);
+			lastToken = smmGetNextToken(lex);
+			break;
+		}
+	case '=':
+		*stmt = smmNewAstNode(nkSmmAssignment, a);
+		processAssignment(*stmt, lex, a);
+		break;
+	case ':':
+		*stmt = smmNewAstNode(nkSmmDecl, a);
+		(*stmt)->token = lastToken;
+		(*stmt)->left = smmNewAstNode(nkSmmAssignment, a);
+		lastToken = smmGetNextToken(lex);
+		processAssignment((*stmt)->left, lex, a);
+		break;
+	case tkSmmReturn:
+		*stmt = smmNewAstNode(nkSmmBlock, a);
+		processReturn(*stmt, lex, a);
+		break;
+	default:
+		processExpression(stmt, lex, a);
+		lastToken = smmGetNextToken(lex);
+		break;
+	}
+}
+
 static void processBlock(PSmmAstBlockNode block, PSmmLexer lex, PIbsAllocator a) {
 	PSmmAstNode* stmt = &block->stmts;
 	assert(lastToken->kind == tkSmmIdent && lastToken->repr[0] == 'b');
@@ -237,38 +275,7 @@ static void processBlock(PSmmAstBlockNode block, PSmmLexer lex, PIbsAllocator a)
 	lastToken = smmGetNextToken(lex);
 	while (lastToken->kind != tkSmmEof && lastToken->kind != '}' &&
 			!(lastToken->kind == tkSmmIdent && strcmp(lastToken->repr, "ENDMODULE") == 0)) {
-		switch (lastToken->kind) {
-		case '{':
-			{
-				PSmmAstBlockNode newBlock = smmNewAstNode(nkSmmBlock, a);
-				*stmt = (PSmmAstNode)newBlock;
-				newBlock->scope = smmNewAstNode(nkSmmScope, a);
-				lastToken = smmGetNextToken(lex);
-				processLocalSymbols(newBlock->scope, lex, a);
-				processBlock(newBlock, lex, a);
-				lastToken = smmGetNextToken(lex);
-				break;
-			}
-		case '=': 
-			*stmt = smmNewAstNode(nkSmmAssignment, a);
-			processAssignment(*stmt, lex, a);
-			break;
-		case ':':
-			*stmt = smmNewAstNode(nkSmmDecl, a);
-			(*stmt)->token = lastToken;
-			(*stmt)->left = smmNewAstNode(nkSmmAssignment, a);
-			lastToken = smmGetNextToken(lex);
-			processAssignment((*stmt)->left, lex, a);
-			break;
-		case tkSmmReturn:
-			*stmt = smmNewAstNode(nkSmmBlock, a);
-			processReturn(*stmt, lex, a);
-			break;
-		default:
-			processExpression(stmt, lex, a);
-			lastToken = smmGetNextToken(lex);
-			break;
-		}
+		processStatement(stmt, lex, a);
 		stmt = &(*stmt)->next;
 	}
 }

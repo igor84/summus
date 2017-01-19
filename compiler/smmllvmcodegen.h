@@ -5,6 +5,8 @@
 #include "ibsallocator.h"
 #include "smmparser.h"
 
-void smmExecuteLLVMCodeGenPass(PSmmAstNode module, PIbsAllocator a);
+#include <stdio.h>
+
+bool smmExecuteLLVMCodeGenPass(PSmmAstNode module, FILE* out, PIbsAllocator a);
 
 #endif

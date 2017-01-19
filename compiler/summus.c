@@ -20,7 +20,7 @@ static PSmmAstNode loadModule(const char* filename, PSmmMsgs msgs, PIbsAllocator
 	char filebuf[64 * 1024] = { 0 };
 	FILE* f = fopen(filename, "rb");
 	if (!f) {
-		printf("Can't find %s in the current folder!\n", filename);
+		printf("Can't find %s !\n", filename);
 		exit(EXIT_FAILURE);
 	}
 	fread(filebuf, 1, 64 * 1024, f);
@@ -35,30 +35,56 @@ static PSmmAstNode loadModule(const char* filename, PSmmMsgs msgs, PIbsAllocator
 
 int main(int argc, char* argv[]) {
 	bool pp[3] = { false };
+	const char* inFile = NULL;
+	const char* outFile = NULL;
 	for (int i = 1; i < argc; i++) {
 		if (strcmp("-pp1", argv[i]) == 0) pp[0] = true;
 		else if (strcmp("-pp2", argv[i]) == 0) pp[1] = true;
 		else if (strcmp("-pp3", argv[i]) == 0) pp[2] = true;
+		else if (strcmp("-o", argv[i]) == 0) {
+			i++;
+			if (i < argc) outFile = argv[i];
+		} else if (argv[i][0] == '-') {
+			printf("ERROR: Got unknown parameter %s\n", argv[i]);
+			return EXIT_FAILURE;
+		} else if (!inFile) {
+			inFile = argv[i];
+		} else {
+			printf("ERROR: Got extra parameter %s\n", argv[i]);
+		}
 	}
-	PIbsAllocator a = ibsSimpleAllocatorCreate("test", 1024 * 1024);
+	if (inFile == NULL) {
+		printf("ERROR: File to compile not given\n");
+		return EXIT_FAILURE;
+	}
+	PIbsAllocator a = ibsSimpleAllocatorCreate("main", 1024 * 1024);
 	
 	struct SmmMsgs msgs = { 0 };
 	msgs.a = a;
 
-	PSmmAstNode module = loadModule("test.smm", &msgs, a);
+	PSmmAstNode module = loadModule(inFile, &msgs, a);
+
+	FILE* out = stdout;
+	if (outFile) {
+		out = fopen(outFile, "wb");
+		if (!out) {
+			printf("ERROR: Failed to open %s for writing!\n", outFile);
+		}
+	}
+
 	if (pp[0]) {
-		smmExecuteGVPass(module, stdout);
+		smmExecuteGVPass(module, out);
 		return EXIT_SUCCESS;
 	}
 	smmExecuteTypeInferencePass(module, &msgs, a);
 	if (pp[1]) {
-		smmExecuteGVPass(module, stdout);
+		smmExecuteGVPass(module, out);
 		return EXIT_SUCCESS;
 	}
 
 	smmExecuteSemPass(module, &msgs, a);
 	if (pp[2]) {
-		smmExecuteGVPass(module, stdout);
+		smmExecuteGVPass(module, out);
 		return EXIT_SUCCESS;
 	}
 
@@ -68,7 +94,11 @@ int main(int argc, char* argv[]) {
 		return EXIT_FAILURE;
 	}
 
-	smmExecuteLLVMCodeGenPass(module, a);
+	if (smmExecuteLLVMCodeGenPass(module, out, a)) {
+		if (outFile) printf("\nModule saved to %s\n", outFile);
+		return EXIT_SUCCESS;
+	}
 
-	return EXIT_SUCCESS;
+	printf("\nERROR: Module compilation failed!\n");
+	return EXIT_FAILURE;
 }

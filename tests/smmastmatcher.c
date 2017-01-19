@@ -5,6 +5,9 @@ static const char* NODES_DONT_MATCH = "Node kinds don't match";
 static const char* NODES_TYPES_DONT_MATCH = "Node's types don't match";
 static const char* NODES_REPRS_DONT_MATCH = "Nodes representations don't match";
 
+static void processStatement(CuTest* tc, PSmmAstNode exStmt, PSmmAstNode gotStmt);
+static void processBlock(CuTest* tc, PSmmAstBlockNode exBlock, PSmmAstBlockNode gotBlock);
+
 static void assertNodeFlagsEqual(CuTest* tc, PSmmAstNode ex, PSmmAstNode got) {
 	CuAssertUIntEquals_Msg(tc, "Ident flag doesn't match", ex->isIdent, got->isIdent);
 	CuAssertUIntEquals_Msg(tc, "Const flag doesn't match", ex->isConst, got->isConst);
@@ -111,31 +114,35 @@ static void processReturn(CuTest* tc, PSmmAstNode exStmt, PSmmAstNode gotStmt) {
 	}
 }
 
+static void processStatement(CuTest* tc, PSmmAstNode exStmt, PSmmAstNode gotStmt) {
+	CuAssertPtrNotNullMsg(tc, "Got more statements than expected", exStmt);
+	assertNodesEqual(tc, exStmt, gotStmt);
+	switch (gotStmt->kind) {
+	case nkSmmBlock:
+		{
+			PSmmAstBlockNode newExBlock = (PSmmAstBlockNode)exStmt;
+			PSmmAstBlockNode newGotBlock = (PSmmAstBlockNode)gotStmt;
+			CuAssertIntEquals_Msg(tc, NODES_DONT_MATCH, newExBlock->scope->kind, newGotBlock->scope->kind);
+			processLocalSymbols(tc, newExBlock->scope->decls, newGotBlock->scope->decls);
+			processBlock(tc, newExBlock, newGotBlock);
+			break;
+		}
+	case nkSmmAssignment: processAssignment(tc, exStmt, gotStmt); break;
+	case nkSmmDecl:
+		assertNodesEqual(tc, exStmt->left, gotStmt->left);
+		processAssignment(tc, exStmt->left, gotStmt->left);
+		break;
+	case nkSmmReturn: processReturn(tc, exStmt, gotStmt); break;
+	default:
+		processExpression(tc, exStmt, gotStmt); break;
+	}
+}
+
 static void processBlock(CuTest* tc, PSmmAstBlockNode exBlock, PSmmAstBlockNode gotBlock) {
 	PSmmAstNode exStmt = exBlock->stmts;
 	PSmmAstNode gotStmt = gotBlock->stmts;
 	while (gotStmt) {
-		CuAssertPtrNotNullMsg(tc, "Got more statements than expected", exStmt);
-		assertNodesEqual(tc, exStmt, gotStmt);
-		switch (gotStmt->kind) {
-		case nkSmmBlock:
-			{
-				PSmmAstBlockNode newExBlock = (PSmmAstBlockNode)exStmt;
-				PSmmAstBlockNode newGotBlock = (PSmmAstBlockNode)gotStmt;
-				CuAssertIntEquals_Msg(tc, NODES_DONT_MATCH, newExBlock->scope->kind, newGotBlock->scope->kind);
-				processLocalSymbols(tc, newExBlock->scope->decls, newGotBlock->scope->decls);
-				processBlock(tc, newExBlock, newGotBlock);
-				break;
-			}
-		case nkSmmAssignment: processAssignment(tc, exStmt, gotStmt); break;
-		case nkSmmDecl: 
-			assertNodesEqual(tc, exStmt->left, gotStmt->left);
-			processAssignment(tc, exStmt->left, gotStmt->left);
-			break;
-		case nkSmmReturn: processReturn(tc, exStmt, gotStmt); break;
-		default:
-			processExpression(tc, exStmt, gotStmt); break;
-		}
+		processStatement(tc, exStmt, gotStmt);
 		exStmt = exStmt->next;
 		gotStmt = gotStmt->next;
 	}

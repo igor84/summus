@@ -5,6 +5,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+static void processStatement(PSmmAstNode stmt, int level, FILE* f, PIbsAllocator a);
+static void processBlock(PSmmAstBlockNode block, int level, FILE* f, PIbsAllocator a);
+
 static uint32_t getFlags(PSmmAstNode node) {
 	// We must do it this way instead of having a union with uint32 field
 	// because bit positions are compiler dependent
@@ -106,37 +109,41 @@ static void processReturn(PSmmAstNode stmt, FILE* f, PIbsAllocator a) {
 	fputs("\n", f);
 }
 
+static void processStatement(PSmmAstNode stmt, int level, FILE* f, PIbsAllocator a) {
+	if (level) fprintf(f, "%*s", level, " ");
+	switch (stmt->kind) {
+	case nkSmmBlock:
+		{
+			PSmmAstBlockNode newBlock = (PSmmAstBlockNode)stmt;
+			fputs("{\n", f);
+			processLocalSymbols(newBlock->scope->decls, level + 4, f, a);
+			processBlock(newBlock, level + 4, f, a);
+			fputs("}\n", f);
+			break;
+		}
+	case nkSmmAssignment: processAssignment(stmt, f, a); break;
+	case nkSmmReturn: processReturn(stmt, f, a); break;
+	case nkSmmDecl:
+		{
+			assert(!stmt->left->left->isConst);
+			assert(stmt->left->kind == nkSmmAssignment);
+			fputs(": ", f);
+			processAssignment(stmt->left, f, a);
+			break;
+		}
+	default:
+		processExpression(stmt, f, a);
+		fputs("\n", f);
+		break;
+	}
+}
+
 static void processBlock(PSmmAstBlockNode block, int level, FILE* f, PIbsAllocator a) {
 	PSmmAstNode stmt = block->stmts;
 	if (level) fprintf(f, "%*s", level, " ");
 	fprintf(f, "blockFlags:%u\n", getFlags((PSmmAstNode)block));
 	while (stmt) {
-		if (level) fprintf(f, "%*s", level, " ");
-		switch (stmt->kind) {
-		case nkSmmBlock:
-			{
-				PSmmAstBlockNode newBlock = (PSmmAstBlockNode)stmt;
-				fputs("{\n", f);
-				processLocalSymbols(newBlock->scope->decls, level + 4, f, a);
-				processBlock(newBlock, level + 4, f, a);
-				fputs("}\n", f);
-				break;
-			}
-		case nkSmmAssignment: processAssignment(stmt, f, a); break;
-		case nkSmmReturn: processReturn(stmt, f, a); break;
-		case nkSmmDecl:
-			{
-				assert(!stmt->left->left->isConst);
-				assert(stmt->left->kind == nkSmmAssignment);
-				fputs(": ", f);
-				processAssignment(stmt->left, f, a);
-				break;
-			}
-		default:
-			processExpression(stmt, f, a);
-			fputs("\n", f);
-			break;
-		}
+		processStatement(stmt, level, f, a);
 		stmt = stmt->next;
 	}
 }

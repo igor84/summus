@@ -474,7 +474,7 @@ static void processGlobalSymbols(PSmmLLVMCodeGenData data, PSmmAstDeclNode decl,
 	}
 }
 
-void smmExecuteLLVMCodeGenPass(PSmmAstNode module, PIbsAllocator a) {
+bool smmExecuteLLVMCodeGenPass(PSmmAstNode module, FILE* out, PIbsAllocator a) {
 	PIbsAllocator la = ibsSimpleAllocatorCreate("llvmTempAllocator", a->size);
 	PSmmLLVMCodeGenData data = ibsAlloc(la, sizeof(struct SmmLLVMCodeGenData));
 	data->localVars = ibsDictCreate(la);
@@ -498,15 +498,14 @@ void smmExecuteLLVMCodeGenPass(PSmmAstNode module, PIbsAllocator a) {
 	processBlock(data, globalBlock, la);
 
 	char *error = NULL;
-	LLVMVerifyModule(data->llvmModule, LLVMAbortProcessAction, &error);
+	bool isInvalid = LLVMVerifyModule(data->llvmModule, LLVMAbortProcessAction, &error);
 	LLVMDisposeMessage(error);
 
-	char* err = NULL;
-	LLVMPrintModuleToFile(data->llvmModule, "test.ll", &err);
-	if (err) {
-		printf("\nError Saving Module: %s\n", err);
-	} else {
-		printf("\nModule saved to test.ll\n");
+	if (!isInvalid) {
+		char* outData = LLVMPrintModuleToString(data->llvmModule);
+		fputs(outData, out);
+		LLVMDisposeMessage(outData);
 	}
 	ibsSimpleAllocatorFree(la);
+	return !isInvalid;
 }
