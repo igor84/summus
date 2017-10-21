@@ -18,7 +18,7 @@ entry:
   ret i32 %6
 }
 
-declare i32 @putchar_int32(i32)
+declare i32 @putchar(i32)
 
 define i32 @main() {
 entry:
@@ -74,8 +74,8 @@ entry:
   %21 = call i32 @bla_int16_int16(i16 2, i16 3)
   %22 = add i32 %20, %21
   store i32 %22, i32* %r, align 4
-  %23 = call i32 @putchar_int32(i32 65)
-  %24 = call i32 @putchar_int32(i32 10)
+  %23 = call i32 @putchar(i32 65)
+  %24 = call i32 @putchar(i32 10)
   %25 = load i64, i64* %y, align 8
   %26 = icmp ne i64 %25, 0
   br i1 %26, label %if.then, label %if.end

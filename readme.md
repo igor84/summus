@@ -9,7 +9,7 @@ Feel free to open issues if you feel any part of the code could be better docume
 # Requirements and compiling
 
 ## Windows
-- [Visual Studio 2015](https://www.visualstudio.com/products/free-developer-offers-vs) (Community Edition)
+- [Visual Studio 2017](https://www.visualstudio.com/vs/community/) (Community Edition)
 - [Clang](https://sourceforge.net/projects/clangonwin/files/MsvcBuild/3.9/) compiler for Windows (LLVM-3.9.0svn-r258602-win64.exe)
 
 If you install Clang to C:\\Program Files\\LLVM\\ the VS project should just work. Otherwise you will have to change project library path under linker options. Also in case you get a lot of linker errors try changing Runtime Library in project options, under C/C++ -> Code Generation, to /MD or /MT.
@@ -63,6 +63,11 @@ Here are some useful commands you can run on that output ll file:
 - `clang -x ir -o test.exe test.ll` to make native executable from ll file
 - `clang -c -x ir -o test.o test.ll` to make native object file from ll file
 - `llvm-objdump.exe -disassemble test.o` to get native disassembly of object file
+
+Also if you want to experiment and discover what kind of llvm code needs to be written for certain constructs in C and C++ you can write the code you want to compile in a test.cpp file and then run:
+- `clang -S -emit-llvm test.cpp -o test.ll` to compile any cpp code to llvm assembly
+- `llc -march=cpp test.ll -o llvmtest.cpp` to convert llvm assembly to cpp file of llvm API calls that generate that assembly
+For this you need llc built with cpp option which isn't always included in binary builds of LLVM so you may need to compile LLVM manually in order to get it.
 
 # Compiler structure
 
