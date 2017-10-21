@@ -67,6 +67,7 @@ Here are some useful commands you can run on that output ll file:
 Also if you want to experiment and discover what kind of llvm code needs to be written for certain constructs in C and C++ you can write the code you want to compile in a test.cpp file and then run:
 - `clang -S -emit-llvm test.cpp -o test.ll` to compile any cpp code to llvm assembly
 - `llc -march=cpp test.ll -o llvmtest.cpp` to convert llvm assembly to cpp file of llvm API calls that generate that assembly
+
 For this you need llc built with cpp option which isn't always included in binary builds of LLVM so you may need to compile LLVM manually in order to get it.
 
 # Compiler structure
