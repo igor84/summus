@@ -642,7 +642,7 @@ static PSmmAstDeclNode processGlobalSymbols(PSmmAstDeclNode decl, PTIData tidata
 				}
 				else {
 					// If function has no body we assume it is external C func and we don't mangle the name
-					funcNode->token->stringVal = funcNode->token->repr;
+					funcNode->token->stringVal = (char*)funcNode->token->repr;
 				}
 			} else {
 				*varDeclField = decl;

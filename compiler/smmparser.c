@@ -800,7 +800,7 @@ static PSmmAstNode parseIfWhileStmt(PSmmParser parser) {
 	PSmmAstNode cond = parseExpression(parser);
 	expect(parser, condTerm);
 	PSmmAstNode body = parseStatement(parser);
-	PSmmAstIfWhileNode ifstmt = smmNewAstNode(nkSmmIf, parser->a);
+	PSmmAstIfWhileNode ifstmt = smmNewAstNode(kind, parser->a);
 	ifstmt->body = body;
 	ifstmt->cond = cond;
 	ifstmt->token = iftoken;

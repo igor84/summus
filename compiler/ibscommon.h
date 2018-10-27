@@ -30,7 +30,7 @@
 //		4456 - declaration of 'identifier' hides previous local declaration
 //		4457 - declaration of 'identifier' hides function parameter
 //		4459 - declaration of 'identifier' hides global declaration
-//		4505 - 'function' : unreferenced local function has been removed 
+//		4505 - 'function' : unreferenced local function has been removed
 //		4592 - 'function': 'constexpr' call evaluation failed; function will be called at run-time
 //		4701 - potentially uninitialized local variable 'name' used
 //		4702 - unreachable code
@@ -45,5 +45,6 @@
 #else
 
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
+#pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
 
 #endif // if MSVC
